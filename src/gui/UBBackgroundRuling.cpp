@@ -1243,3 +1243,16 @@ const QList<UBBackgroundRuling::Linegroup>& UBBackgroundRuling::Rules::linegroup
 {
     return mLinegroups;
 }
+
+/**
+ * @brief Spacing of the first line group in millimetres, 0 if there is none.
+ */
+double UBBackgroundRuling::primarySpacing() const
+{
+    if (!mRules || mRules->linegroups().isEmpty())
+    {
+        return 0.;
+    }
+
+    return mRules->linegroups().at(0).spacing();
+}

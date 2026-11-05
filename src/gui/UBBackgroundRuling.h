@@ -54,6 +54,7 @@ public:
     bool isRuled() const;
     bool hasIntermediateLines() const;
     bool isUserProvided() const;
+    double primarySpacing() const;
 
     void draw(QPainter* painter, const QRectF& rect, double gridSize, const QRectF& nominalScene, bool onDark) const;
     QPointF snap(const QPointF& point, double gridSize, const QRectF& nominalScene, double* force = nullptr,

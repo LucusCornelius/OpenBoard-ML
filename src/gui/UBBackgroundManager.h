@@ -49,6 +49,13 @@ public:
     QPixmap createButtonPixmap(const UBBackgroundRuling& background, bool dark, bool on) const;
     QIcon createButtonIcon(const UBBackgroundRuling& background, bool dark) const;
     void savePreferredBackgrounds(QList<QUuid>& uuidList);
+    const QList<const UBBackgroundRuling*> preferredBackgrounds() const;
+    bool isPreferred(const QUuid& uuid) const;
+
+    static const QUuid blankBackground;
+    static const QUuid linedBackground;
+    static const QUuid grid1cmBackground;
+    static const QUuid grid5mmBackground;
 
 signals:
     void preferredBackgroundChanged();

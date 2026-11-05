@@ -32,12 +32,15 @@ class UBBackgroundPalette : public UBActionPalette
         void defaultBackgroundGridSize();
         void toggleBackgroundColor(bool checked);
         void changeBackground(bool checked);
+        void selectBackground(const QUuid& uuid);
 
     protected:
         virtual void updateLayout();
         void init();
         void createActions();
         void updateActions();
+        void updateGridSizeLabel();
+        void updateSliderRange();
 
     private:
         QVBoxLayout* mVLayout;
@@ -53,6 +56,7 @@ class UBBackgroundPalette : public UBActionPalette
 
         bool mIsDark{false};
         const UBBackgroundRuling* mBackground{nullptr};
+        QLabel* mSliderValueLabel{nullptr};
 };
 
 #endif // UBBACKGROUNDPALETTE_H

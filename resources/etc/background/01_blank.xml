@@ -1,7 +1,8 @@
 <bg:background xmlns:bg="http://openboard.org/template/background/">
     <bg:uuid>84836d5a-1846-4c91-9ff9-f2c4d118364d</bg:uuid>
-    <bg:description xml:lang="en">Empty</bg:description>
+    <bg:description xml:lang="en">Blank</bg:description>
     <bg:description xml:lang="de">Leer</bg:description>
+    <bg:description xml:lang="nl">Blanco</bg:description>
     <!-- add an invisible grid to enable snapping -->
     <bg:defaultColor>
         <bg:onDark>#00000000</bg:onDark>
