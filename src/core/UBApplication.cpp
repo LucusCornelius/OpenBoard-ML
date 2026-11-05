@@ -715,30 +715,53 @@ bool UBApplication::eventFilter(QObject *obj, QEvent *event)
                     || result;
     }
 
-    else if (event->type() == QEvent::MouseButtonPress)
+    else if (event->type() == QEvent::MouseButtonPress
+             || event->type() == QEvent::MouseButtonDblClick
+             || event->type() == QEvent::MouseButtonRelease)
     {
-        // intercept special mouse buttons for shortcut handler
+        // Intercept special mouse buttons for shortcut handler. As this is an application
+        // event filter, it sees the event before any widget (e.g. UBBoardView), so a
+        // mapped button never starts a stroke or a selection. Press, double click and
+        // release of a mapped button are all consumed, the action is triggered once.
+        // The right button is reserved for the configurable right click behaviour.
         QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
         Qt::MouseButton button = mouseEvent->button();
 
-        if (button != Qt::LeftButton && button != Qt::RightButton)
+        if (button != Qt::LeftButton && button != Qt::RightButton && button != Qt::NoButton)
         {
-            return mPreferencesController->handleMouseEvent(mouseEvent)
-                    || UBShortcutManager::shortcutManager()->handleMouseEvent(mouseEvent)
+            if (event->type() == QEvent::MouseButtonPress && mPreferencesController
+                    && mPreferencesController->handleMouseEvent(mouseEvent))
+            {
+                return true;
+            }
+
+            return UBShortcutManager::shortcutManager()->handleMouseEvent(mouseEvent)
+                    || result;
+        }
+        else if (button == Qt::RightButton)
+        {
+            // only consumes the mouse events the platform generates for a mapped tablet button
+            return UBShortcutManager::shortcutManager()->handleMouseEvent(mouseEvent)
                     || result;
         }
     }
 
-    else if (event->type() == QEvent::TabletPress)
+    else if (event->type() == QEvent::TabletPress || event->type() == QEvent::TabletRelease)
     {
-        // intercept special tablet buttons for shortcut handler
+        // intercept special tablet buttons (stylus barrel buttons) for shortcut handler,
+        // before UBBoardView::tabletEvent can start a stroke
         QTabletEvent *tabletEvent = static_cast<QTabletEvent *>(event);
         Qt::MouseButton button = tabletEvent->button();
 
-        if (button != Qt::LeftButton)
+        if (button != Qt::LeftButton && button != Qt::NoButton)
         {
-            return mPreferencesController->handleTabletEvent(tabletEvent)
-                    || UBShortcutManager::shortcutManager()->handleTabletEvent(tabletEvent)
+            if (event->type() == QEvent::TabletPress && mPreferencesController
+                    && mPreferencesController->handleTabletEvent(tabletEvent))
+            {
+                return true;
+            }
+
+            return UBShortcutManager::shortcutManager()->handleTabletEvent(tabletEvent)
                     || result;
         }
     }

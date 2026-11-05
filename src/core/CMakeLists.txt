@@ -37,4 +37,10 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBThemeManager.h
     UBWidgetInspector.cpp
     UBWidgetInspector.h
+    UBClickBehavior.cpp
+    UBClickBehavior.h
+    UBShortcutProfile.cpp
+    UBShortcutProfile.h
+    UBInputDevicePreferences.cpp
+    UBInputDevicePreferences.h
 )

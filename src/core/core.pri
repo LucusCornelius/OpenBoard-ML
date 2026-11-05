@@ -17,7 +17,10 @@ HEADERS      += src/core/UB.h \
                 src/core/UBDownloadThread.h \
                 src/core/UBTextTools.h \
                 src/core/UBWidgetInspector.h \
-    src/core/UBPersistenceWorker.h
+    src/core/UBPersistenceWorker.h \
+    src/core/UBClickBehavior.h \
+    src/core/UBShortcutProfile.h \
+    src/core/UBInputDevicePreferences.h
 
 SOURCES      += src/core/main.cpp \
                 src/core/UBShortcutManager.cpp \
@@ -37,4 +40,7 @@ SOURCES      += src/core/main.cpp \
                 src/core/UBDownloadThread.cpp \
                 src/core/UBTextTools.cpp \
                 src/core/UBWidgetInspector.cpp \
-    src/core/UBPersistenceWorker.cpp
+    src/core/UBPersistenceWorker.cpp \
+    src/core/UBClickBehavior.cpp \
+    src/core/UBShortcutProfile.cpp \
+    src/core/UBInputDevicePreferences.cpp

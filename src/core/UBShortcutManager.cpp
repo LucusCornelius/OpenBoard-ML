@@ -25,6 +25,7 @@
  */
 
 #include "UBShortcutManager.h"
+#include "core/UBClickBehavior.h"
 #include "core/UBSettings.h"
 #include "frameworks/UBPlatformUtils.h"
 #include "gui/UBMainWindow.h"
@@ -38,6 +39,18 @@ static const char* defaultShortcutProperty("defaultShortcut");
 static const char* descriptionProperty("description");
 static const char* mouseButtonProperty("mouseButton");
 static const char* tabletButtonProperty("tabletButton");
+static const char* primaryShortcutProperty("primaryShortcut");
+static const char* extraShortcutsProperty("extraShortcuts");
+
+// separator for multiple key sequences in settings, same as QKeySequence::listToString
+static const QString shortcutListSeparator("; ");
+
+// primary (user editable) shortcut of an action
+static QKeySequence primaryShortcut(const QAction* action)
+{
+    QVariant primary = action->property(primaryShortcutProperty);
+    return primary.isValid() ? QKeySequence(primary.toString()) : action->shortcut();
+}
 
 // helper function to flip keyboard modifier depending on Qt version
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -73,10 +86,13 @@ UBShortcutManager *UBShortcutManager::shortcutManager()
 
 void UBShortcutManager::addActions(const QString& group, const QList<QAction*> actions, QWidget *widget)
 {
+    // actions may be added at any time, so inform attached views
+    beginResetModel();
+
     // save default shortcuts for later
     for (QAction* action : actions)
     {
-        if (!action->isSeparator())
+        if (action && !action->isSeparator())
         {
             if (widget && !widget->actions().contains(action))
             {
@@ -86,32 +102,54 @@ void UBShortcutManager::addActions(const QString& group, const QList<QAction*> a
 
             QKeySequence shortcut = action->shortcut();
 
-            if (!shortcut.isEmpty())
+            if (!shortcut.isEmpty() && !action->property(defaultShortcutProperty).isValid())
             {
                 action->setProperty(defaultShortcutProperty, shortcut.toString());
             }
 
             action->setProperty(descriptionProperty, action->toolTip());
 
-            QStringList settings = UBSettings::settings()->value("Shortcut/" + action->objectName()).toStringList();
-
-            if (settings.size() == 3)
+            if (action->objectName().isEmpty())
             {
-                if (!settings[0].isEmpty())
+                if (!action->property("builtIn").toBool())
                 {
-                    action->setShortcut(settings[0]);
+                    qWarning() << "UBShortcutManager: action" << action->text() << "has no objectName, shortcut settings are not persisted";
                 }
+            }
+            else
+            {
+                QStringList settings = UBSettings::settings()->value("Shortcut/" + action->objectName()).toStringList();
 
-                if (int button = settings[1].toInt())
+                if (settings.size() == 3)
                 {
-                    action->setProperty(mouseButtonProperty, button);
-                    mMouseActions[static_cast<Qt::MouseButton>(button)] = action;
+                    // an empty key sequence means that the user removed the shortcut,
+                    // additional key sequences (e.g. from device profiles) are separated by "; "
+                    QStringList keys = settings[0].split(shortcutListSeparator);
+                    QKeySequence primary(keys.takeFirst());
+
+                    if (!keys.isEmpty())
+                    {
+                        action->setProperty(extraShortcutsProperty, keys);
+                    }
+
+                    applyShortcut(action, primary);
+
+                    if (int button = settings[1].toInt())
+                    {
+                        action->setProperty(mouseButtonProperty, button);
+                        mMouseActions[static_cast<Qt::MouseButton>(button)] = action;
+                    }
+
+                    if (int button = settings[2].toInt())
+                    {
+                        action->setProperty(tabletButtonProperty, button);
+                        mTabletActions[static_cast<Qt::MouseButton>(button)] = action;
+                    }
                 }
-
-                if (int button = settings[2].toInt())
+                else if (mIgnoreCtrl && !action->property("builtIn").toBool())
                 {
-                    action->setProperty(tabletButtonProperty, button);
-                    mTabletActions[static_cast<Qt::MouseButton>(button)] = action;
+                    // add the variant without Ctrl for actions registered after startup
+                    applyShortcut(action, primaryShortcut(action));
                 }
             }
 
@@ -119,15 +157,22 @@ void UBShortcutManager::addActions(const QString& group, const QList<QAction*> a
 
             if (oldGroup.isEmpty()) {
                 actionsOfGroup(group) << action;
+                connect(action, &QObject::destroyed, this, &UBShortcutManager::removeAction, Qt::UniqueConnection);
             }
-            else
+            else if (oldGroup != group)
             {
                 // remove from oldGroup, add to Common, which is always first group
                 actionsOfGroup(oldGroup).removeAll(action);
-                mActionGroups[0].second << action;
+
+                if (!mActionGroups[0].second.contains(action))
+                {
+                    mActionGroups[0].second << action;
+                }
             }
         }
     }
+
+    endResetModel();
 }
 
 void UBShortcutManager::addMainActions(UBMainWindow *mainWindow)
@@ -191,6 +236,9 @@ void UBShortcutManager::addMainActions(UBMainWindow *mainWindow)
     }
 
     addActions(tr("Stylus Palette"),{ mainWindow->actionSnap }, mainWindow);
+
+    // additional tool actions for input devices (tablet ExpressKeys, pen buttons)
+    addActions(tr("Stylus Palette"), UBClickBehavior::instance()->createToolActions(mainWindow), mainWindow);
 
     addActions(tr("Lines and colours"), {
                    mainWindow->actionLineSmall,
@@ -329,18 +377,72 @@ void UBShortcutManager::removeActionGroup(QActionGroup *actionGroup)
     }
 }
 
+static void triggerMappedAction(QAction* action)
+{
+    if (action->isEnabled() && (!action->isCheckable() || !action->actionGroup() || !action->isChecked()))
+    {
+        action->trigger();
+    }
+}
+
 bool UBShortcutManager::handleMouseEvent(QMouseEvent *event)
 {
-    if (mMouseActions.contains(event->button()))
-    {
-        QAction* action = mMouseActions[event->button()];
+    // Note: this function is called from the application event filter, i.e. before
+    // the event reaches any widget. As the filter sees the event first for the
+    // QWindow and then again for the target widget, a consumed press never reaches
+    // the widget and is therefore handled only once.
+    const int button = event->button();
 
-        if (!action->isCheckable() || !action->actionGroup() || !action->isChecked())
+    if (button == Qt::NoButton)
+    {
+        return false;
+    }
+
+    switch (event->type())
+    {
+    case QEvent::MouseButtonPress:
+        if (mPressedTabletButtons.contains(button))
         {
-            action->trigger();
+            // mouse event generated by the platform for a mapped tablet button
+            event->accept();
+            return true;
         }
 
-        return true;
+        mPendingMouseReleaseButtons.clear();
+
+        if (QAction* action = mMouseActions.value(static_cast<Qt::MouseButton>(button)))
+        {
+            mPressedMouseButtons.insert(button);
+            triggerMappedAction(action);
+            event->accept();
+            return true;
+        }
+
+        break;
+
+    case QEvent::MouseButtonDblClick:
+        // the press of the second click was already handled, don't trigger twice
+        if (mMouseActions.contains(static_cast<Qt::MouseButton>(button)) || mPressedTabletButtons.contains(button))
+        {
+            mPressedMouseButtons.insert(button);
+            event->accept();
+            return true;
+        }
+
+        break;
+
+    case QEvent::MouseButtonRelease:
+        if (mPressedMouseButtons.remove(button) || mPressedTabletButtons.contains(button)
+                || mPendingMouseReleaseButtons.remove(button))
+        {
+            event->accept();
+            return true;
+        }
+
+        break;
+
+    default:
+        break;
     }
 
     return false;
@@ -348,16 +450,42 @@ bool UBShortcutManager::handleMouseEvent(QMouseEvent *event)
 
 bool UBShortcutManager::handleTabletEvent(QTabletEvent *event)
 {
-    if (mTabletActions.contains(event->button()))
-    {
-        QAction* action = mTabletActions[event->button()];
+    const int button = event->button();
 
-        if (!action->isCheckable() || !action->actionGroup() || !action->isChecked())
+    if (button == Qt::NoButton)
+    {
+        return false;
+    }
+
+    switch (event->type())
+    {
+    case QEvent::TabletPress:
+        mPendingMouseReleaseButtons.clear();
+
+        if (QAction* action = mTabletActions.value(static_cast<Qt::MouseButton>(button)))
         {
-            action->trigger();
+            mPressedTabletButtons.insert(button);
+            triggerMappedAction(action);
+            // accept, so that Qt does not synthesize a mouse event
+            event->accept();
+            return true;
         }
 
-        return true;
+        break;
+
+    case QEvent::TabletRelease:
+        if (mPressedTabletButtons.remove(button))
+        {
+            // some platforms (e.g. macOS) send an additional mouse release
+            mPendingMouseReleaseButtons.insert(button);
+            event->accept();
+            return true;
+        }
+
+        break;
+
+    default:
+        break;
     }
 
     return false;
@@ -457,7 +585,7 @@ QVariant UBShortcutManager::data(const QModelIndex &index, int role) const
         return !action;
 
     case UBShortcutManager::PrimaryShortcutRole:
-        return (index.column() == 2 && action) ? action->shortcut().toString() : QVariant();
+        return (index.column() == 2 && action) ? primaryShortcut(action).toString() : QVariant();
 
     case Qt::DecorationRole:
     case Qt::EditRole:
@@ -518,7 +646,7 @@ bool UBShortcutManager::setData(const QModelIndex &index, const QVariant &value,
     {
         QKeySequence keySequence(value.toString());
 
-        action->setShortcut(keySequence);
+        applyShortcut(action, keySequence);
         updateSettings(action);
         emit dataChanged(index, index);
         return true;
@@ -536,7 +664,11 @@ bool UBShortcutManager::setData(const QModelIndex &index, const QVariant &value,
             }
         }
 
-        mMouseActions[static_cast<Qt::MouseButton>(value.toInt())] = action;
+        if (value.toInt() != Qt::NoButton)
+        {
+            mMouseActions[static_cast<Qt::MouseButton>(value.toInt())] = action;
+        }
+
         updateSettings(action);
         emit dataChanged(index, index);
         return true;
@@ -553,7 +685,11 @@ bool UBShortcutManager::setData(const QModelIndex &index, const QVariant &value,
             }
         }
 
-        mTabletActions[static_cast<Qt::MouseButton>(value.toInt())] = action;
+        if (value.toInt() != Qt::NoButton)
+        {
+            mTabletActions[static_cast<Qt::MouseButton>(value.toInt())] = action;
+        }
+
         updateSettings(action);
         emit dataChanged(index, index);
         return true;
@@ -566,10 +702,11 @@ bool UBShortcutManager::resetData(const QModelIndex &index)
 {
     QAction* action = getAction(index);
 
-    if (action)
+    if (action && !action->property("builtIn").toBool())
     {
         QKeySequence shortcut(action->property(defaultShortcutProperty).toString());
-        action->setShortcut(shortcut);
+        action->setProperty(extraShortcutsProperty, QVariant());
+        applyShortcut(action, shortcut);
         mMouseActions.remove(static_cast<Qt::MouseButton>(action->property(mouseButtonProperty).toInt()));
         mTabletActions.remove(static_cast<Qt::MouseButton>(action->property(tabletButtonProperty).toInt()));
         action->setProperty(mouseButtonProperty, QVariant());
@@ -628,8 +765,9 @@ bool UBShortcutManager::hasCtrlConflicts(const QKeySequence &additionalShortcut)
         }
         else
         {
-            shortcuts << action->shortcut();
-            ctrlShortcuts << QKeySequence(flipModifier(action->shortcut()[0], Qt::ControlModifier));
+            const QKeySequence primary = primaryShortcut(action);
+            shortcuts << primary;
+            ctrlShortcuts << QKeySequence(flipModifier(primary[0], Qt::ControlModifier));
         }
 
     }
@@ -707,23 +845,8 @@ void UBShortcutManager::ignoreCtrl(bool ignore)
         {
             if (!action->property("builtIn").toBool())
             {
-                QList<QKeySequence> shortcuts = action->shortcuts();
-
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-                bool hasCtrl = !shortcuts.empty() && shortcuts[0][0].keyboardModifiers().testFlag(Qt::ControlModifier);
-#else
-                bool hasCtrl = !shortcuts.empty() && shortcuts[0][0] & Qt::ControlModifier;
-#endif
-
-                if (ignore && hasCtrl) {
-                    QKeySequence noCtrl(flipModifier(shortcuts[0][0], Qt::ControlModifier));
-                    shortcuts << noCtrl;
-                    action->setShortcuts(shortcuts);
-                }
-                else if (!ignore && shortcuts.size() > 1)
-                {
-                    action->setShortcuts( { shortcuts[0] } );
-                }
+                // rebuild shortcut list with or without the variants without Ctrl
+                applyShortcut(action, primaryShortcut(action));
             }
         }
     }
@@ -804,13 +927,19 @@ QAction *UBShortcutManager::getAction(const QModelIndex &index, QString *group) 
 
 void UBShortcutManager::updateSettings(const QAction *action) const
 {
+    if (action->objectName().isEmpty())
+    {
+        return;
+    }
+
     QString key = "Shortcut/" + action->objectName();
-    QString keySequence = action->shortcut().toString();
+    QString keySequence = primaryShortcut(action).toString();
+    QStringList extraShortcuts = action->property(extraShortcutsProperty).toStringList();
     QString defaultSequence = action->property(defaultShortcutProperty).toString();
     int mouseButton = action->property(mouseButtonProperty).toInt();
     int tabletButton = action->property(tabletButtonProperty).toInt();
 
-    if (keySequence == defaultSequence && mouseButton == 0 && tabletButton == 0)
+    if (keySequence == defaultSequence && extraShortcuts.isEmpty() && mouseButton == 0 && tabletButton == 0)
     {
         // back to default, delete settings
         UBSettings::settings()->setValue(key, QVariant());
@@ -818,11 +947,209 @@ void UBShortcutManager::updateSettings(const QAction *action) const
     else
     {
         QStringList list;
-        list << keySequence;
+        list << QStringList(QStringList(keySequence) + extraShortcuts).join(shortcutListSeparator);
         list << QString("%1").arg(mouseButton);
         list << QString("%1").arg(tabletButton);
         UBSettings::settings()->setValue(key, list);
     }
+}
+
+void UBShortcutManager::applyShortcut(QAction *action, const QKeySequence &shortcut) const
+{
+    // The shortcut list of an action consists of
+    // - the primary shortcut (editable in the preferences),
+    // - the variant of the primary shortcut without Ctrl, if "ignore Ctrl" is active,
+    // - additional shortcuts set by device profiles.
+    QList<QKeySequence> shortcuts;
+
+    action->setProperty(primaryShortcutProperty, shortcut.toString());
+
+    if (!shortcut.isEmpty())
+    {
+        shortcuts << shortcut;
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        bool hasCtrl = shortcut[0].keyboardModifiers().testFlag(Qt::ControlModifier);
+#else
+        bool hasCtrl = shortcut[0] & Qt::ControlModifier;
+#endif
+
+        if (mIgnoreCtrl && hasCtrl)
+        {
+            // add the variant without Ctrl
+            shortcuts << QKeySequence(flipModifier(shortcut[0], Qt::ControlModifier));
+        }
+    }
+
+    for (const QString& extra : action->property(extraShortcutsProperty).toStringList())
+    {
+        QKeySequence extraShortcut(extra);
+
+        if (!extraShortcut.isEmpty() && !shortcuts.contains(extraShortcut))
+        {
+            shortcuts << extraShortcut;
+        }
+    }
+
+    action->setShortcuts(shortcuts);
+}
+
+bool UBShortcutManager::setExtraShortcuts(const QModelIndex &index, const QList<QKeySequence> &shortcuts)
+{
+    QAction* action = getAction(index);
+
+    if (!action || action->property("builtIn").toBool())
+    {
+        return false;
+    }
+
+    QStringList extras;
+
+    for (const QKeySequence& shortcut : shortcuts)
+    {
+        if (!shortcut.isEmpty() && shortcut != primaryShortcut(action))
+        {
+            extras << shortcut.toString();
+        }
+    }
+
+    action->setProperty(extraShortcutsProperty, extras.isEmpty() ? QVariant() : QVariant(extras));
+    applyShortcut(action, primaryShortcut(action));
+    updateSettings(action);
+    emit dataChanged(index.siblingAtColumn(2), index.siblingAtColumn(2));
+    return true;
+}
+
+void UBShortcutManager::removeAction(QObject *action)
+{
+    // called from QObject::destroyed, don't access the action
+    beginResetModel();
+
+    for (auto& actionGroup : mActionGroups)
+    {
+        actionGroup.second.removeAll(static_cast<QAction*>(action));
+    }
+
+    for (auto map : { &mMouseActions, &mTabletActions })
+    {
+        for (const Qt::MouseButton& key : map->keys())
+        {
+            if (map->value(key) == action)
+            {
+                map->remove(key);
+            }
+        }
+    }
+
+    endResetModel();
+}
+
+QAction *UBShortcutManager::actionByName(const QString &objectName) const
+{
+    if (objectName.isEmpty())
+    {
+        return nullptr;
+    }
+
+    for (auto& actionGroup : mActionGroups)
+    {
+        for (QAction* action : actionGroup.second)
+        {
+            if (action->objectName() == objectName)
+            {
+                return action;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+QModelIndex UBShortcutManager::indexOfAction(const QString &objectName, int column) const
+{
+    for (int row = 0; row < rowCount(); ++row)
+    {
+        QAction* action = getAction(index(row, 0));
+
+        if (action && action->objectName() == objectName)
+        {
+            return index(row, column);
+        }
+    }
+
+    return QModelIndex();
+}
+
+void UBShortcutManager::resetAll()
+{
+    for (int row = 0; row < rowCount(); ++row)
+    {
+        resetData(index(row, 0));
+    }
+}
+
+QString UBShortcutManager::buttonId(Qt::MouseButton button)
+{
+    switch (button)
+    {
+    case Qt::NoButton: return QString();
+    case Qt::LeftButton: return "Left";
+    case Qt::RightButton: return "Right";
+    case Qt::MiddleButton: return "Middle";
+    case Qt::BackButton: return "Back";
+    case Qt::ForwardButton: return "Forward";
+    case Qt::TaskButton: return "Task";
+    default:
+        break;
+    }
+
+    for (int n = 4; n <= 24; ++n)
+    {
+        if (button == static_cast<Qt::MouseButton>(Qt::ExtraButton4 << (n - 4)))
+        {
+            return QString("Extra%1").arg(n);
+        }
+    }
+
+    return QString();
+}
+
+Qt::MouseButton UBShortcutManager::buttonFromId(const QString &id)
+{
+    const QString trimmed = id.trimmed();
+
+    if (trimmed.isEmpty())
+    {
+        return Qt::NoButton;
+    }
+
+    // accept aliases used by Qt and X11 documentation
+    if (trimmed.compare("Extra1", Qt::CaseInsensitive) == 0)
+    {
+        return Qt::BackButton;
+    }
+
+    if (trimmed.compare("Extra2", Qt::CaseInsensitive) == 0)
+    {
+        return Qt::ForwardButton;
+    }
+
+    if (trimmed.compare("Extra3", Qt::CaseInsensitive) == 0)
+    {
+        return Qt::TaskButton;
+    }
+
+    for (unsigned int index = Qt::LeftButton; index < Qt::AllButtons; index <<= 1)
+    {
+        Qt::MouseButton button = static_cast<Qt::MouseButton>(index);
+
+        if (trimmed.compare(buttonId(button), Qt::CaseInsensitive) == 0)
+        {
+            return button;
+        }
+    }
+
+    return Qt::NoButton;
 }
 
 // ---------- UBActionGroupHistory ----------
