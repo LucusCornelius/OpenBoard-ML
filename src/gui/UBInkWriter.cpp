@@ -105,12 +105,6 @@ UBInkWriter::UBInkWriter(QObject* parent)
 {
     connect(UBDrawingController::drawingController(), &UBDrawingController::stylusToolChanged,
             this, &UBInkWriter::cancelPlacement);
-
-    if (UBApplication::boardController)
-    {
-        connect(UBApplication::boardController, &UBBoardController::activeSceneChanged,
-                this, &UBInkWriter::cancelPlacement);
-    }
 }
 
 UBInkWriter::~UBInkWriter()
@@ -224,6 +218,10 @@ void UBInkWriter::beginPlacement(const UBMathInkLayout::Formula& formula)
     {
         return;
     }
+
+    // another page: the formula is not placed there (the board controller may not exist yet in the constructor)
+    connect(UBApplication::boardController, &UBBoardController::activeSceneChanged,
+            this, &UBInkWriter::cancelPlacement, Qt::UniqueConnection);
 
     mFormula = formula;
     mInk = inkStrokes(formula);

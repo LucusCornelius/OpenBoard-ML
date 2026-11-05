@@ -377,12 +377,12 @@ namespace
 
             if (upper)
             {
-                box.place(*upper, opWidth * 0.82, opTop + upper->ascent * sScriptScale, sScriptScale);
+                box.place(*upper, opWidth * 0.95, opTop + upper->ascent * sScriptScale, sScriptScale);
             }
 
             if (lower)
             {
-                box.place(*lower, opWidth * 0.42, opBottom + 0.02, sScriptScale);
+                box.place(*lower, opWidth * 0.55, opBottom + 0.06, sScriptScale);
             }
         }
         else
@@ -795,9 +795,12 @@ namespace
                     item.inner = parseSequence(close);
                     item.group = true;
 
+                    bool closed = false;
+
                     if (peek() == close)
                     {
                         ++mPos;
+                        closed = true;
                     }
 
                     if (c == '{')
@@ -810,7 +813,12 @@ namespace
                         const qreal descent = item.inner.descent;
                         item.box = fenceBox(c, ascent, descent);
                         item.box.append(item.inner, 0.02);
-                        item.box.append(fenceBox(close, ascent, descent), 0.02);
+
+                        // an opening bracket without its closing one is written alone
+                        if (closed)
+                        {
+                            item.box.append(fenceBox(close, ascent, descent), 0.02);
+                        }
                     }
 
                     return true;

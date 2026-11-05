@@ -481,13 +481,16 @@ void UBMathPalette::pageSelected(int index)
 {
     if (index >= 0 && index < mPages->count())
     {
+        // keep the tab row where it is, so that the tabs do not jump away from the finger
+        const QPoint topLeft = pos();
+
         mPages->setCurrentIndex(index);
         UBSettings::settings()->boardMathPaletteTab->set(index);
         updatePageSize();
 
         if (isVisible())
         {
-            placeInsideParent();
+            moveInsideParent(topLeft);
         }
     }
 }
