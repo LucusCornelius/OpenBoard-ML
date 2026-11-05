@@ -101,6 +101,10 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBWidgetMirror.h
     UBZoomPalette.cpp
     UBZoomPalette.h
+    UBColorPickerPopup.cpp
+    UBColorPickerPopup.h
+    UBColorPaletteDialog.cpp
+    UBColorPaletteDialog.h
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
