@@ -63,6 +63,7 @@ UBStylusPalette::UBStylusPalette(QWidget *parent, Qt::Orientation orient)
 
     actions << UBApplication::mainWindow->actionPointer;
     actions << UBApplication::mainWindow->actionLine;
+    actions << UBApplication::mainWindow->actionShapes;
     actions << UBApplication::mainWindow->actionText;
     actions << UBApplication::mainWindow->actionCapture;
 
@@ -78,6 +79,12 @@ UBStylusPalette::UBStylusPalette(QWidget *parent, Qt::Orientation orient)
     setActions(actions);
     setButtonIconSize(QSize(42, 42));
     groupActions();
+
+    // the id of an action is its index in the palette. Keep the ids equal to the
+    // UBStylusTool values for tools which are not in the order of the enum.
+    UBApplication::mainWindow->actionShapes->setProperty("id", UBStylusTool::Shape);
+    UBApplication::mainWindow->actionText->setProperty("id", UBStylusTool::Text);
+    UBApplication::mainWindow->actionCapture->setProperty("id", UBStylusTool::Capture);
 
     UBShortcutManager::shortcutManager()->addActionGroup(mActionGroup);
 

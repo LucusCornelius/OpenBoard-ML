@@ -103,6 +103,17 @@ class UBGraphicsTextItem : public QGraphicsTextItem, public UBItem, public UBRes
 
         QString mTypeTextHereLabel;
 
+        // text box style: optional border (text color) and background fill
+        bool hasBoxBorder() const { return mBoxBorder; }
+        void setBoxBorder(bool border);
+        bool hasBoxFill() const { return mBoxFill; }
+        void setBoxFill(bool fill);
+        /// custom fill color, invalid for the automatic color depending on the background
+        QColor boxFillColor() const { return mBoxFillColor; }
+        void setBoxFillColor(const QColor& color);
+        QColor effectiveBoxFillColor(bool darkBackground) const;
+        QColor effectiveBoxBorderColor(bool darkBackground) const;
+
 
     signals:
         void textUndoCommandAdded(UBGraphicsTextItem *textItem);
@@ -133,6 +144,10 @@ class UBGraphicsTextItem : public QGraphicsTextItem, public UBItem, public UBRes
         QColor mColorOnDarkBackground;
         QColor mColorOnLightBackground;
         bool isActivatedTextEditor;
+
+        bool mBoxBorder{false};
+        bool mBoxFill{false};
+        QColor mBoxFillColor;
 };
 
 #endif /* UBGRAPHICSTEXTITEM_H_ */

@@ -330,6 +330,22 @@ void UBGraphicsTextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem
     styleOption.state &= ~QStyle::State_Selected;
     styleOption.state &= ~QStyle::State_HasFocus;
 
+    if (mBoxBorder || mBoxFill)
+    {
+        // text box style: background and border below the text
+        const UBGraphicsScene* ubScene = dynamic_cast<const UBGraphicsScene*>(QGraphicsItem::scene());
+        const bool dark = ubScene ? ubScene->isDarkBackground() : false;
+        const qreal borderWidth = 2.;
+
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        painter->setPen(mBoxBorder ? QPen(effectiveBoxBorderColor(dark), borderWidth) : QPen(Qt::NoPen));
+        painter->setBrush(mBoxFill ? QBrush(effectiveBoxFillColor(dark)) : QBrush(Qt::NoBrush));
+        const qreal inset = borderWidth / 2.;
+        painter->drawRect(boundingRect().adjusted(inset, inset, -inset, -inset));
+        painter->restore();
+    }
+
     QGraphicsTextItem::paint(painter, &styleOption, widget);
 
     if (widget == UBApplication::boardController->controlView()->viewport() && !isSelected())
@@ -374,6 +390,9 @@ void UBGraphicsTextItem::copyItemParameters(UBItem *copy) const
         cp->setData(UBGraphicsItemData::ItemOwnZValue, this->data(UBGraphicsItemData::ItemOwnZValue));
         cp->setTextWidth(this->textWidth());
         cp->setTextHeight(this->textHeight());
+        cp->setBoxBorder(mBoxBorder);
+        cp->setBoxFill(mBoxFill);
+        cp->setBoxFillColor(mBoxFillColor);
 
         cp->setZValue(this->zValue());
     }
@@ -511,4 +530,56 @@ void UBGraphicsTextItem::activateTextEditor(bool activate)
     }
 
     qDebug() <<  textInteractionFlags();
+}
+
+void UBGraphicsTextItem::setBoxBorder(bool border)
+{
+    mBoxBorder = border;
+    update();
+}
+
+void UBGraphicsTextItem::setBoxFill(bool fill)
+{
+    mBoxFill = fill;
+    update();
+}
+
+void UBGraphicsTextItem::setBoxFillColor(const QColor& color)
+{
+    mBoxFillColor = color;
+    update();
+}
+
+QColor UBGraphicsTextItem::effectiveBoxFillColor(bool darkBackground) const
+{
+    if (mBoxFillColor.isValid())
+    {
+        return mBoxFillColor;
+    }
+
+    return darkBackground ? QColor(0x40, 0x40, 0x40) : QColor(0xe6, 0xe6, 0xe6);
+}
+
+QColor UBGraphicsTextItem::effectiveBoxBorderColor(bool darkBackground) const
+{
+    QColor color = defaultTextColor();
+
+    // use the color of the first character, if defined
+    if (!document()->isEmpty())
+    {
+        QTextCursor cursor(document());
+        cursor.movePosition(QTextCursor::NextCharacter);
+        const QBrush foreground = cursor.charFormat().foreground();
+
+        if (foreground.style() != Qt::NoBrush)
+            color = foreground.color();
+    }
+
+    // black and white text is swapped on the other background, so swap the border too
+    if (darkBackground && color == Qt::black)
+        color = Qt::white;
+    else if (!darkBackground && color == Qt::white)
+        color = Qt::black;
+
+    return color;
 }

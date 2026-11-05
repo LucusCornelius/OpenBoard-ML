@@ -387,5 +387,15 @@
         <file>images/backgroundPalette/bgButtonTemplateLightOn.svg</file>
         <file>images/toolbar/mathPalette.svg</file>
         <file>images/toolbar/colorPicker.svg</file>
+        <file>images/toolPalette/shapes.svg</file>
+        <file>images/toolPalette/shapesOn.svg</file>
+        <file>images/toolbar/shapeRect.svg</file>
+        <file>images/toolbar/shapeRoundedRect.svg</file>
+        <file>images/toolbar/shapeEllipse.svg</file>
+        <file>images/toolbar/shapeTriangle.svg</file>
+        <file>images/toolbar/shapeLine.svg</file>
+        <file>images/toolbar/shapeArrow.svg</file>
+        <file>images/toolbar/shapeFill.svg</file>
+        <file>images/textBox.svg</file>
     </qresource>
 </RCC>

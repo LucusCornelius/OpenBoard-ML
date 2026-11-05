@@ -158,6 +158,13 @@ void UBGraphicsTextItemDelegate::createControls()
         mButtons << mAlignButton;
     }
 
+    if (!mBoxButton) {
+        mBoxButton = new DelegateButton(":/images/textBox.svg", mDelegated, mFrame, Qt::TitleBarArea);
+        mBoxButton->setToolTip(tr("Text box style"));
+        connect(mBoxButton, SIGNAL(clicked(bool)), this, SLOT(cycleBoxStyle()));
+        mButtons << mBoxButton;
+    }
+
     foreach(DelegateButton* button, mButtons)
     {
         button->hide();
@@ -218,6 +225,10 @@ void UBGraphicsTextItemDelegate::freeButtons()
     mButtons.removeOne(mAlignButton);
     delete mAlignButton;
     mAlignButton = 0;
+
+    mButtons.removeOne(mBoxButton);
+    delete mBoxButton;
+    mBoxButton = nullptr;
 
     UBGraphicsItemDelegate::freeButtons();
 }
@@ -473,11 +484,24 @@ void UBGraphicsTextItemDelegate::decorateMenu(QMenu *menu)
     mEditableAction->setCheckable(true);
     mEditableAction->setChecked(isEditable());
 
+    menu->addSeparator();
+
+    mBoxBorderAction = menu->addAction(tr("Text Box Border"), this, SLOT(setBoxBorder(bool)));
+    mBoxBorderAction->setCheckable(true);
+    mBoxFillAction = menu->addAction(tr("Text Box Background"), this, SLOT(setBoxFill(bool)));
+    mBoxFillAction->setCheckable(true);
+    menu->addAction(tr("Text Box Background Color..."), this, SLOT(pickBoxFillColor()));
 }
 
 void UBGraphicsTextItemDelegate::updateMenuActionState()
 {
     UBGraphicsItemDelegate::updateMenuActionState();
+
+    if (mBoxBorderAction)
+        mBoxBorderAction->setChecked(delegated()->hasBoxBorder());
+
+    if (mBoxFillAction)
+        mBoxFillAction->setChecked(delegated()->hasBoxFill());
 }
 
 bool UBGraphicsTextItemDelegate::mousePressEvent(QGraphicsSceneMouseEvent *event)
@@ -852,4 +876,71 @@ QVariant UBGraphicsTextItemDelegate::itemChange(QGraphicsItem::GraphicsItemChang
     }
 
     return UBGraphicsItemDelegate::itemChange(change, value);
+}
+
+void UBGraphicsTextItemDelegate::boxStyleChanged()
+{
+    delegated()->contentsChanged();
+    delegated()->update();
+}
+
+void UBGraphicsTextItemDelegate::cycleBoxStyle()
+{
+    // none -> border -> border and background -> background -> none
+    const bool border = delegated()->hasBoxBorder();
+    const bool fill = delegated()->hasBoxFill();
+
+    if (!border && !fill)
+    {
+        delegated()->setBoxBorder(true);
+    }
+    else if (border && !fill)
+    {
+        delegated()->setBoxFill(true);
+    }
+    else if (border && fill)
+    {
+        delegated()->setBoxBorder(false);
+    }
+    else
+    {
+        delegated()->setBoxFill(false);
+    }
+
+    boxStyleChanged();
+}
+
+void UBGraphicsTextItemDelegate::setBoxBorder(bool border)
+{
+    delegated()->setBoxBorder(border);
+    boxStyleChanged();
+}
+
+void UBGraphicsTextItemDelegate::setBoxFill(bool fill)
+{
+    delegated()->setBoxFill(fill);
+    boxStyleChanged();
+}
+
+void UBGraphicsTextItemDelegate::pickBoxFillColor()
+{
+    if (mDelegated && mDelegated->scene() && mDelegated->scene()->views().size() > 0)
+    {
+        const bool dark = delegated()->scene()->isDarkBackground();
+        QColorDialog colorDialog(delegated()->effectiveBoxFillColor(dark), static_cast<QGraphicsView*>(UBApplication::boardController->controlView()));
+        colorDialog.setWindowTitle(tr("Text Box Background Color"));
+        colorDialog.setOption(QColorDialog::DontUseNativeDialog);
+
+        if (UBSettings::settings()->isDarkBackground())
+        {
+            colorDialog.setStyleSheet("background-color: white;");
+        }
+
+        if (colorDialog.exec())
+        {
+            delegated()->setBoxFillColor(colorDialog.selectedColor());
+            delegated()->setBoxFill(true);
+            boxStyleChanged();
+        }
+    }
 }

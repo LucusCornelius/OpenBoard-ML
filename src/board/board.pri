@@ -4,14 +4,16 @@ HEADERS      += src/board/UBBoardController.h \
                 src/board/UBBoardView.h \
                 src/board/UBColorPreferencesDialog.h \
                 src/board/UBDrawingController.h \
-		src/board/UBFeaturesController.h
+		src/board/UBFeaturesController.h \
+                src/board/UBShapeToolController.h
 
 SOURCES      += src/board/UBBoardController.cpp \
                 src/board/UBBoardPaletteManager.cpp \
                 src/board/UBBoardView.cpp \
                 src/board/UBColorPreferencesDialog.cpp \
                 src/board/UBDrawingController.cpp \
-		src/board/UBFeaturesController.cpp
+		src/board/UBFeaturesController.cpp \
+                src/board/UBShapeToolController.cpp
 
     
     

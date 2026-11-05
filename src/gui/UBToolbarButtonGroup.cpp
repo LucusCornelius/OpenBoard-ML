@@ -256,7 +256,8 @@ void UBToolbarButtonGroup::colorPaletteChanged()
     QList<QColor> colors;
 
     if (UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Pen 
-        || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Line)
+        || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Line
+        || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Shape)
     {
         colors = UBSettings::settings()->penColors(isDarkBackground);
     }

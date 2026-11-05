@@ -60,6 +60,7 @@ class UBGraphicsGroupContainerItem;
 class UBMediaAssetItem;
 class UBSelectionFrame;
 class UBBoardView;
+class UBGraphicsShapeItem;
 
 const double PI = 4.0 * atan(1.0);
 
@@ -479,6 +480,14 @@ signals:
         UBSelectionFrame *mSelectionFrame;
 
         UBGraphicsCache* mGraphicsCache;
+
+        // shape tool
+        bool shapeToolPress(const QPointF& scenePos);
+        void shapeToolMove(const QPointF& scenePos, Qt::KeyboardModifiers modifiers);
+        void shapeToolRelease();
+
+        UBGraphicsShapeItem* mCurrentShape{nullptr};
+        QPointF mShapeStartPoint;
 };
 
 

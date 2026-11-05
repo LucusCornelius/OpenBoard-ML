@@ -57,4 +57,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBUndoCommand.h
     UBWebEngineView.cpp
     UBWebEngineView.h
+    UBGraphicsShapeItem.cpp
+    UBGraphicsShapeItem.h
+    UBGraphicsShapeItemDelegate.cpp
+    UBGraphicsShapeItemDelegate.h
 )

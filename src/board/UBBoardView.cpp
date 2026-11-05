@@ -65,6 +65,7 @@
 #endif
 
 #include "domain/UBGraphicsTextItem.h"
+#include "domain/UBGraphicsShapeItem.h"
 #include "domain/UBGraphicsPixmapItem.h"
 #include "domain/UBGraphicsWidgetItem.h"
 #include "domain/UBGraphicsPDFItem.h"
@@ -465,6 +466,9 @@ bool UBBoardView::isUBItem(QGraphicsItem *item)
     if ((UBGraphicsItemType::UserTypesCount > item->type()) && (item->type() > QGraphicsItem::UserType))
         return true;
 
+    if (item->type() == UBGraphicsShapeItem::Type)
+        return true;
+
     return false;
 }
 
@@ -517,7 +521,8 @@ void UBBoardView::handleItemsSelection(QGraphicsItem *item)
         {
             // here we need to determine what item is pressed. We should work
             // only with UB items.
-            if ((UBGraphicsItemType::UserTypesCount > item->type()) && (item->type() > QGraphicsItem::UserType))
+            if (((UBGraphicsItemType::UserTypesCount > item->type()) && (item->type() > QGraphicsItem::UserType))
+                    || item->type() == UBGraphicsShapeItem::Type)
             {
                 scene()->deselectAllItemsExcept(item);
                 scene()->updateSelectionFrame();
@@ -569,6 +574,7 @@ Here we determines cases when items should to get mouse press event at pressing 
         return true;
     case UBGraphicsPixmapItem::Type:
     case UBGraphicsSvgItem::Type:
+    case UBGraphicsShapeItem::Type:
         if (currentTool == UBStylusTool::Play)
             return true;
         if (item->isSelected())
@@ -640,6 +646,7 @@ bool UBBoardView::itemShouldReceiveSuspendedMousePressEvent(QGraphicsItem *item)
     case UBGraphicsSvgItem::Type:
     case UBGraphicsTextItem::Type:
     case UBGraphicsWidgetItem::Type:
+    case UBGraphicsShapeItem::Type:
         if (currentTool == UBStylusTool::Selector && !item->isSelected() && item->parentItem())
             return true;
         if (currentTool == UBStylusTool::Selector && item->isSelected())
@@ -697,6 +704,7 @@ bool UBBoardView::itemShouldBeMoved(QGraphicsItem *item)
 
     case UBGraphicsSvgItem::Type:
     case UBGraphicsPixmapItem::Type:
+    case UBGraphicsShapeItem::Type:
         if (currentTool == UBStylusTool::Play || !item->isSelected())
             return true;
         if (item->isSelected())
@@ -957,7 +965,8 @@ void UBBoardView::moveRubberedItems(QPointF movingVector)
                 || item->type() == UBGraphicsSvgItem::Type
                 || item->type() == UBGraphicsTextItem::Type
                 || item->type() == UBGraphicsStrokesGroup::Type
-                || item->type() == UBGraphicsGroupContainerItem::Type)
+                || item->type() == UBGraphicsGroupContainerItem::Type
+                || item->type() == UBGraphicsShapeItem::Type)
         {
             item->setPos(item->pos()+movingVector);
         }
@@ -1192,7 +1201,7 @@ void UBBoardView::mousePressEvent (QMouseEvent *event)
             break;
 
         default:
-            if (UBDrawingController::drawingController()->activeRuler() == nullptr) {
+            if (UBDrawingController::drawingController()->activeRuler() == nullptr && currentTool != UBStylusTool::Shape) {
                 viewport()->setCursor (QCursor (Qt::BlankCursor));
             }
             if (scene () && !mTabletStylusIsPressed) {
@@ -1326,7 +1335,8 @@ void UBBoardView::mouseMoveEvent (QMouseEvent *event)
                             || item->type() == UBGraphicsSvgItem::Type
                             || item->type() == UBGraphicsTextItem::Type
                             || item->type() == UBGraphicsStrokesGroup::Type
-                            || item->type() == UBGraphicsGroupContainerItem::Type) {
+                            || item->type() == UBGraphicsGroupContainerItem::Type
+                            || item->type() == UBGraphicsShapeItem::Type) {
 
 
                         if (!mJustSelectedItems.contains(item)) {
@@ -2015,6 +2025,9 @@ void UBBoardView::setToolCursor (int tool)
         break;
     case UBStylusTool::Capture:
         controlViewport->setCursor (UBResources::resources ()->penCursor);
+        break;
+    case UBStylusTool::Shape:
+        controlViewport->setCursor (Qt::CrossCursor);
         break;
     default:
         Q_ASSERT (false);

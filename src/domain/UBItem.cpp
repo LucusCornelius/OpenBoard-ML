@@ -41,6 +41,7 @@
 #include "domain/UBGraphicsScene.h"
 #include "tools/UBGraphicsCurtainItem.h"
 #include "domain/UBGraphicsItemDelegate.h"
+#include "domain/UBGraphicsShapeItem.h"
 
 UBItem::UBItem()
     : mUuid(QUuid::createUuid())
@@ -133,6 +134,9 @@ UBGraphicsItemDelegate *UBGraphicsItem::Delegate(QGraphicsItem *pItem)
         break;
     case UBGraphicsCurtainItem::Type :
         result = (static_cast<UBGraphicsCurtainItem*>(pItem))->Delegate();
+        break;
+    case UBGraphicsShapeItem::Type :
+        result = (static_cast<UBGraphicsShapeItem*>(pItem))->Delegate();
         break;
     }
 
