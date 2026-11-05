@@ -74,6 +74,12 @@ UBMainWindow::UBMainWindow(QWidget *parent, Qt::WindowFlags flags)
 #endif
 
     UBShortcutManager::shortcutManager()->addMainActions(this);
+
+    UBShortcutManager::shortcutManager()->addActions(tr("Colors"), {
+                   actionCustomColor,
+                   actionNextColorPalette,
+                   actionPreviousColorPalette
+               }, this);
 }
 
 UBMainWindow::~UBMainWindow()

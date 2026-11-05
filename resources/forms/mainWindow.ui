@@ -1928,6 +1928,34 @@
     <string>Ctrl+S</string>
    </property>
   </action>
+  <action name="actionCustomColor">
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/colorPicker.svg</normaloff>:/images/toolbar/colorPicker.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Custom Color</string>
+   </property>
+   <property name="toolTip">
+    <string>Pick any color for pen or marker</string>
+   </property>
+  </action>
+  <action name="actionNextColorPalette">
+   <property name="text">
+    <string>Next Color Palette</string>
+   </property>
+   <property name="toolTip">
+    <string>Switch to the next color palette</string>
+   </property>
+  </action>
+  <action name="actionPreviousColorPalette">
+   <property name="text">
+    <string>Previous Color Palette</string>
+   </property>
+   <property name="toolTip">
+    <string>Switch to the previous color palette</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="../OpenBoard.qrc"/>
