@@ -32,6 +32,7 @@
 #include <QPainterPath>
 
 #include "UBDockPalette.h"
+#include "UBGlassStyle.h"
 
 #include "frameworks/UBPlatformUtils.h"
 
@@ -661,14 +662,23 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
         }
 
         painter.save();
-        //QPixmap transparencyPix(":/images/tab_mask.png");
-        if (dock->mCurrentTab != i) {
-            //iconPixmap.setAlphaChannel(transparencyPix); // deprecated; removed for now, to be re-implemented
-            QColor color(0x7F, 0x7F, 0x7F, 0x3F);
-            painter.setBrush(QBrush(color));
+
+        // glass tab, the corners on the screen edge side are outside of the widget
+        const qreal overlap = 12.0;
+        QRectF tabRect(1.0, yFrom + 1.0, width() + overlap - 1.0, TABSIZE - 2.0);
+
+        if (dock->mOrientation == eUBDockOrientation_Left)
+        {
+            tabRect.moveLeft(-overlap);
         }
 
-        painter.drawPath(path);
+        if (dock->mCurrentTab != i)
+        {
+            painter.setOpacity(0.8);
+        }
+
+        UBGlassStyle::paintGlass(&painter, tabRect, 10.0, QImage());
+        painter.setOpacity(1.0);
 
         // Optional tab icon
         if (!tabIcon.isNull()) {

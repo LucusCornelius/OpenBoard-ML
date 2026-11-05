@@ -210,20 +210,15 @@ void UBActionPalette::setToolButtonStyle(Qt::ToolButtonStyle tbs)
 
 void UBActionPalette::updateLayout()
 {
-    if (mToolButtonStyle == Qt::ToolButtonIconOnly)
-    {
-        layout()->setContentsMargins (sLayoutContentMargin / 2  + border(), sLayoutContentMargin / 2  + border()
-                , sLayoutContentMargin / 2  + border(), sLayoutContentMargin / 2  + border());
-    }
-    else
-    {
-        layout()->setContentsMargins (sLayoutContentMargin  + border(), sLayoutContentMargin  + border()
-                , sLayoutContentMargin  + border(), sLayoutContentMargin + border());
+    const int margin = (mToolButtonStyle == Qt::ToolButtonIconOnly ? sLayoutContentMargin / 2 : sLayoutContentMargin) + border();
 
-    }
+    // keep the close button of the glass panel free from the content
+    const int top = isClosable() ? qMax(margin, closeButtonTop()) : margin;
+
+    layout()->setContentsMargins(margin, top, margin, margin);
+
    update();
 }
-
 
 void UBActionPalette::setClosable(bool pClosable)
 {
@@ -235,10 +230,11 @@ void UBActionPalette::setClosable(bool pClosable)
 
 int UBActionPalette::border()
 {
+    // room for the drop shadow of the glass panel
     if (isClosable())
         return 10;
     else
-        return 5;
+        return 8;
 }
 
 
@@ -301,7 +297,7 @@ UBActionPaletteButton::UBActionPaletteButton(QAction* action, QWidget * parent)
 {
     setIconSize(QSize(32, 32));
     setDefaultAction(action);
-    setStyleSheet(QString("QToolButton {color: palette(button-text); font-weight: bold; font-family: Arial; background-color: transparent; border: none}"));
+    // look defined by the glass stylesheet (UBGlassStyle)
 
     setFocusPolicy(Qt::NoFocus);
 

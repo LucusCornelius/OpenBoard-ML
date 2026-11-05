@@ -42,6 +42,7 @@
 
 #include "gui/UBMainWindow.h"
 #include "gui/UBStylusPalette.h"
+#include "gui/UBPenPanel.h"
 #include "gui/UBKeyboardPalette.h"
 #include "gui/UBToolWidget.h"
 #include "gui/UBZoomPalette.h"
@@ -245,6 +246,11 @@ void UBBoardPaletteManager::setupPalettes()
     mZoomPalette = new UBZoomPalette(mContainer);
 
     mStylusPalette->stackUnder(mZoomPalette);
+
+    // the pen options (colours, widths, shapes) float in a glass panel at the top centre,
+    // its content is added by UBBoardController::setupToolbar
+    mPenPanel = new UBPenPanel(mContainer);
+    mPenPanel->show();
 
     // Only create the hints palette when its web page is installed; otherwise the
     // web view would show an error page ("Your file couldn't be accessed").
@@ -518,6 +524,11 @@ void UBBoardPaletteManager::containerResized()
         mStylusPalette->initPosition();
     }
 
+    if (mPenPanel)
+    {
+        mPenPanel->reposition();
+    }
+
     if(mZoomPalette)
     {
         mZoomPalette->move(userLeft + userWidth - mZoomPalette->width()
@@ -584,6 +595,11 @@ void UBBoardPaletteManager::backgroundPaletteClosed()
 void UBBoardPaletteManager::toggleStylusPalette(bool checked)
 {
     mStylusPalette->setVisible(checked);
+
+    if (mPenPanel)
+    {
+        mPenPanel->setVisible(checked);
+    }
 }
 
 
@@ -978,6 +994,12 @@ void UBBoardPaletteManager::changeStylusPaletteOrientation(QVariant var)
 
     connect(mStylusPalette, SIGNAL(stylusToolDoubleClicked(int)), UBApplication::boardController, SLOT(stylusToolDoubleClicked(int)));
     mStylusPalette->setVisible(bVisible); // always show stylus palette at startup
+
+    if (mPenPanel)
+    {
+        mPenPanel->raise();
+        mPenPanel->reposition();
+    }
 }
 
 

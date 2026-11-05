@@ -226,20 +226,12 @@ void UBBackgroundPalette::setActions(QList<QAction*> actions)
 
 void UBBackgroundPalette::updateLayout()
 {
-    if (mToolButtonStyle == Qt::ToolButtonIconOnly) {
-        mVLayout->setContentsMargins(sLayoutContentMargin / 2 + border(),
-                                     sLayoutContentMargin / 2 + border(),
-                                     sLayoutContentMargin / 2 + border(),
-                                     sLayoutContentMargin / 2 + border());
-    }
-    else
-    {
-        mVLayout->setContentsMargins(sLayoutContentMargin + border(),
-                                     sLayoutContentMargin + border(),
-                                     sLayoutContentMargin + border(),
-                                     sLayoutContentMargin + border());
+    const int margin = (mToolButtonStyle == Qt::ToolButtonIconOnly ? sLayoutContentMargin / 2 : sLayoutContentMargin) + border();
 
-    }
+    // keep the close button of the glass panel free from the content
+    const int top = isClosable() ? qMax(margin, closeButtonTop()) : margin;
+
+    mVLayout->setContentsMargins(margin, top, margin, margin);
 
    update();
 }

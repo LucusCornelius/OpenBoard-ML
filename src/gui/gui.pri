@@ -55,7 +55,10 @@ HEADERS +=  \
     src/gui/UBColorPickerPopup.h \
     src/gui/UBColorPaletteDialog.h \
     src/gui/UBScreenCalibration.h \
-    src/gui/UBInkWriter.h
+    src/gui/UBInkWriter.h \
+    src/gui/UBGlassStyle.h \
+    src/gui/UBGlassEffect.h \
+    src/gui/UBPenPanel.h
 SOURCES +=  \
     src/gui/UBThumbnail.cpp \
     src/gui/UBThumbnailArranger.cpp \
@@ -113,11 +116,14 @@ SOURCES +=  \
     src/gui/UBColorPickerPopup.cpp \
     src/gui/UBColorPaletteDialog.cpp \
     src/gui/UBScreenCalibration.cpp \
-    src/gui/UBInkWriter.cpp
+    src/gui/UBInkWriter.cpp \
+    src/gui/UBGlassStyle.cpp \
+    src/gui/UBPenPanel.cpp
 
 win32:SOURCES += src/gui/UBKeyboardPalette_win.cpp
 macx:OBJECTIVE_SOURCES += src/gui/UBKeyboardPalette_mac.mm
 linux-g++:SOURCES += src/gui/UBKeyboardPalette_linux.cpp
 linux-g++-32:SOURCES += src/gui/UBKeyboardPalette_linux.cpp
 linux-g++-64:SOURCES += src/gui/UBKeyboardPalette_linux.cpp
-
+macx:OBJECTIVE_SOURCES += src/gui/UBGlassEffect_mac.mm
+!macx:SOURCES += src/gui/UBGlassEffect.cpp

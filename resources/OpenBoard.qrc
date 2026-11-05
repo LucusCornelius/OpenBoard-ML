@@ -397,6 +397,43 @@
         <file>images/toolbar/shapeArrow.svg</file>
         <file>images/toolbar/shapeFill.svg</file>
         <file>images/textBox.svg</file>
+        <file>images/glass/backgrounds.svg</file>
+        <file>images/glass/board.svg</file>
+        <file>images/glass/capture.svg</file>
+        <file>images/glass/close.svg</file>
+        <file>images/glass/desktop.svg</file>
+        <file>images/glass/documents.svg</file>
+        <file>images/glass/erase.svg</file>
+        <file>images/glass/eraserLarge.svg</file>
+        <file>images/glass/eraserMedium.svg</file>
+        <file>images/glass/eraserSmall.svg</file>
+        <file>images/glass/hand.svg</file>
+        <file>images/glass/keyboard.svg</file>
+        <file>images/glass/line.svg</file>
+        <file>images/glass/lineLarge.svg</file>
+        <file>images/glass/lineMedium.svg</file>
+        <file>images/glass/lineSmall.svg</file>
+        <file>images/glass/maths.svg</file>
+        <file>images/glass/menu.svg</file>
+        <file>images/glass/next.svg</file>
+        <file>images/glass/pages.svg</file>
+        <file>images/glass/paletteSettings.svg</file>
+        <file>images/glass/play.svg</file>
+        <file>images/glass/pointer.svg</file>
+        <file>images/glass/previous.svg</file>
+        <file>images/glass/redo.svg</file>
+        <file>images/glass/selector.svg</file>
+        <file>images/glass/shapes.svg</file>
+        <file>images/glass/snap.svg</file>
+        <file>images/glass/text.svg</file>
+        <file>images/glass/undo.svg</file>
+        <file>images/glass/web.svg</file>
+        <file>images/glass/zoomIn.svg</file>
+        <file>images/glass/zoomOut.svg</file>
+        <file>images/glass/home.svg</file>
+        <file>images/glass/reload.svg</file>
+        <file>images/glass/stop.svg</file>
+        <file>images/glass/tools.svg</file>
     </qresource>
     <qresource prefix="/shortcutProfiles">
         <file alias="keyboard-default.json">etc/shortcutProfiles/keyboard-default.json</file>

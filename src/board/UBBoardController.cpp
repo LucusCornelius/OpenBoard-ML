@@ -82,6 +82,9 @@
 #include "gui/UBThumbnailScene.h"
 #include "gui/UBToolWidget.h"
 #include "gui/UBToolbarButtonGroup.h"
+#include "gui/UBPenPanel.h"
+#include "gui/UBGlassStyle.h"
+#include "gui/UBGlassEffect.h"
 
 #include "podcast/UBPodcastController.h"
 
@@ -401,14 +404,22 @@ void UBBoardController::setupToolbar()
 {
     UBSettings *settings = UBSettings::settings();
 
+    // glass look: monochrome theme tinted icons, native window chrome on macOS
+    UBGlassStyle::applyIcons(mMainWindow);
+    UBGlassEffect::applyToWindow(mMainWindow);
+
+    // The pen options live in the floating glass pen panel at the top centre of the board.
+    // The actions are unchanged, so shortcuts and drawing controller signals keep working.
+    UBPenPanel* penPanel = mPaletteManager->penPanel();
+    const QSize swatchIconSize(24, 24);
+    const QSize widthIconSize(22, 22);
+
     buildColorActions();
 
-    mColorChoice = new UBToolbarButtonGroup(mMainWindow->boardToolBar, mColorActions, QString(), settings->colorPaletteSize);
+    mColorChoice = new UBToolbarButtonGroup(penPanel, mColorActions, QStringLiteral("glass"), settings->colorPaletteSize, swatchIconSize);
     mColorChoice->setLabel(tr("Color"));
+    penPanel->addSection(mColorChoice);
 
-    mMainWindow->boardToolBar->insertWidget(mMainWindow->actionBackgrounds, mColorChoice);
-
-    connect(settings->appToolBarDisplayText, SIGNAL(changed(QVariant)), mColorChoice, SLOT(displayText(QVariant)));
     connect(mColorChoice, SIGNAL(activated(int)), this, SLOT(setColorIndex(int)));
     connect(UBDrawingController::drawingController(), SIGNAL(colorIndexChanged(int)), mColorChoice, SLOT(setCurrentIndex(int)));
     connect(UBDrawingController::drawingController(), SIGNAL(colorIndexChanged(int)), UBDrawingController::drawingController(), SIGNAL(colorPaletteChanged()));
@@ -416,7 +427,6 @@ void UBBoardController::setupToolbar()
     connect(UBDrawingController::drawingController(), SIGNAL(colorPaletteChanged()), this, SLOT(colorPaletteChanged()));
     connect(mMainWindow->actionColorPreferences, SIGNAL(triggered()), this, SLOT(openColorPreferencesDialog()));
 
-    mColorChoice->displayText(QVariant(settings->appToolBarDisplayText->get().toBool()));
     updateColorButtonsForPaletteSize();
 
     // full spectrum color picker, named color palettes
@@ -429,9 +439,7 @@ void UBBoardController::setupToolbar()
     lineWidthActions.append(mMainWindow->actionLineLarge);
 
     UBToolbarButtonGroup *lineWidthChoice =
-            new UBToolbarButtonGroup(mMainWindow->boardToolBar, lineWidthActions);
-
-    connect(settings->appToolBarDisplayText, SIGNAL(changed(QVariant)), lineWidthChoice, SLOT(displayText(QVariant)));
+            new UBToolbarButtonGroup(penPanel, lineWidthActions, QStringLiteral("glass"), -1, widthIconSize);
 
     connect(lineWidthChoice, SIGNAL(activated(int))
             , UBDrawingController::drawingController(), SLOT(setLineWidthIndex(int)));
@@ -439,14 +447,13 @@ void UBBoardController::setupToolbar()
     connect(UBDrawingController::drawingController(), SIGNAL(lineWidthIndexChanged(int))
             , lineWidthChoice, SLOT(setCurrentIndex(int)));
 
-    lineWidthChoice->displayText(QVariant(settings->appToolBarDisplayText->get().toBool()));
     lineWidthChoice->setCurrentIndex(settings->penWidthIndex());
     lineWidthActions.at(settings->penWidthIndex())->setChecked(true);
 
-    mMainWindow->boardToolBar->insertWidget(mMainWindow->actionBackgrounds, lineWidthChoice);
+    penPanel->addSection(lineWidthChoice);
 
     //-----------------------------------------------------------//
-    // Setup eraser width choice widget
+    // Setup eraser width choice widget, visible while the eraser is active
 
     QList<QAction *> eraserWidthActions;
     eraserWidthActions.append(mMainWindow->actionEraserSmall);
@@ -454,25 +461,37 @@ void UBBoardController::setupToolbar()
     eraserWidthActions.append(mMainWindow->actionEraserLarge);
 
     UBToolbarButtonGroup *eraserWidthChoice =
-            new UBToolbarButtonGroup(mMainWindow->boardToolBar, eraserWidthActions);
+            new UBToolbarButtonGroup(penPanel, eraserWidthActions, QStringLiteral("glass"), -1, widthIconSize);
 
-    mMainWindow->boardToolBar->insertWidget(mMainWindow->actionBackgrounds, eraserWidthChoice);
+    penPanel->addSection(eraserWidthChoice);
 
-    connect(settings->appToolBarDisplayText, SIGNAL(changed(QVariant)), eraserWidthChoice, SLOT(displayText(QVariant)));
     connect(eraserWidthChoice, SIGNAL(activated(int)), UBDrawingController::drawingController(), SLOT(setEraserWidthIndex(int)));
 
-    eraserWidthChoice->displayText(QVariant(settings->appToolBarDisplayText->get().toBool()));
     eraserWidthChoice->setCurrentIndex(settings->eraserWidthIndex());
     eraserWidthActions.at(settings->eraserWidthIndex())->setChecked(true);
 
     //-----------------------------------------------------------//
     // Setup shape kind choice widget, visible while the shapes tool is active
 
-    new UBShapeToolController(mMainWindow, mMainWindow->boardToolBar, mMainWindow->actionBackgrounds, this);
+    UBShapeToolController* shapeToolController = new UBShapeToolController(mMainWindow, penPanel, this);
+    penPanel->addSection(shapeToolController->widget());
 
-    mMainWindow->boardToolBar->insertSeparator(mMainWindow->actionBackgrounds);
+    // show the width choice that matches the active tool
+    auto updatePenPanelSections = [lineWidthChoice, eraserWidthChoice](int tool) {
+        const bool eraser = (tool == UBStylusTool::Eraser);
+        eraserWidthChoice->setVisible(eraser);
+        lineWidthChoice->setVisible(!eraser);
+    };
+
+    connect(UBDrawingController::drawingController(), &UBDrawingController::stylusToolChanged, penPanel,
+            [updatePenPanelSections](int tool, int) {
+        updatePenPanelSections(tool);
+    });
+
+    updatePenPanelSections(UBDrawingController::drawingController()->stylusTool());
 
     //-----------------------------------------------------------//
+    // Top bar: undo/redo, backgrounds, maths and pages on the left, the modes on the right
 
     UBApplication::app()->insertSpaceToToolbarBeforeAction(mMainWindow->boardToolBar, mMainWindow->actionBoard);
 
@@ -487,6 +506,17 @@ void UBBoardController::setupToolbar()
     initToolbarTexts();
 
     UBApplication::app()->toolBarDisplayTextChanged(QVariant(settings->appToolBarDisplayText->get().toBool()));
+
+    // the glass stylesheet sizes the top bar buttons for icons with or without text
+    auto updateToolBarTextMode = [this](const QVariant& display) {
+        for (QToolBar* toolBar : {mMainWindow->boardToolBar, mMainWindow->webToolBar, mMainWindow->documentToolBar})
+        {
+            UBGlassStyle::setToolBarTextMode(toolBar, display.toBool());
+        }
+    };
+
+    connect(settings->appToolBarDisplayText, &UBSetting::changed, this, updateToolBarTextMode);
+    updateToolBarTextMode(settings->appToolBarDisplayText->get());
 }
 
 
@@ -719,9 +749,9 @@ void UBBoardController::setToolbarTexts()
     QSize iconSize;
 
     if (mMainWindow->width() <= 1280)
-        iconSize = QSize(24, 24);
+        iconSize = QSize(22, 22);
     else
-        iconSize = QSize(48, 32);
+        iconSize = QSize(26, 26);
 
     mMainWindow->boardToolBar->setIconSize(iconSize);
     mMainWindow->webToolBar->setIconSize(iconSize);
@@ -1859,6 +1889,10 @@ void UBBoardController::setDisabled(bool disable)
 {
     mMainWindow->boardToolBar->setDisabled(disable);
     mControlView->setDisabled(disable);
+
+    // the pen options moved from the toolbar to the pen panel
+    if (mPaletteManager && mPaletteManager->penPanel())
+        mPaletteManager->penPanel()->setDisabled(disable);
 }
 
 

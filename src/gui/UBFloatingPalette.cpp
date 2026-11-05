@@ -30,14 +30,59 @@
 #include <QtGui>
 #include <QPainterPath>
 #include <QToolButton>
+#include <QTimer>
+#include <QAbstractScrollArea>
 
 #include "UBFloatingPalette.h"
+#include "UBGlassStyle.h"
+#include "UBGlassEffect.h"
 
 #include "frameworks/UBPlatformUtils.h"
 
 #include "core/UBSettings.h"
 
 #include "core/memcheck.h"
+
+namespace
+{
+    // refresh period of the blurred backdrop
+    constexpr int backdropThrottleMs = 40;
+    // minimal period between two synchronous refreshes while dragging (about 60 fps)
+    constexpr int backdropDragMs = 16;
+    // blur radius of the backdrop in pixels
+    constexpr int backdropBlurRadius = 12;
+}
+
+int UBFloatingPalette::sRenderingBackdrop = 0;
+
+/**
+ * Watches the sibling widgets below a floating palette (board view, dock
+ * palettes, other palettes) and requests a refresh of the blurred backdrop
+ * when they repaint, move or change visibility in the covered area.
+ * A separate object is used so that sub classes can keep their own event filters.
+ */
+class UBFloatingPaletteWatcher : public QObject
+{
+    public:
+        explicit UBFloatingPaletteWatcher(UBFloatingPalette* palette)
+            : QObject(palette)
+            , mPalette(palette)
+        {
+        }
+
+        bool eventFilter(QObject* watched, QEvent* event) override
+        {
+            if (watched->isWidgetType())
+            {
+                mPalette->siblingEvent(static_cast<QWidget*>(watched), event);
+            }
+
+            return false;
+        }
+
+    private:
+        UBFloatingPalette* mPalette;
+};
 
 UBFloatingPalette::UBFloatingPalette(Qt::Corner position, QWidget *parent)
     : QWidget(parent, parent ? Qt::Widget : Qt::Tool | (Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::X11BypassWindowManagerHint))
@@ -48,8 +93,19 @@ UBFloatingPalette::UBFloatingPalette(Qt::Corner position, QWidget *parent)
     , mMinimizedLocation(eMinimizedLocation_None)
     , mDefaultPosition(position)
     , mCloseButton(nullptr)
+    , mGlassBackdropEnabled(true)
+    , mBackdropTimer(nullptr)
+    , mWatcher(nullptr)
 {
     setCursor(Qt::ArrowCursor);
+
+    mWatcher = new UBFloatingPaletteWatcher(this);
+    mBackdropTimer = new QTimer(this);
+    mBackdropTimer->setSingleShot(true);
+    mBackdropTimer->setInterval(backdropThrottleMs);
+    connect(mBackdropTimer, &QTimer::timeout, this, [this]() {
+        updateBackdrop();
+    });
 
     if (parent)
     {
@@ -77,6 +133,8 @@ UBFloatingPalette::UBFloatingPalette(Qt::Corner position, QWidget *parent)
     pal.setBrush(QPalette::Window, mBackgroundBrush);
     setPalette(pal);
     mbGrip = true;
+
+    watchSiblings();
 }
 
 void UBFloatingPalette::setClosable(bool closable)
@@ -133,7 +191,7 @@ void UBFloatingPalette::setCustomPosition(bool pFlag)
 
 int UBFloatingPalette::radius()
 {
-    return 10;
+    return UBGlassStyle::panelRadius;
 }
 
 
@@ -144,7 +202,13 @@ int UBFloatingPalette::border()
 
 int UBFloatingPalette::closeButtonMargin() const
 {
-    return 10;
+    return 14;
+}
+
+int UBFloatingPalette::closeButtonTop() const
+{
+    // close button (22 px) plus a small gap
+    return closeButtonMargin() + 22 + 4;
 }
 
 void UBFloatingPalette::onCloseButtonClicked()
@@ -306,28 +370,307 @@ void UBFloatingPalette::removeAllAssociatedPalette()
 void UBFloatingPalette::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
+    paintGlassBackground(painter);
+}
 
+
+QRectF UBFloatingPalette::glassRect()
+{
+    // the border area around the body holds the drop shadow
+    const int b = qMax(0, border());
+    return QRectF(rect()).adjusted(b, b, -b, -b);
+}
+
+
+void UBFloatingPalette::paintGlassBackground(QPainter& painter)
+{
+    const QRectF body = glassRect();
+    const qreal r = radius();
+    const qreal dpr = devicePixelRatio();
+
+    painter.save();
     painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(Qt::NoPen);
-    painter.setBrush(palette().brush(QPalette::Window));
 
-    if(mbGrip)
+    if (backdropActive())
     {
-        QColor borderColor = palette().color(QPalette::Mid);
-        painter.setBrush(QBrush(borderColor));
-        QPainterPath borderPath;
-        borderPath.addRoundedRect(0, 0, width(), height(), radius(), radius());
-        borderPath.addRoundedRect(border(), border(), width() - 2 * border(), height() - 2 * border(), radius(), radius());
-        painter.drawPath(borderPath);
-        painter.setBrush(palette().brush(QPalette::Window));
-        painter.drawRoundedRect(border(), border(), width() - 2 * border(), height() - 2 * border(), radius(), radius());
+        // the palette paints all its pixels (WA_OpaquePaintEvent): first the
+        // unblurred content behind it, visible around the rounded body
+        if (mRawBackdrop.isNull() || mRawBackdrop.size() != size() * dpr)
+        {
+            painter.fillRect(rect(), parentWidget()->palette().color(QPalette::Window));
+            scheduleBackdropUpdate();
+        }
+
+        if (!mRawBackdrop.isNull())
+        {
+            painter.drawImage(QPointF(0, 0), mRawBackdrop);
+        }
     }
-    else
+
+    if (mShadow.isNull() || mShadow.size() != size() * dpr)
     {
-        painter.setBrush(palette().brush(QPalette::Window));
-        painter.drawRoundedRect(border(), border(), width() - 2 * border(), height() - 2 * border(), radius(), radius());
+        mShadow = UBGlassStyle::shadowImage(size(), body, r, dpr);
+    }
+
+    painter.drawImage(QPointF(0, 0), mShadow);
+
+    UBGlassStyle::paintGlass(&painter, body, r, backdropActive() ? mBlurredBackdrop : QImage());
+
+    painter.restore();
+}
+
+
+void UBFloatingPalette::setGlassBackdropEnabled(bool enabled)
+{
+    mGlassBackdropEnabled = enabled;
+    setAttribute(Qt::WA_OpaquePaintEvent, backdropActive());
+    scheduleBackdropUpdate();
+    update();
+}
+
+
+bool UBFloatingPalette::backdropActive() const
+{
+    QWidget* parent = parentWidget();
+
+    if (!mGlassBackdropEnabled || !parent || isWindow())
+        return false;
+
+    // transparent windows (desktop annotation) show the desktop behind, which cannot be captured.
+    // The main window on macOS is only translucent for the vibrancy of its title bar (UBGlassEffect).
+    QWidget* top = window();
+    return !top->testAttribute(Qt::WA_TranslucentBackground) || top->property("ubGlassTranslucentWindow").toBool();
+}
+
+
+void UBFloatingPalette::scheduleBackdropUpdate()
+{
+    if (!backdropActive() || !isVisible())
+        return;
+
+    if (!mBackdropTimer->isActive())
+        mBackdropTimer->start();
+}
+
+
+void UBFloatingPalette::updateBackdrop()
+{
+    mBackdropTimer->stop();
+
+    const bool active = backdropActive();
+
+    if (testAttribute(Qt::WA_OpaquePaintEvent) != active)
+        setAttribute(Qt::WA_OpaquePaintEvent, active);
+
+    if (!active || !isVisible() || sRenderingBackdrop > 0 || size().isEmpty())
+    {
+        if (!active)
+        {
+            mRawBackdrop = QImage();
+            mBlurredBackdrop = QImage();
+        }
+        return;
+    }
+
+    QWidget* parent = parentWidget();
+    const QRect geometryInParent = geometry();
+    const qreal dpr = devicePixelRatio();
+
+    QImage raw(size() * dpr, QImage::Format_ARGB32_Premultiplied);
+    raw.setDevicePixelRatio(dpr);
+    raw.fill(parent->palette().color(QPalette::Window));
+
+    ++sRenderingBackdrop;
+    {
+        QPainter painter(&raw);
+
+        // render the siblings below this palette, never the palette itself or what is above it
+        for (QObject* child : parent->children())
+        {
+            if (child == this)
+                break;
+
+            QWidget* sibling = qobject_cast<QWidget*>(child);
+
+            if (!sibling || sibling->isWindow() || !sibling->isVisible())
+                continue;
+
+            const QRect overlap = sibling->geometry() & geometryInParent;
+
+            if (overlap.isEmpty())
+                continue;
+
+            const QRect source = overlap.translated(-sibling->pos());
+            sibling->render(&painter, overlap.topLeft() - geometryInParent.topLeft(), QRegion(source),
+                            QWidget::DrawWindowBackground | QWidget::DrawChildren);
+        }
+    }
+    --sRenderingBackdrop;
+
+    mRawBackdrop = raw;
+
+    // blur only the body area
+    const QRectF body = glassRect();
+    const QRect bodyPixels = QRectF(body.topLeft() * dpr, body.size() * dpr).toAlignedRect() & QRect(QPoint(0, 0), raw.size());
+    mBlurredBackdrop = UBGlassStyle::blurredBackdrop(raw.copy(bodyPixels), qRound(backdropBlurRadius * dpr));
+
+    mBackdropAge.restart();
+    update();
+}
+
+
+bool UBFloatingPalette::event(QEvent *event)
+{
+    switch (event->type())
+    {
+        case QEvent::ParentChange:
+            watchSiblings();
+            mRawBackdrop = QImage();
+            mBlurredBackdrop = QImage();
+            setAttribute(Qt::WA_OpaquePaintEvent, backdropActive());
+            break;
+
+        case QEvent::Show:
+            setAttribute(Qt::WA_OpaquePaintEvent, backdropActive());
+            UBGlassEffect::applyToPanel(this);
+            // capture the backdrop before the first paint
+            updateBackdrop();
+            break;
+
+        case QEvent::Resize:
+            mShadow = QImage();
+            if (isVisible())
+                updateBackdrop();
+            break;
+
+        case QEvent::Move:
+            if (isVisible())
+            {
+                if (mIsMoving && (!mBackdropAge.isValid() || mBackdropAge.elapsed() >= backdropDragMs))
+                    updateBackdrop();
+                else
+                    scheduleBackdropUpdate();
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    return QWidget::event(event);
+}
+
+
+void UBFloatingPalette::watchSiblings()
+{
+    for (const QPointer<QWidget>& watched : std::as_const(mWatched))
+    {
+        if (watched)
+            watched->removeEventFilter(mWatcher);
+    }
+
+    mWatched.clear();
+
+    QWidget* parent = parentWidget();
+
+    if (!parent)
+        return;
+
+    auto watch = [this](QWidget* widget) {
+        widget->installEventFilter(mWatcher);
+        mWatched << widget;
+    };
+
+    // the parent tells about new siblings
+    watch(parent);
+
+    for (QObject* child : parent->children())
+    {
+        QWidget* sibling = qobject_cast<QWidget*>(child);
+
+        if (!sibling || sibling == this)
+            continue;
+
+        watch(sibling);
+
+        // scroll areas (the board view) paint in their viewport
+        if (QAbstractScrollArea* scrollArea = qobject_cast<QAbstractScrollArea*>(sibling))
+        {
+            if (scrollArea->viewport())
+                watch(scrollArea->viewport());
+        }
     }
 }
+
+
+void UBFloatingPalette::siblingEvent(QWidget* sibling, QEvent* event)
+{
+    if (sRenderingBackdrop > 0 || !isVisible() || !backdropActive())
+        return;
+
+    QWidget* parent = parentWidget();
+
+    if (!parent)
+        return;
+
+    if (sibling != parent)
+    {
+        // ignore widgets stacked above this palette, they are not part of the backdrop
+        QWidget* topSibling = sibling;
+
+        while (topSibling && topSibling->parentWidget() != parent)
+            topSibling = topSibling->parentWidget();
+
+        const QObjectList& children = parent->children();
+
+        if (!topSibling || children.indexOf(topSibling) > children.indexOf(this))
+            return;
+    }
+
+    if (sibling == parent)
+    {
+        if (event->type() == QEvent::ChildAdded || event->type() == QEvent::ChildRemoved)
+        {
+            // re-install the filters later, the new child is not fully constructed yet
+            QTimer::singleShot(0, this, [this]() {
+                watchSiblings();
+                scheduleBackdropUpdate();
+            });
+        }
+        else if (event->type() == QEvent::Resize)
+        {
+            scheduleBackdropUpdate();
+        }
+
+        return;
+    }
+
+    switch (event->type())
+    {
+        case QEvent::Paint:
+        {
+            // only repaints of the area covered by this palette matter
+            const QRect dirty = static_cast<QPaintEvent*>(event)->region().boundingRect();
+            const QRect dirtyInParent(sibling->mapTo(parent, dirty.topLeft()), dirty.size());
+
+            if (dirtyInParent.intersects(geometry()))
+                scheduleBackdropUpdate();
+            break;
+        }
+
+        case QEvent::Move:
+        case QEvent::Resize:
+        case QEvent::Show:
+        case QEvent::Hide:
+        case QEvent::ZOrderChange:
+            scheduleBackdropUpdate();
+            break;
+
+        default:
+            break;
+    }
+}
+
 
 int UBFloatingPalette::gripSize()
 {
@@ -344,9 +687,9 @@ void UBFloatingPalette::buildCloseButton()
     mCloseButton->setAutoRaise(true);
     mCloseButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
     mCloseButton->setText(QString());
-    mCloseButton->setFixedSize(28, 28);
+    mCloseButton->setFixedSize(22, 22);
     mCloseButton->setIconSize(QSize(12, 12));
-    mCloseButton->setIcon(QIcon(":/images/close-no-bg.png"));
+    mCloseButton->setIcon(UBGlassStyle::icon("close"));
     mCloseButton->setToolTip(tr("Close"));
     const int margin = closeButtonMargin();
     mCloseButton->move(margin, margin);

@@ -111,6 +111,12 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBScreenCalibration.h
     UBInkWriter.cpp
     UBInkWriter.h
+    UBGlassStyle.cpp
+    UBGlassStyle.h
+    UBGlassEffect.cpp
+    UBGlassEffect.h
+    UBPenPanel.cpp
+    UBPenPanel.h
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)

@@ -43,6 +43,12 @@ class UBToolbarButtonGroup : public QWidget
 
     public:
         UBToolbarButtonGroup(QToolBar *toolbar, const QList<QAction*> &actions = QList<QAction*>(), QString objectNameprefix = "", int selectableCount = -1);
+
+        /**
+         * Group hosted outside of a toolbar (e.g. in the pen panel). It never
+         * paints a label and uses the given button and icon size.
+         */
+        UBToolbarButtonGroup(QWidget *parent, const QList<QAction*> &actions, const QString& objectNameprefix, int selectableCount, const QSize& buttonIconSize);
         virtual ~UBToolbarButtonGroup();
 
         void setIcon(const QIcon &icon, int index);
@@ -56,6 +62,8 @@ class UBToolbarButtonGroup : public QWidget
         void paintEvent(QPaintEvent *);
 
     private:
+        void init(QString objectNameprefix, const QSize& buttonIconSize);
+
         QToolButton         *mToolButton; // The first button in the toolbar
         QString              mLabel;
         QList<QAction*>      mActions;

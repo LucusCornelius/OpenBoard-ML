@@ -66,19 +66,16 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
-   <addaction name="actionStylus"/>
-   <addaction name="actionBackgrounds"/>
-   <addaction name="actionMathPalette"/>
-   <addaction name="separator"/>
    <addaction name="actionUndo"/>
    <addaction name="actionRedo"/>
+   <addaction name="separator"/>
+   <addaction name="actionBackgrounds"/>
+   <addaction name="actionMathPalette"/>
    <addaction name="separator"/>
    <addaction name="actionPages"/>
    <addaction name="actionBack"/>
    <addaction name="actionForward"/>
-   <addaction name="separator"/>
    <addaction name="actionErase"/>
-   <addaction name="separator"/>
    <addaction name="actionBoard"/>
    <addaction name="actionWeb"/>
    <addaction name="actionDocument"/>

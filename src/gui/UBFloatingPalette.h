@@ -33,6 +33,9 @@
 #include <QWidget>
 #include <QPoint>
 #include <QToolButton>
+#include <QImage>
+#include <QElapsedTimer>
+#include <QPointer>
 
 #include "core/UB.h"
 
@@ -44,6 +47,8 @@ typedef enum
     eMinimizedLocation_Right,
     eMinimizedLocation_Bottom
 }eMinimizedLocation;
+
+class QTimer;
 
 class UBFloatingPalette : public QWidget
 {
@@ -77,7 +82,25 @@ class UBFloatingPalette : public QWidget
 
         void setMinimizePermission(bool permission);
 
+        /**
+         * Enable or disable the blurred backdrop of the glass panel (enabled by default).
+         * Without backdrop the panel is painted with a more opaque tint.
+         */
+        void setGlassBackdropEnabled(bool enabled);
+
+    public slots:
+        /** request a (throttled) refresh of the blurred backdrop */
+        void scheduleBackdropUpdate();
+
     protected:
+        bool event(QEvent *event) override;
+
+        /** rectangle of the visible glass body, the area around it holds the shadow */
+        virtual QRectF glassRect();
+
+        /** paint the glass background (shadow, blurred backdrop, tint and highlights) */
+        void paintGlassBackground(QPainter& painter);
+
         virtual void enterEvent(UB::EnterEvent *event) override;
         virtual void paintEvent(QPaintEvent *event) override;
 
@@ -85,6 +108,9 @@ class UBFloatingPalette : public QWidget
         virtual int border();
         virtual int gripSize();
         virtual int closeButtonMargin() const;
+
+        /** top layout margin leaving room for the close button above the content */
+        int closeButtonTop() const;
         virtual void onCloseButtonClicked();
 
         QBrush mBackgroundBrush;
@@ -100,7 +126,13 @@ class UBFloatingPalette : public QWidget
         eMinimizedLocation minimizedLocation(){return mMinimizedLocation;}
 
     private:
+        friend class UBFloatingPaletteWatcher;
+
         void buildCloseButton();
+        bool backdropActive() const;
+        void updateBackdrop();
+        void watchSiblings();
+        void siblingEvent(QWidget* sibling, QEvent* event);
         void removeAllAssociatedPalette();
         void minimizePalette(const QPoint& pos);
 
@@ -111,6 +143,17 @@ class UBFloatingPalette : public QWidget
         eMinimizedLocation mMinimizedLocation;
         Qt::Corner mDefaultPosition;
         QToolButton* mCloseButton;
+
+        bool mGlassBackdropEnabled;
+        QImage mRawBackdrop;
+        QImage mBlurredBackdrop;
+        QImage mShadow;
+        QTimer* mBackdropTimer;
+        QElapsedTimer mBackdropAge;
+        QObject* mWatcher;
+        QList<QPointer<QWidget>> mWatched;
+
+        static int sRenderingBackdrop;
 
     signals:
         void mouseEntered();
