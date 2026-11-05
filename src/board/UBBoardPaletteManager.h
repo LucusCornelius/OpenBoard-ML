@@ -47,6 +47,7 @@ class UBPageNumberPalette;
 class UBZoomPalette;
 class UBActionPalette;
 class UBBackgroundPalette;
+class UBMathPalette;
 class UBBoardController;
 class UBServerXMLHttpRequest;
 class UBKeyboardPalette;
@@ -120,6 +121,7 @@ class UBBoardPaletteManager : public QObject
         UBActionPalette* mAddItemPalette;
         UBActionPalette* mErasePalette;
         UBActionPalette* mPagePalette;
+        UBMathPalette* mMathPalette{nullptr};
 
         QUrl mItemUrl;
         QPixmap mPixmap;

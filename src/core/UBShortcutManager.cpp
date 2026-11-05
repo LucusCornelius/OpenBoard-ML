@@ -222,6 +222,10 @@ void UBShortcutManager::addMainActions(UBMainWindow *mainWindow)
                    // mainWindow->actionPodcastPause currently not activated in UBPodcastRecordingPalette
                }, mainWindow);
 
+    addActions(tr("Maths"), {
+                   mainWindow->actionMathPalette
+               }, mainWindow);
+
     // add builtIn actions
     QList<QAction*> actions;
 

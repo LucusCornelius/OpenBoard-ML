@@ -68,6 +68,7 @@
    </attribute>
    <addaction name="actionStylus"/>
    <addaction name="actionBackgrounds"/>
+   <addaction name="actionMathPalette"/>
    <addaction name="separator"/>
    <addaction name="actionUndo"/>
    <addaction name="actionRedo"/>
@@ -1926,6 +1927,26 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionMathPalette">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/mathPalette.svg</normaloff>:/images/toolbar/mathPalette.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Maths</string>
+   </property>
+   <property name="toolTip">
+    <string>Maths notation</string>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>9</pointsize>
+    </font>
    </property>
   </action>
  </widget>

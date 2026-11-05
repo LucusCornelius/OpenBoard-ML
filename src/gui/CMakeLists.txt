@@ -101,6 +101,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBWidgetMirror.h
     UBZoomPalette.cpp
     UBZoomPalette.h
+    UBMathPalette.cpp
+    UBMathPalette.h
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)

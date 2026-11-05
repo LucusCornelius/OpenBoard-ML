@@ -448,6 +448,9 @@ void UBSettings::init()
     lastVideoPath = new UBSetting(this, "Library", "LastVideoPath", QVariant(QStandardPaths::writableLocation(QStandardPaths::MoviesLocation)));
 
     boardShowToolsPalette = new UBSetting(this, "Board", "ShowToolsPalette", "false");
+    boardShowMathPalette = new UBSetting(this, "Board", "ShowMathPalette", false);
+    boardMathPalettePosition = new UBSetting(this, "Board", "MathPalettePosition", QVariant());
+    boardMathPaletteTab = new UBSetting(this, "Board", "MathPaletteTab", 0);
     magnifierDrawingMode = new UBSetting(this, "Board", "MagnifierDrawingMode", "0");
     autoSaveInterval = new UBSetting(this, "Board", "AutoSaveIntervalInMinutes", "3");
 

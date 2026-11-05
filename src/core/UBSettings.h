@@ -371,6 +371,9 @@ class UBSettings : public QObject
         UBSetting* lastVideoPath;
 
         UBSetting* boardShowToolsPalette;
+        UBSetting* boardShowMathPalette;
+        UBSetting* boardMathPalettePosition;
+        UBSetting* boardMathPaletteTab;
 
         QMap<DocumentSizeRatio::Enum, QSize> documentSizes;
 

@@ -48,6 +48,7 @@
 #include "gui/UBWebToolsPalette.h"
 #include "gui/UBActionPalette.h"
 #include "gui/UBBackgroundPalette.h"
+#include "gui/UBMathPalette.h"
 #include "gui/UBFavoriteToolPalette.h"
 #include "gui/UBStartupHintsPalette.h"
 #include "gui/UBPageNavigationWidget.h"
@@ -255,6 +256,9 @@ void UBBoardPaletteManager::setupPalettes()
     mBackgroundsPalette->adjustSizeAndPosition();
     mBackgroundsPalette->hide();
 
+    mMathPalette = new UBMathPalette(mContainer);
+    mMathPalette->hide();
+
     QList<QAction*> addItemActions;
 
     addItemActions << UBApplication::mainWindow->actionAddItemToCurrentPage;
@@ -437,6 +441,13 @@ void UBBoardPaletteManager::connectPalettes()
 
     connect(UBApplication::mainWindow->actionBackgrounds, SIGNAL(toggled(bool)), this, SLOT(toggleBackgroundPalette(bool)));
     connect(mBackgroundsPalette, SIGNAL(closed()), this, SLOT(backgroundPaletteClosed()));
+
+    connect(UBApplication::mainWindow->actionMathPalette, &QAction::toggled, mMathPalette, &UBMathPalette::setPaletteVisible);
+    connect(mMathPalette, &UBMathPalette::closed, UBApplication::mainWindow->actionMathPalette, [](){
+        UBApplication::mainWindow->actionMathPalette->setChecked(false);
+    });
+    // restore the visibility of the maths palette from the last session
+    UBApplication::mainWindow->actionMathPalette->setChecked(UBSettings::settings()->boardShowMathPalette->get().toBool());
 
     connect(UBApplication::mainWindow->actionPodcast, SIGNAL(triggered(bool)), this, SLOT(tooglePodcastPalette(bool)));
 
