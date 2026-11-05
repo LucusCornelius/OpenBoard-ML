@@ -1973,6 +1973,36 @@
    </property>
    <property name="toolTip">
     <string>Switch to the previous color palette</string>
+  <action name="actionBackgroundBlank">
+   <property name="text">
+    <string>Blank background</string>
+   </property>
+   <property name="toolTip">
+    <string>Set blank background on current page</string>
+   </property>
+  </action>
+  <action name="actionBackgroundLined">
+   <property name="text">
+    <string>Lined background</string>
+   </property>
+   <property name="toolTip">
+    <string>Set lined background on current page</string>
+   </property>
+  </action>
+  <action name="actionBackgroundGrid1cm">
+   <property name="text">
+    <string>Grid 1 cm background</string>
+   </property>
+   <property name="toolTip">
+    <string>Set 1 cm grid background on current page</string>
+   </property>
+  </action>
+  <action name="actionBackgroundGrid5mm">
+   <property name="text">
+    <string>Grid 0.5 cm background</string>
+   </property>
+   <property name="toolTip">
+    <string>Set 0.5 cm grid background on current page</string>
    </property>
   </action>
  </widget>

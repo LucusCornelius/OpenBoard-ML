@@ -27,6 +27,7 @@
 
 // forward
 class UBFlowLayout;
+class QCheckBox;
 class QLabel;
 class QLayoutItem;
 
@@ -62,8 +63,10 @@ private:
         explicit BackgroundWidget(const QPixmap& pixmap, const QString& text, QWidget* parent = nullptr);
 
         QPixmap pixmap() const;
+        QCheckBox* paletteCheckBox() const;
 
     private:
         QPixmap mPixmap;
+        QCheckBox* mPaletteCheckBox{nullptr};
     };
 };

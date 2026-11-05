@@ -77,6 +77,7 @@
 #include "gui/UBMagnifer.h"
 #include "gui/UBMainWindow.h"
 #include "gui/UBMessageWindow.h"
+#include "gui/UBScreenCalibration.h"
 #include "gui/UBThumbnailScene.h"
 #include "gui/UBToolWidget.h"
 #include "gui/UBToolbarButtonGroup.h"
@@ -177,31 +178,76 @@ UBBoardController::~UBBoardController()
 }
 
 /**
- * @brief Set the default background grid size to appear as roughly 1cm on screen
+ * @brief Set the default background grid size to appear as 1cm on the control screen
  */
 void UBBoardController::initBackgroundGridSize()
 {
-    // Besides adjusting for DPI, we also need to scale the grid size by the ratio of the control view size
-    // to document size. Here we approximate this ratio as (document resolution) / (screen resolution).
-    // Later on, this is calculated by `updateSystemScaleFactor` and stored in `mSystemScaleFactor`.
-
-    qreal dpi = UBApplication::displayManager->logicalDpi(ScreenRole::Control);
-
-    //qDebug() << "dpi: " << dpi;
-
-    qreal screenY = UBApplication::displayManager->screenSize(ScreenRole::Control).height();
-    qreal documentY = mActiveScene->nominalSize().height();
-    qreal resolutionRatio = documentY / screenY;
-
-    //qDebug() << "resolution ratio: " << resolutionRatio;
-
-    int gridSize = (resolutionRatio * 10. * dpi) / UBGeometryUtils::inchSize;
+    const int gridSize = calibratedGridSize();
 
     UBSettings::settings()->crossSize = gridSize;
     UBSettings::settings()->defaultCrossSize = gridSize;
     mActiveScene->setBackgroundGridSize(gridSize);
+}
 
-    //qDebug() << "grid size: " << gridSize;
+/**
+ * @brief Calculate the number of scene pixels which appear as 1cm on the control screen at zoom 100%
+ *
+ * The grid size is the number of scene pixels per centimetre. The board view scales the scene by
+ * mSystemScaleFactor (fit page into view) at zoom 100%, so the grid size is the number of logical
+ * screen pixels per centimetre divided by this factor. As long as the control view does not have
+ * its final size, the factor is approximated by the ratio of screen height to document height.
+ */
+int UBBoardController::calibratedGridSize() const
+{
+    const qreal pixelsPerCm = UBScreenCalibration::pixelsPerCm();
+    qreal scaleFactor = mSystemScaleFactor;
+
+    if (!mControlView || !mControlView->isVisible() || mControlView->height() < 100 || scaleFactor <= 0)
+    {
+        const qreal screenY = UBApplication::displayManager->screenSize(ScreenRole::Control).height();
+        const qreal documentY = mActiveScene ? mActiveScene->nominalSize().height() : 0;
+        scaleFactor = (screenY > 0 && documentY > 0) ? screenY / documentY : 1.;
+    }
+
+    return std::max(1, qRound(pixelsPerCm / scaleFactor));
+}
+
+/**
+ * @brief Recalculate the default grid size after a change of view size, page size or calibration
+ *
+ * The current grid size follows if it was still at the default value. The grid size of the
+ * active scene is only adjusted if the scene is empty, as otherwise the grid would no longer
+ * match the content.
+ */
+void UBBoardController::updateDefaultGridSize()
+{
+    if (!mActiveScene || !mControlView || !mControlView->isVisible())
+    {
+        // the scale factor is only reliable when the board is visible
+        return;
+    }
+
+    const int oldDefault = UBSettings::settings()->defaultCrossSize;
+    const int gridSize = calibratedGridSize();
+
+    if (gridSize == oldDefault)
+    {
+        return;
+    }
+
+    UBSettings::settings()->defaultCrossSize = gridSize;
+
+    if (UBSettings::settings()->crossSize == oldDefault)
+    {
+        UBSettings::settings()->crossSize = gridSize;
+    }
+
+    if (mActiveScene->isEmpty() && mActiveScene->backgroundGridSize() == oldDefault)
+    {
+        mActiveScene->setBackgroundGridSize(gridSize);
+    }
+
+    emit backgroundChanged();
 }
 
 int UBBoardController::currentPage() const
@@ -2158,6 +2204,7 @@ void UBBoardController::updateSystemScaleFactor()
 
         restoreViewPositionOnCurrentScene();
         mActiveScene->setBackgroundZoomFactor(mControlView->transform().m11());
+        updateDefaultGridSize();
     }
     else
     {

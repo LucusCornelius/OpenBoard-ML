@@ -201,6 +201,8 @@ class UBBoardController : public UBDocumentContainer
             return mInitialDocumentScene;
         }
 
+        void updateDefaultGridSize();
+
     public slots:
         void showDocumentsDialog();
         void showKeyboard(bool show);
@@ -297,6 +299,7 @@ class UBBoardController : public UBDocumentContainer
 
     private:
         void initBackgroundGridSize();
+        int calibratedGridSize() const;
         void updatePageSizeState();
         int autosaveTimeoutFromSettings() const;
         void buildColorActions();

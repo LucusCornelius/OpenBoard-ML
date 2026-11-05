@@ -31,6 +31,27 @@
 #include <QSvgGenerator>
 
 
+// uuids of the rulings offered by default in the background palette
+const QUuid UBBackgroundManager::blankBackground{QUuid::fromString(QStringLiteral("{84836d5a-1846-4c91-9ff9-f2c4d118364d}"))};
+const QUuid UBBackgroundManager::linedBackground{QUuid::fromString(QStringLiteral("{0de33238-c30e-4396-8ec4-2bfc53304389}"))};
+const QUuid UBBackgroundManager::grid1cmBackground{QUuid::fromString(QStringLiteral("{7493c8bb-6d98-4be6-966c-fbddf9eff529}"))};
+const QUuid UBBackgroundManager::grid5mmBackground{QUuid::fromString(QStringLiteral("{1655ed23-9290-444a-86b8-4774a1b8f0be}"))};
+
+static QStringList preferredBackgroundUuids()
+{
+    QStringList uuidList{UBSettings::settings()->value("Board/BackgroundRulingList").toStringList()};
+    uuidList.removeAll(QString{});
+
+    if (uuidList.isEmpty())
+    {
+        // fallback if neither OpenBoard.config nor the user settings contain a list
+        uuidList << UBBackgroundManager::blankBackground.toString() << UBBackgroundManager::linedBackground.toString()
+                 << UBBackgroundManager::grid1cmBackground.toString() << UBBackgroundManager::grid5mmBackground.toString();
+    }
+
+    return uuidList;
+}
+
 UBBackgroundManager::UBBackgroundManager(QObject *parent)
     : QObject{parent}
 {
@@ -105,7 +126,7 @@ const QList<const UBBackgroundRuling*> UBBackgroundManager::backgrounds() const
 {
     QList<const UBBackgroundRuling*> backgroundList;
 
-    QStringList uuidList{UBSettings::settings()->value("Board/BackgroundRulingList").toStringList()};
+    QStringList uuidList{preferredBackgroundUuids()};
 
     // first add rulings from list
     for (const auto& uuid : uuidList)
@@ -127,6 +148,37 @@ const QList<const UBBackgroundRuling*> UBBackgroundManager::backgrounds() const
     }
 
     return backgroundList;
+}
+
+const QList<const UBBackgroundRuling*> UBBackgroundManager::preferredBackgrounds() const
+{
+    QList<const UBBackgroundRuling*> backgroundList;
+
+    for (const auto& uuid : preferredBackgroundUuids())
+    {
+        const auto ruling = background(QUuid::fromString(uuid));
+
+        if (ruling && ruling->isValid() && !backgroundList.contains(ruling))
+        {
+            backgroundList << ruling;
+        }
+    }
+
+    if (backgroundList.isEmpty())
+    {
+        // never show an empty palette
+        return backgrounds();
+    }
+
+    return backgroundList;
+}
+
+bool UBBackgroundManager::isPreferred(const QUuid& uuid) const
+{
+    const auto uuidList{preferredBackgroundUuids()};
+
+    return std::any_of(uuidList.cbegin(), uuidList.cend(),
+                       [&uuid](const QString& entry) { return QUuid::fromString(entry) == uuid; });
 }
 
 QAction *UBBackgroundManager::backgroundAction(const UBBackgroundRuling &background, bool dark)

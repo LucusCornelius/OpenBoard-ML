@@ -23,6 +23,8 @@
 
 #include "UBPreferredBackgroundWidget.h"
 
+#include <QCheckBox>
+
 #include "board/UBBoardController.h"
 #include "core/UBApplication.h"
 #include "gui/UBBackgroundManager.h"
@@ -246,9 +248,15 @@ void UBPreferredBackgroundWidget::savePreferrdBackgrounds() const
 {
     QList<QUuid> uuidList;
 
-    for (int i = 0; i < mLayout->count() && i < 6; ++i)
+    // backgrounds checked for the palette, in the order of the layout
+    for (int i = 0; i < mLayout->count(); ++i)
     {
-        uuidList << mLayout->itemAt(i)->widget()->property("uuid").toUuid();
+        const auto backgroundWidget = dynamic_cast<BackgroundWidget*>(mLayout->itemAt(i)->widget());
+
+        if (backgroundWidget && backgroundWidget->paletteCheckBox()->isChecked())
+        {
+            uuidList << backgroundWidget->property("uuid").toUuid();
+        }
     }
 
     UBApplication::boardController->backgroundManager()->savePreferredBackgrounds(uuidList);
@@ -279,6 +287,32 @@ void UBPreferredBackgroundWidget::updateBackgroundButtons()
         auto widget = new BackgroundWidget{pixmap, text, this};
         widget->setProperty("uuid", background->uuid());
         widget->setToolTip(text);
+        widget->paletteCheckBox()->setChecked(bgManager->isPreferred(background->uuid()));
+
+        const auto checkBox = widget->paletteCheckBox();
+
+        connect(checkBox, &QCheckBox::toggled, this, [this, checkBox](bool checked){
+            if (!checked)
+            {
+                // keep at least one background in the palette
+                bool anyChecked = false;
+
+                for (int i = 0; i < mLayout->count() && !anyChecked; ++i)
+                {
+                    const auto backgroundWidget = dynamic_cast<BackgroundWidget*>(mLayout->itemAt(i)->widget());
+                    anyChecked = backgroundWidget && backgroundWidget->paletteCheckBox()->isChecked();
+                }
+
+                if (!anyChecked)
+                {
+                    const QSignalBlocker blocker{checkBox};
+                    checkBox->setChecked(true);
+                    return;
+                }
+            }
+
+            savePreferrdBackgrounds();
+        });
 
         mLayout->addWidget(widget);
     }
@@ -302,15 +336,24 @@ UBPreferredBackgroundWidget::BackgroundWidget::BackgroundWidget(const QPixmap& p
     label->setWordWrap(true);
     label->setMaximumWidth(pixmap.width());
 
+    mPaletteCheckBox = new QCheckBox{UBPreferredBackgroundWidget::tr("Show in palette"), this};
+    mPaletteCheckBox->setToolTip(UBPreferredBackgroundWidget::tr("Show this background in the background palette. Drag the backgrounds to change their order."));
+
     auto layout = new QVBoxLayout{this};
     layout->setSpacing(0);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(icon);
     layout->addWidget(label);
+    layout->addWidget(mPaletteCheckBox, 0, Qt::AlignHCenter);
     setLayout(layout);
 }
 
 QPixmap UBPreferredBackgroundWidget::BackgroundWidget::pixmap() const
 {
     return mPixmap;
+}
+
+QCheckBox* UBPreferredBackgroundWidget::BackgroundWidget::paletteCheckBox() const
+{
+    return mPaletteCheckBox;
 }

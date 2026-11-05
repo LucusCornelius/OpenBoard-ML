@@ -1,7 +1,8 @@
 <bg:background xmlns:bg="http://openboard.org/template/background/">
     <bg:uuid>7493c8bb-6d98-4be6-966c-fbddf9eff529</bg:uuid>
-    <bg:description xml:lang="en">Crossed</bg:description>
-    <bg:description xml:lang="de">Kariert</bg:description>
+    <bg:description xml:lang="en">Grid 1 cm</bg:description>
+    <bg:description xml:lang="de">Kariert 1 cm</bg:description>
+    <bg:description xml:lang="nl">Ruitjes 1 cm</bg:description>
     <bg:attributes crossed="true"/>
     <bg:linegroup>
         <bg:angle>0</bg:angle>

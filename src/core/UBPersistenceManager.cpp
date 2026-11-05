@@ -826,7 +826,15 @@ std::shared_ptr<UBGraphicsScene> UBPersistenceManager::createDocumentSceneAt(std
     }
 
     const auto uuid = UBSettings::settings()->UBSettings::pageBackgroundUuid();
-    const auto background = UBApplication::boardController->backgroundManager()->background(uuid);
+    const auto bgManager = UBApplication::boardController->backgroundManager();
+    auto background = bgManager->background(uuid);
+
+    if (!background)
+    {
+        // no or unknown background chosen yet: use the blank ruling
+        background = bgManager->background(UBBackgroundManager::blankBackground);
+    }
+
     newScene->setSceneBackground(UBSettings::settings()->isDarkBackground(), background);
 
     newScene->setBackgroundGridSize(UBSettings::settings()->crossSize);

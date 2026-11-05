@@ -1,0 +1,23 @@
+<bg:background xmlns:bg="http://openboard.org/template/background/">
+    <bg:uuid>1655ed23-9290-444a-86b8-4774a1b8f0be</bg:uuid>
+    <bg:description xml:lang="en">Grid 0.5 cm</bg:description>
+    <bg:description xml:lang="de">Kariert 0,5 cm</bg:description>
+    <bg:description xml:lang="nl">Ruitjes 0,5 cm</bg:description>
+    <bg:attributes crossed="true"/>
+    <bg:linegroup>
+        <bg:angle>0</bg:angle>
+        <bg:spacing>5</bg:spacing>
+        <bg:line>
+            <bg:offset>0</bg:offset>
+            <bg:width>1</bg:width>
+        </bg:line>
+    </bg:linegroup>
+    <bg:linegroup>
+        <bg:angle>90</bg:angle>
+        <bg:spacing>5</bg:spacing>
+        <bg:line>
+            <bg:offset>0</bg:offset>
+            <bg:width>1</bg:width>
+        </bg:line>
+    </bg:linegroup>
+</bg:background>

@@ -107,6 +107,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBColorPickerPopup.h
     UBColorPaletteDialog.cpp
     UBColorPaletteDialog.h
+    UBScreenCalibration.cpp
+    UBScreenCalibration.h
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)

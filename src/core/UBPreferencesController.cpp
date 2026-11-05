@@ -36,6 +36,7 @@
 
 #include "gui/UBCircleFrame.h"
 #include "gui/UBColorPaletteDialog.h"
+#include "gui/UBScreenCalibration.h"
 
 #include "core/UBSetting.h"
 #include "core/UBApplicationController.h"
@@ -378,6 +379,9 @@ void UBPreferencesController::wire()
 
     QObject::connect(mDarkBackgroundGridColorPicker, SIGNAL(colorSelected(const QColor&)), this, SLOT(setCrossColorOnDarkBackground(const QColor&)));
     connect(mPreferencesUI->darkBackgroundOpacitySlider, SIGNAL(valueChanged(int)), this, SLOT(darkBackgroundCrossOpacityValueChanged(int)));
+
+    // screen calibration for real size grids
+    mPreferencesUI->gridLayout_17->addWidget(new UBScreenCalibrationWidget{mPreferencesUI->gridTab}, 2, 0);
 
     // pen
     mPenProperties = new UBBrushPropertiesFrame(mPreferencesUI->penFrame);

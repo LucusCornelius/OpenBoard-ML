@@ -15,6 +15,30 @@ UBBackgroundPalette::UBBackgroundPalette(QWidget * parent)
 
     connect(UBApplication::boardController->backgroundManager(), &UBBackgroundManager::preferredBackgroundChanged,
             this, &UBBackgroundPalette::createActions);
+
+    // keep palette in sync when the background is changed by shortcuts or page changes
+    connect(UBApplication::boardController, &UBBoardController::backgroundChanged, this, [this]() {
+        if (isVisible())
+        {
+            refresh();
+        }
+    });
+
+    // shortcut-able actions to select one of the default backgrounds on the current page
+    const auto mainWindow = UBApplication::mainWindow;
+
+    connect(mainWindow->actionBackgroundBlank, &QAction::triggered, this, [this]() {
+        selectBackground(UBBackgroundManager::blankBackground);
+    });
+    connect(mainWindow->actionBackgroundLined, &QAction::triggered, this, [this]() {
+        selectBackground(UBBackgroundManager::linedBackground);
+    });
+    connect(mainWindow->actionBackgroundGrid1cm, &QAction::triggered, this, [this]() {
+        selectBackground(UBBackgroundManager::grid1cmBackground);
+    });
+    connect(mainWindow->actionBackgroundGrid5mm, &QAction::triggered, this, [this]() {
+        selectBackground(UBBackgroundManager::grid5mmBackground);
+    });
 }
 
 void UBBackgroundPalette::init()
@@ -39,7 +63,7 @@ void UBBackgroundPalette::init()
     mButtonScrollArea = new QScrollArea{this};
     mButtonScrollArea->setObjectName("BackgroundPaletteScrollArea");
     mButtonScrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    mButtonScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    mButtonScrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     mButtonScrollArea->setWidgetResizable(true);
 
     QWidget* bgWidget = new QWidget{mButtonScrollArea};
@@ -55,9 +79,15 @@ void UBBackgroundPalette::init()
     mSlider->setMaximum(UBSettings::settings()->maxCrossSize);
     mSlider->setSingleStep(2);
     mSlider->setTracking(true); // valueChanged() is emitted during movement and not just upon releasing the slider
+    connect(mSlider, &QSlider::valueChanged, this, &UBBackgroundPalette::sliderValueChanged);
 
     mSliderLabel = new QLabel(tr("Grid size"));
     mSliderLabel->setObjectName("BackgroundPaletteLabel");
+    mSliderValueLabel = new QLabel;
+    mSliderValueLabel->setObjectName("BackgroundPaletteLabel");
+    mSliderValueLabel->setToolTip(tr("Spacing of the lines on screen at 100% zoom"));
+    // reserve space for the longest text to avoid jumping of the layout
+    mSliderValueLabel->setMinimumWidth(mSliderValueLabel->fontMetrics().horizontalAdvance("00.00 cm"));
     mLightDarkModeLabel = new QLabel(tr("Switch background color"));
     mLightDarkModeLabel->setObjectName("BackgroundPaletteLabel");
 
@@ -79,6 +109,7 @@ void UBBackgroundPalette::init()
     mBottomLayout->addSpacing(16);
     mBottomLayout->addWidget(mSliderLabel);
     mBottomLayout->addWidget(mSlider);
+    mBottomLayout->addWidget(mSliderValueLabel);
     mBottomLayout->addWidget(mResetDefaultGridSizeButton);
     mBottomLayout->addSpacing(16);
 
@@ -107,7 +138,7 @@ void UBBackgroundPalette::createActions()
     }
 
     // then add actions for the backgrounds from the background manager
-    const QList<const UBBackgroundRuling*> backgrounds = UBApplication::boardController->backgroundManager()->backgrounds();
+    const QList<const UBBackgroundRuling*> backgrounds = UBApplication::boardController->backgroundManager()->preferredBackgrounds();
     const auto dark = false;  // starting value, updated later with updateActions()
     const auto bgManager = UBApplication::boardController->backgroundManager();
 
@@ -163,10 +194,19 @@ void UBBackgroundPalette::addAction(QAction* action)
 
     const auto size = action->icon().availableSizes().at(0);
 
-    if (mButtonScrollArea->height() < size.height())
+    // count the background buttons, they have an uuid
+    const auto buttonCount = std::count_if(mActions.cbegin(), mActions.cend(), [](const QAction* a) {
+        return !a->property("uuid").toUuid().isNull();
+    });
+
+    // one row if all buttons fit into it, else make part of the second row visible
+    const int rowHeight = std::max(size.height(), button->sizeHint().height()) + 2 * mButtonScrollArea->frameWidth() + 6;
+    const int height = buttonCount <= 6 ? rowHeight : size.height() * 3 / 2;
+    mButtonScrollArea->setVerticalScrollBarPolicy(buttonCount <= 6 ? Qt::ScrollBarAlwaysOff : Qt::ScrollBarAlwaysOn);
+
+    if (mButtonScrollArea->height() != height)
     {
-        // make part of the second row visible
-        mButtonScrollArea->setFixedHeight(size.height() * 3 / 2);
+        mButtonScrollArea->setFixedHeight(height);
         // account for the width of the scrollbar
         mButtonScrollArea->setFixedWidth(6 * size.width() + 40);
     }
@@ -236,16 +276,12 @@ void UBBackgroundPalette::clearLayout()
 
 void UBBackgroundPalette::showEvent(QShowEvent* event)
 {
-    backgroundChanged();
-
-    mSlider->setValue(UBApplication::boardController->activeScene()->backgroundGridSize());
-    connect(mSlider, SIGNAL(valueChanged(int)),
-            this, SLOT(sliderValueChanged(int)));
-
     const auto scene = UBApplication::boardController->activeScene();
     mIsDark = scene->isDarkBackground();
     mLightDarkModeSwitch->setChecked(mIsDark);
     mBackground = scene->background();
+
+    refresh();
 
     QWidget::showEvent(event);
 }
@@ -256,17 +292,31 @@ void UBBackgroundPalette::sliderValueChanged(int value)
     UBSettings::settings()->crossSize = value; // since this function is called (indirectly, by refresh) when we switch scenes, the settings will always have the current scene's cross size.
 
     UBApplication::boardController->activeScene()->setModified(true);
+    updateGridSizeLabel();
 }
 
 void UBBackgroundPalette::defaultBackgroundGridSize()
 {
+    updateSliderRange();
+    const QSignalBlocker blocker{mSlider};
     mSlider->setValue(UBSettings::settings()->defaultCrossSize);
     sliderValueChanged(UBSettings::settings()->defaultCrossSize);
 }
 
 void UBBackgroundPalette::toggleBackgroundColor(bool checked)
 {
-    mIsDark = checked;
+    Q_UNUSED(checked)
+
+    const auto scene = UBApplication::boardController->activeScene();
+
+    if (!scene)
+    {
+        return;
+    }
+
+    // use the state of the active scene, the palette may be outdated when triggered by a shortcut
+    mIsDark = !scene->isDarkBackground();
+    mBackground = scene->background();
     UBApplication::boardController->setBackground(mIsDark, mBackground);
     backgroundChanged();
 }
@@ -279,11 +329,26 @@ void UBBackgroundPalette::changeBackground(bool checked)
 
         if (action)
         {
-            const auto uuid = action->property("uuid").toUuid();
-            mBackground = UBApplication::boardController->backgroundManager()->background(uuid);
-            UBApplication::boardController->setBackground(mIsDark, mBackground);
+            selectBackground(action->property("uuid").toUuid());
         }
     }
+}
+
+void UBBackgroundPalette::selectBackground(const QUuid& uuid)
+{
+    const auto scene = UBApplication::boardController->activeScene();
+    const auto background = UBApplication::boardController->backgroundManager()->background(uuid);
+
+    if (!scene || !background)
+    {
+        return;
+    }
+
+    mIsDark = scene->isDarkBackground();
+    mBackground = background;
+    UBApplication::boardController->setBackground(mIsDark, mBackground);
+    backgroundChanged();
+    updateGridSizeLabel();
 }
 
 void UBBackgroundPalette::backgroundChanged()
@@ -294,5 +359,52 @@ void UBBackgroundPalette::backgroundChanged()
 void UBBackgroundPalette::refresh()
 {
     backgroundChanged();
-    mSlider->setValue(UBApplication::boardController->activeScene()->backgroundGridSize());
+    updateSliderRange();
+
+    {
+        const QSignalBlocker blocker{mSlider};
+        mSlider->setValue(UBApplication::boardController->activeScene()->backgroundGridSize());
+    }
+
+    // new pages use the grid size of the current page
+    UBSettings::settings()->crossSize = UBApplication::boardController->activeScene()->backgroundGridSize();
+
+    updateGridSizeLabel();
+}
+
+void UBBackgroundPalette::updateGridSizeLabel()
+{
+    const auto scene = UBApplication::boardController->activeScene();
+    const int defaultGridSize = UBSettings::settings()->defaultCrossSize;
+
+    if (!scene || defaultGridSize <= 0)
+    {
+        mSliderValueLabel->clear();
+        return;
+    }
+
+    // The grid size is the number of scene pixels per ruling centimetre, the default grid size
+    // is calibrated to show 1 cm on screen at 100% zoom. Show the spacing of the ruling lines.
+    const auto background = scene->background();
+    double spacingMm = background ? background->primarySpacing() : 0.;
+
+    if (spacingMm <= 0.)
+    {
+        spacingMm = 10.;
+    }
+
+    const double spacingCm = spacingMm / 10. * scene->backgroundGridSize() / defaultGridSize;
+    mSliderValueLabel->setText(tr("%1 cm").arg(spacingCm, 0, 'f', spacingCm < 0.5 ? 2 : 1));
+}
+
+void UBBackgroundPalette::updateSliderRange()
+{
+    // make sure the calibrated default and the current value are always reachable
+    const int defaultGridSize = UBSettings::settings()->defaultCrossSize;
+    const auto scene = UBApplication::boardController->activeScene();
+    const int current = scene ? scene->backgroundGridSize() : defaultGridSize;
+
+    const QSignalBlocker blocker{mSlider};
+    mSlider->setMinimum(std::min({UBSettings::settings()->minCrossSize, defaultGridSize / 2, current}));
+    mSlider->setMaximum(std::max({UBSettings::settings()->maxCrossSize, defaultGridSize * 3, current}));
 }
