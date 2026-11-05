@@ -33,6 +33,8 @@
 #include <QCheckBox>
 #include <QWebEnginePage>
 #include <QWebChannel>
+#include <QFile>
+#include <QDebug>
 #include "UBStartupHintsPalette.h"
 #include "core/UBApplication.h"
 #include "core/UBThemeManager.h"
@@ -54,7 +56,7 @@ UBStartupHintsPalette::UBStartupHintsPalette(QWidget *parent) :
     mLayout = new QVBoxLayout();
     mLayout->setContentsMargins(10,28,10,10);
     setLayout(mLayout);
-    QString url = UBSettings::settings()->applicationStartupHintsDirectory() + "/index.html";
+    QString url = hintsIndexFile();
     mpWebView = new UBWebEngineView(this);
     mpSankoreAPI = new UBWidgetUniboardAPI(0);
     QWebChannel* channel = new QWebChannel(this);
@@ -82,6 +84,22 @@ UBStartupHintsPalette::~UBStartupHintsPalette()
 {
 //    DELETEPTR(mButtonLayout);
 //    DELETEPTR(mLayout);
+}
+
+QString UBStartupHintsPalette::hintsIndexFile()
+{
+    return UBSettings::settings()->applicationStartupHintsDirectory() + "/index.html";
+}
+
+bool UBStartupHintsPalette::hintsAvailable()
+{
+    const QString indexFile = hintsIndexFile();
+
+    if (QFile::exists(indexFile))
+        return true;
+
+    qWarning() << "Startup hints not available, file not found:" << indexFile;
+    return false;
 }
 
 void UBStartupHintsPalette::paintEvent(QPaintEvent *event)

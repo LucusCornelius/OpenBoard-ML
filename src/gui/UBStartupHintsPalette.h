@@ -46,6 +46,11 @@ public:
     UBStartupHintsPalette(QWidget *parent = 0);
     ~UBStartupHintsPalette();
 
+    // Path of the hints start page (index.html) inside the startup hints directory
+    static QString hintsIndexFile();
+    // True if the hints start page exists on disk; logs a warning otherwise
+    static bool hintsAvailable();
+
 
 signals:
 

@@ -855,7 +855,8 @@ void UBWebController::onOpenTutorial()
 
 void UBWebController::onHintsAndTips()
 {
-    UBApplication::boardController->paletteManager()->tipsPalette()->show();
+    if (UBStartupHintsPalette* tipsPalette = UBApplication::boardController->paletteManager()->tipsPalette())
+        tipsPalette->show();
 }
 
 void UBWebController::captureStripe(QPointF pos, QSize size, QPixmap* pix, QPointF scrollPosition)

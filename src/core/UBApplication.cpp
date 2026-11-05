@@ -418,7 +418,8 @@ int UBApplication::exec(const QString& pFileToImport)
 
     if(UBSettings::settings()->appStartupHintsEnabled->get().toBool())
     {
-        UBApplication::boardController->paletteManager()->tipsPalette()->show();
+        if (UBStartupHintsPalette* tipsPalette = UBApplication::boardController->paletteManager()->tipsPalette())
+            tipsPalette->show();
     }
 
     emit UBDrawingController::drawingController()->colorPaletteChanged();

@@ -246,7 +246,11 @@ void UBBoardPaletteManager::setupPalettes()
 
     mStylusPalette->stackUnder(mZoomPalette);
 
-    mTipPalette = new UBStartupHintsPalette(mContainer);
+    // Only create the hints palette when its web page is installed; otherwise the
+    // web view would show an error page ("Your file couldn't be accessed").
+    if (UBStartupHintsPalette::hintsAvailable())
+        mTipPalette = new UBStartupHintsPalette(mContainer);
+    UBApplication::mainWindow->actionHintsAndTips->setEnabled(mTipPalette != nullptr);
 
     mBackgroundsPalette = new UBBackgroundPalette(mContainer);
     mBackgroundsPalette->setButtonIconSize(QSize(128, 128));

@@ -81,6 +81,7 @@ UB_I18N.files = resources/i18n/*.qm
 UB_LIBRARY.files = resources/library
 UB_FONTS.files = resources/fonts
 UB_THIRDPARTY_INTERACTIVE.files = thirdparty/interactive
+UB_STARTUP_HINTS.files = resources/startupHints
 
 DEFINES += NO_THIRD_PARTY_WARNINGS
 DEFINES += UBVERSION=\"\\\"$${LONG_VERSION}\"\\\" \
@@ -135,6 +136,7 @@ win32 {
    UB_I18N.path = $$DESTDIR/i18n
    UB_ETC.path = $$DESTDIR
    UB_THIRDPARTY_INTERACTIVE.path = $$DESTDIR/library
+   UB_STARTUP_HINTS.path = $$DESTDIR
    system(md $$replace(BUILD_DIR, /, \\))
    system(echo "$$VERSION" > $$BUILD_DIR/version)
    system(echo "$$LONG_VERSION" > $$BUILD_DIR/longversion)
@@ -253,6 +255,8 @@ macx {
    UB_FONTS.path = "$$RESOURCES_DIR"
    UB_THIRDPARTY_INTERACTIVE.files = $$files($$THIRD_PARTY_PATH/interactive/*)
    UB_THIRDPARTY_INTERACTIVE.path = "$$RESOURCES_DIR/library/interactive"
+   UB_STARTUP_HINTS.files = "resources/startupHints"
+   UB_STARTUP_HINTS.path = "$$RESOURCES_DIR"
    UB_MACX_ICNS.files = $$files(resources/macx/*.icns)
    UB_MACX_ICNS.path = "$$RESOURCES_DIR"
    UB_MACX_EXTRAS.files = "resources/macx/Save PDF to OpenBoard.workflow"
@@ -474,6 +478,7 @@ macx {
        UB_LIBRARY \
        UB_FONTS \
        UB_THIRDPARTY_INTERACTIVE \
+       UB_STARTUP_HINTS \
        UB_MACX_ICNS \
        UB_MACX_EXTRAS \
        SPARKLE_KEY \
@@ -512,6 +517,7 @@ linux-g++* {
     UB_I18N.path = $$DESTDIR/i18n
     UB_ETC.path = $$DESTDIR
     UB_THIRDPARTY_INTERACTIVE.path = $$DESTDIR/library
+    UB_STARTUP_HINTS.path = $$DESTDIR
     system(mkdir -p $$BUILD_DIR)
     system(echo "$$VERSION" > $$BUILD_DIR/version)
     system(echo "$$LONG_VERSION" > $$BUILD_DIR/longversion)
@@ -560,7 +566,8 @@ TRANSLATIONS = resources/i18n/OpenBoard_ar.ts \
 INSTALLS = UB_ETC \
    UB_I18N \
    UB_LIBRARY \
-   UB_THIRDPARTY_INTERACTIVE
+   UB_THIRDPARTY_INTERACTIVE \
+   UB_STARTUP_HINTS
 
 DISTFILES += \
     resources/images/moveDown.svg \
