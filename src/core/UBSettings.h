@@ -334,6 +334,10 @@ class UBSettings : public QObject
         UBColorListSetting* boardMarkerDarkBackgroundColors;
         UBColorListSetting* boardMarkerDarkBackgroundSelectedColors;
 
+        // Named color palettes (JSON array) and the name of the active one
+        UBSetting* boardColorPalettes;
+        UBSetting* boardActiveColorPalette;
+
         UBSetting* showEraserPreviewCircle;
         UBSetting* showMarkerPreviewCircle;
         UBSetting* showPenPreviewCircle;
