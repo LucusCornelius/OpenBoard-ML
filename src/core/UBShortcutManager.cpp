@@ -190,7 +190,8 @@ void UBShortcutManager::addMainActions(UBMainWindow *mainWindow)
                    mainWindow->actionCut,
                    mainWindow->actionCopy,
                    mainWindow->actionPaste,
-                   mainWindow->actionQuit
+                   mainWindow->actionQuit,
+                   mainWindow->actionToggleFullScreen
                }, mainWindow);
 
     // Don't allow to modify these shortcuts

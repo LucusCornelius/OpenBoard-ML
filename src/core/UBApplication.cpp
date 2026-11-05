@@ -314,13 +314,8 @@ int UBApplication::exec(const QString& pFileToImport)
     displayManager = new UBDisplayManager(staticMemoryCleaner);
 
     if (UBSettings::settings()->appRunInWindow->get().toBool()) {
-        mainWindow = new UBMainWindow(0,
-                Qt::Window |
-                Qt::WindowCloseButtonHint |
-                Qt::WindowMinimizeButtonHint |
-                Qt::WindowMaximizeButtonHint |
-                Qt::WindowShadeButtonHint
-        ); // deleted by application destructor
+        // normal, resizable top level window with title bar and window buttons
+        mainWindow = new UBMainWindow(0, UBDisplayManager::windowModeFlags()); // deleted by application destructor
     } else {
         mainWindow = new UBMainWindow(0, Qt::FramelessWindowHint); // deleted by application destructor
     }
@@ -385,6 +380,10 @@ int UBApplication::exec(const QString& pFileToImport)
 
     connect(mainWindow->actionPreferences, SIGNAL(triggered()), mPreferencesController, SLOT(show()));
 
+    mainWindow->actionToggleFullScreen->setChecked(displayManager->isControlFullScreen());
+    connect(mainWindow->actionToggleFullScreen, &QAction::triggered, this, &UBApplication::toggleFullScreen);
+    connect(displayManager, &UBDisplayManager::controlFullScreenChanged, mainWindow->actionToggleFullScreen, &QAction::setChecked);
+
 
     toolBarPositionChanged(UBSettings::settings()->appToolBarPositionedAtTop->get());
 
@@ -397,6 +396,12 @@ int UBApplication::exec(const QString& pFileToImport)
     connect(mainWindow->actionCut, SIGNAL(triggered()), applicationController, SLOT(actionCut()));
     connect(mainWindow->actionCopy, SIGNAL(triggered()), applicationController, SLOT(actionCopy()));
     connect(mainWindow->actionPaste, SIGNAL(triggered()), applicationController, SLOT(actionPaste()));
+
+    // window title: "OpenBoard" plus the name of the current document
+    connect(boardController, &UBBoardController::documentSet, this, &UBApplication::updateWindowTitle);
+    connect(boardController, &UBBoardController::activeSceneChanged, this, &UBApplication::updateWindowTitle);
+    connect(UBPersistenceManager::persistenceManager(), &UBPersistenceManager::documentMetadataChanged, this, &UBApplication::updateWindowTitle);
+    updateWindowTitle();
 
     applicationController->initScreenLayout(bUseMultiScreen);
     boardController->setupLayout();
@@ -432,6 +437,31 @@ int UBApplication::exec(const QString& pFileToImport)
 void UBApplication::onScreenCountChanged(int newCount)
 {
     mainWindow->actionMultiScreen->setEnabled(newCount > 1);
+}
+
+void UBApplication::toggleFullScreen(bool fullScreen)
+{
+    displayManager->setControlFullScreen(fullScreen);
+}
+
+void UBApplication::updateWindowTitle()
+{
+    QString title = applicationName();
+
+    if (boardController)
+    {
+        std::shared_ptr<UBDocumentProxy> document = boardController->selectedDocument();
+
+        if (document && !document->name().isEmpty())
+        {
+            title += " - " + document->name();
+        }
+    }
+
+    if (mainWindow)
+    {
+        mainWindow->setWindowTitle(title);
+    }
 }
 
 void UBApplication::showMinimized()
@@ -534,6 +564,9 @@ void UBApplication::closing()
     if (webController)
         webController->closing();
 
+    if (displayManager)
+        displayManager->saveControlWindowGeometry();
+
     UBSettings::settings()->closing();
 
     UBSettings::settings()->appToolBarPositionedAtTop->set(mainWindow->toolBarArea(mainWindow->boardToolBar) == Qt::TopToolBarArea);
@@ -592,6 +625,7 @@ void UBApplication::decorateActionMenu(QAction* action)
             menu->addSeparator();
             menu->addAction(mainWindow->actionPreferences);
             menu->addAction(mainWindow->actionMultiScreen);
+            menu->addAction(mainWindow->actionToggleFullScreen);
             menu->addSeparator();
 
             menu->addAction(mainWindow->actionPodcast);

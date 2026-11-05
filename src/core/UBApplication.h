@@ -137,6 +137,10 @@ class UBApplication : public SingleApplication
 //#endif
         void onScreenCountChanged(int newCount);
 
+        void toggleFullScreen(bool fullScreen);
+
+        void updateWindowTitle();
+
     private:
         void updateProtoActionsState();
         void setupTranslators(QStringList args);

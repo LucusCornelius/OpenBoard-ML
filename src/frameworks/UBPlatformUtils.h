@@ -205,6 +205,7 @@ public:
         static void bringPreviousProcessToFront();
         static QString osUserLoginName();
         static void hideMenuBarAndDock();
+        static void showMenuBarAndDock();
         static void setWindowNonActivableFlag(QWidget* widget, bool nonAcivable);
         static QString computerName();
         static UBKeyboardLocale** getKeyboardLayouts(int& nCount);

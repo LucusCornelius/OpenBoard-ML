@@ -155,6 +155,19 @@ void UBMainWindow::closeEvent(QCloseEvent *event)
     emit closeEvent_Signal(event);
 }
 
+void UBMainWindow::changeEvent(QEvent *event)
+{
+    QMainWindow::changeEvent(event);
+
+#ifdef Q_OS_MACOS
+    // keep the full screen action in sync when the green zoom button is used
+    if (event->type() == QEvent::WindowStateChange && UBApplication::displayManager)
+    {
+        UBApplication::displayManager->controlWindowStateChanged();
+    }
+#endif
+}
+
 // work around for handling tablet events on MAC OS with Qt 4.8.0 and above
 #if defined(Q_OS_OSX)
 bool UBMainWindow::event(QEvent *event)

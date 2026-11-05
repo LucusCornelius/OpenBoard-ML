@@ -110,6 +110,17 @@ void UBPlatformUtils::hideMenuBarAndDock()
 
 }
 
+void UBPlatformUtils::showMenuBarAndDock()
+{
+    @try {
+        [NSApp setPresentationOptions:NSApplicationPresentationDefault];
+    }
+
+    @catch(NSException * exception) {
+        qDebug() << "Error setting presentation options";
+    }
+}
+
 
 QString UBPlatformUtils::applicationResourcesDirectory()
 {
@@ -625,9 +636,13 @@ void UBPlatformUtils::showFullScreen(QWidget *pWidget)
      * to NSApplication, we have to avoid calling QWidget::showFullScreen on OSX.
     */
 
-    if (UBSettings::settings()->appRunInWindow->get().toBool() &&
+    if (!UBApplication::displayManager->isControlFullScreen() &&
             pWidget == UBApplication::displayManager->widget(ScreenRole::Control)) {
         pWidget->show();
+    } else if (pWidget == UBApplication::displayManager->widget(ScreenRole::Control) &&
+               !(pWidget->windowFlags() & Qt::FramelessWindowHint)) {
+        // full screen toggled from window mode: use the native macOS full screen
+        pWidget->showFullScreen();
     } else {
         pWidget->showMaximized();
 

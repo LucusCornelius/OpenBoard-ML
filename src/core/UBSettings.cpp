@@ -294,7 +294,9 @@ void UBSettings::init()
     appStartupHintsEnabled = new UBSetting(this,"App","EnableStartupHints",false);
 
     appStartMode = new UBSetting(this, "App", "StartMode", "");
-    appRunInWindow = new UBSetting(this, "App", "RunInWindow", false);
+    appRunInWindow = new UBSetting(this, "App", "RunInWindow", true);
+    appMainWindowGeometry = new UBSetting(this, "App", "MainWindowGeometry", QVariant());
+    appMainWindowState = new UBSetting(this, "App", "MainWindowState", "normal");
 
     featureSliderPosition = new UBSetting(this, "Board", "FeatureSliderPosition", 40);
 

@@ -74,6 +74,7 @@ class UBMainWindow : public QMainWindow, public Ui::MainWindow
 
         virtual void keyPressEvent(QKeyEvent *event);
         virtual void closeEvent (QCloseEvent *event);
+        virtual void changeEvent(QEvent *event) override;
 
         virtual QMenu* createPopupMenu ()
         {

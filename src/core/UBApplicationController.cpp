@@ -364,7 +364,10 @@ void UBApplicationController::showBoard()
         UBApplication::boardController->show();
 
     mIsShowingDesktop = false;
-    UBPlatformUtils::hideMenuBarAndDock();
+    if (UBApplication::displayManager->isControlFullScreen())
+        UBPlatformUtils::hideMenuBarAndDock();
+    else
+        UBPlatformUtils::showMenuBarAndDock(); // window mode
     UBDrawingController::drawingController()->setInDesktopMode(false);
 
     mUninoteController->hideWindow();
@@ -417,7 +420,10 @@ void UBApplicationController::showDocument()
 {
     mMainWindow->webToolBar->hide();
     mMainWindow->boardToolBar->hide();
-    UBPlatformUtils::hideMenuBarAndDock();
+    if (UBApplication::displayManager->isControlFullScreen())
+        UBPlatformUtils::hideMenuBarAndDock();
+    else
+        UBPlatformUtils::showMenuBarAndDock(); // window mode
     mMainWindow->documentToolBar->show();
 
     mMainMode = Document;

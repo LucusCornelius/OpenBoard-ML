@@ -273,6 +273,8 @@ class UBSettings : public QObject
         UBSetting* appPreferredLanguage;
         UBSetting* appThemeMode;
         UBSetting* appRunInWindow;
+        UBSetting* appMainWindowGeometry;   // normal (non-maximised) geometry of the main window in window mode
+        UBSetting* appMainWindowState;      // "normal" or "maximized"
 
 
         UBSetting* appLastSessionDocumentUUID;

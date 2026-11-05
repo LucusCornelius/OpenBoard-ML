@@ -44,6 +44,7 @@ UBDisplayManager::UBDisplayManager(QObject *parent)
     : QObject(parent)
 {
     mUseMultiScreen = UBSettings::settings()->appUseMultiscreen->get().toBool();
+    mControlFullScreen = !UBSettings::settings()->appRunInWindow->get().toBool();
 
     initScreenIndexes();
 
@@ -442,50 +443,38 @@ void UBDisplayManager::positionScreens()
 
         QRect geometry = screenGeometry(ScreenRole::Control);
 
-        if (UBSettings::settings()->appRunInWindow->get().toBool())
+        if (!mControlFullScreen)
         {
-            if (controlWidget->property("isInitialized").toBool())
+            // window mode: a normal, resizable top level window
+            positionControlWindow(controlWidget);
+        }
+        else if (!(controlWidget->windowFlags() & Qt::FramelessWindowHint) && controlWidget->isFullScreen())
+        {
+            // full screen entered at runtime from window mode: keep it as it is
+            if (controlWidget->isHidden())
             {
-                // reuse previous size and relative position
-                QRect previousGeometry = controlWidget->geometry();
-                QScreen* previousScreen = QGuiApplication::screenAt(previousGeometry.topLeft());
-
-                if (previousScreen)
-                {
-                    QRect previousScreenGeometry = QGuiApplication::screenAt(previousGeometry.topLeft())->geometry();
-                    QPoint offset = previousGeometry.topLeft() - previousScreenGeometry.topLeft();
-                    geometry.setSize(previousGeometry.size());
-                    geometry.moveTo(geometry.topLeft() + offset);
-
-                    // make sure widget fits to screen
-                    geometry = screenGeometry(ScreenRole::Control).intersected(geometry);
-                }
-            }
-            else
-            {
-                // calculate an initial geometry for window mode
-                geometry.setSize(geometry.size() - QSize(150, 150));
-                geometry.translate(50, 50);
-                controlWidget->setProperty("isInitialized", true);
+                controlWidget->show();
             }
         }
+        else
+        {
+            // Sometimes moving control screen to the left won't operate...
+            // found out that resetting the geometry solves theses cases better than "showNormal() workaround"
+            // however there are cases when "showNormal()" is required to update control screen position, so doing both
+            controlWidget->showNormal();
 
-        // Sometimes moving control screen to the left won't operate...
-        // found out that resetting the geometry solves theses cases better than "showNormal() workaround"
-        // however there are cases when "showNormal()" is required to update control screen position, so doing both
-        controlWidget->showNormal();
+            // suppress resize events while resetting geometry
+            UBApplication::boardController->controlView()->installEventFilter(&resizeEventFilter);
+            controlWidget->setGeometry(QRect());
+            UBApplication::boardController->controlView()->removeEventFilter(&resizeEventFilter);
 
-        // suppress resize events while resetting geometry
-        UBApplication::boardController->controlView()->installEventFilter(&resizeEventFilter);
-        controlWidget->setGeometry(QRect());
-        UBApplication::boardController->controlView()->removeEventFilter(&resizeEventFilter);
-
-        qDebug() << "control geometry" << geometry;
-        controlWidget->setGeometry(geometry);
-        // with Qt6, setGeometry has not the desired effect so we additionally use move and resize
-        controlWidget->move(geometry.topLeft());
-        controlWidget->resize(geometry.size());
-        UBPlatformUtils::showFullScreen(controlWidget);
+            qDebug() << "control geometry" << geometry;
+            controlWidget->setGeometry(geometry);
+            // with Qt6, setGeometry has not the desired effect so we additionally use move and resize
+            controlWidget->move(geometry.topLeft());
+            controlWidget->resize(geometry.size());
+            UBPlatformUtils::showFullScreen(controlWidget);
+        }
     }
 
     if (widget(ScreenRole::Display) && hasDisplay() && mUseMultiScreen)
@@ -716,4 +705,247 @@ ScreenRole operator++(ScreenRole &role, int)
     ScreenRole old = role;  // copy old value
     ++role;                 // prefix increment
     return old;             // return old value
+}
+
+Qt::WindowFlags UBDisplayManager::windowModeFlags()
+{
+    Qt::WindowFlags flags = Qt::Window
+            | Qt::WindowTitleHint
+            | Qt::WindowSystemMenuHint
+            | Qt::WindowCloseButtonHint
+            | Qt::WindowMinimizeButtonHint
+            | Qt::WindowMaximizeButtonHint;
+
+#ifdef Q_OS_MACOS
+    // let the green zoom button switch to (native) full screen
+    flags |= Qt::WindowFullscreenButtonHint;
+#endif
+
+    return flags;
+}
+
+bool UBDisplayManager::isOnScreen(const QRect& geometry)
+{
+    if (!geometry.isValid())
+    {
+        return false;
+    }
+
+    // the upper part of the window (where the title bar is) must be reachable
+    const QRect top(geometry.left(), geometry.top(), geometry.width(), qMin(geometry.height(), 40));
+
+    for (QScreen* screen : QGuiApplication::screens())
+    {
+        const QRect visible = screen->availableGeometry().intersected(top);
+
+        if (visible.width() >= qMin(100, geometry.width()) && visible.height() >= qMin(20, geometry.height()))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+QRect UBDisplayManager::defaultControlWindowGeometry() const
+{
+    QScreen* controlScreen = screen(ScreenRole::Control);
+
+    if (!controlScreen)
+    {
+        controlScreen = QGuiApplication::primaryScreen();
+    }
+
+    // about 85% of the available screen area, centred
+    const QRect available = controlScreen->availableGeometry();
+    QRect geometry(QPoint(0, 0), available.size() * 0.85);
+    geometry.moveCenter(available.center());
+    return geometry;
+}
+
+void UBDisplayManager::positionControlWindow(QWidget* controlWidget)
+{
+    if (!mControlWindowInitialized)
+    {
+        // first positioning: restore the last geometry if it is still on a screen
+        mControlWindowInitialized = true;
+
+        UBSettings* settings = UBSettings::settings();
+        QRect geometry = settings->appMainWindowGeometry->get().toRect();
+        const bool maximized = settings->appMainWindowState->get().toString() == "maximized";
+
+        if (!isOnScreen(geometry))
+        {
+            geometry = defaultControlWindowGeometry();
+        }
+
+        qDebug() << "control window geometry" << geometry << (maximized ? "maximized" : "");
+
+        controlWidget->setGeometry(geometry);
+        controlWidget->move(geometry.topLeft());
+        controlWidget->resize(geometry.size());
+
+        if (maximized)
+        {
+            controlWidget->showMaximized();
+        }
+        else
+        {
+            controlWidget->showNormal();
+        }
+
+        return;
+    }
+
+    // keep size, position and maximised state chosen by the user,
+    // only bring the window back if it is no longer on any screen
+    if (!controlWidget->isMaximized() && !controlWidget->isFullScreen() && !isOnScreen(controlWidget->geometry()))
+    {
+        const QRect geometry = defaultControlWindowGeometry();
+        controlWidget->setGeometry(geometry);
+        controlWidget->move(geometry.topLeft());
+        controlWidget->resize(geometry.size());
+    }
+
+    if (controlWidget->isHidden())
+    {
+        controlWidget->show();
+    }
+}
+
+void UBDisplayManager::setControlFullScreen(bool fullScreen)
+{
+    QWidget* controlWidget = widget(ScreenRole::Control);
+
+    if (fullScreen == mControlFullScreen)
+    {
+        emit controlFullScreenChanged(mControlFullScreen);
+        return;
+    }
+
+    if (fullScreen && controlWidget && !(controlWidget->windowFlags() & Qt::FramelessWindowHint))
+    {
+        // remember the window mode geometry to return to it later
+        mWindowedMaximized = controlWidget->isMaximized();
+        mWindowedGeometry = controlWidget->normalGeometry().isValid() ? controlWidget->normalGeometry() : controlWidget->geometry();
+    }
+
+    mControlFullScreen = fullScreen;
+
+    if (controlWidget)
+    {
+        if (fullScreen)
+        {
+            if (controlWidget->windowFlags() & Qt::FramelessWindowHint)
+            {
+                // legacy kiosk window: use the regular screen positioning
+                adjustScreens();
+            }
+            else
+            {
+#ifndef Q_OS_MACOS
+                // cover the screen the window is currently on, also without a window manager
+                // supporting the full screen state; the window mode geometry is restored when leaving
+                if (QScreen* currentScreen = controlWidget->screen())
+                {
+                    controlWidget->setGeometry(currentScreen->geometry());
+                }
+#endif
+                UBPlatformUtils::showFullScreen(controlWidget);
+            }
+        }
+        else
+        {
+            if (controlWidget->windowFlags() & Qt::FramelessWindowHint)
+            {
+                // started in kiosk mode: give the window a title bar and window buttons
+                controlWidget->setWindowFlags(windowModeFlags());
+            }
+
+            controlWidget->showNormal();
+
+            QRect geometry = mWindowedGeometry;
+
+            if (!isOnScreen(geometry))
+            {
+                geometry = defaultControlWindowGeometry();
+            }
+
+            controlWidget->setGeometry(geometry);
+            controlWidget->move(geometry.topLeft());
+            controlWidget->resize(geometry.size());
+
+            if (mWindowedMaximized)
+            {
+                controlWidget->showMaximized();
+            }
+
+            mControlWindowInitialized = true;
+            UBPlatformUtils::showMenuBarAndDock();
+        }
+
+        controlWidget->activateWindow();
+        controlWidget->raise();
+    }
+
+    emit controlFullScreenChanged(mControlFullScreen);
+}
+
+void UBDisplayManager::controlWindowStateChanged()
+{
+    QWidget* controlWidget = widget(ScreenRole::Control);
+
+    // only relevant for a window with a title bar, e.g. full screen entered or left by the
+    // window system (macOS zoom button) instead of by OpenBoard
+    if (!controlWidget || (controlWidget->windowFlags() & Qt::FramelessWindowHint) || !controlWidget->isVisible())
+    {
+        return;
+    }
+
+    const bool fullScreen = controlWidget->isFullScreen();
+
+    if (fullScreen != mControlFullScreen)
+    {
+        if (fullScreen)
+        {
+            mWindowedMaximized = false;
+            mWindowedGeometry = controlWidget->normalGeometry();
+        }
+
+        mControlFullScreen = fullScreen;
+        mControlWindowInitialized = true;
+        emit controlFullScreenChanged(mControlFullScreen);
+    }
+}
+
+void UBDisplayManager::saveControlWindowGeometry()
+{
+    QWidget* controlWidget = widget(ScreenRole::Control);
+
+    if (!controlWidget || !mControlWindowInitialized)
+    {
+        // never shown in window mode
+        return;
+    }
+
+    QRect geometry;
+    bool maximized;
+
+    if (mControlFullScreen)
+    {
+        geometry = mWindowedGeometry;
+        maximized = mWindowedMaximized;
+    }
+    else
+    {
+        maximized = controlWidget->isMaximized();
+        geometry = maximized ? controlWidget->normalGeometry() : controlWidget->geometry();
+    }
+
+    if (geometry.isValid())
+    {
+        UBSettings::settings()->appMainWindowGeometry->set(geometry);
+    }
+
+    UBSettings::settings()->appMainWindowState->set(maximized ? "maximized" : "normal");
 }

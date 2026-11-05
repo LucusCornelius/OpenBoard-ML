@@ -118,11 +118,31 @@ class UBDisplayManager : public QObject
         void setScreenLabelParent(QWidget* labelParent);
         QStringList availableScreenIndexes();
 
+        // Full screen vs. window mode of the control (main) window.
+        // Initialised from App/RunInWindow, can be toggled at runtime.
+        bool isControlFullScreen() const
+        {
+            return mControlFullScreen;
+        }
+
+        void setControlFullScreen(bool fullScreen);
+
+        // to be called when the window state of the control window changed outside
+        // of OpenBoard's control (e.g. the macOS green zoom button)
+        void controlWindowStateChanged();
+
+        // persist geometry and maximised state of the control window in window mode
+        void saveControlWindowGeometry();
+
+        // window flags of the main window in window mode
+        static Qt::WindowFlags windowModeFlags();
+
     signals:
         void screenRolesAssigned();
         void screenLayoutChanged();
         void availableScreenCountChanged(int screenCount);
         void screenLabelPressed(const QString& screenIndex);
+        void controlFullScreenChanged(bool fullScreen);
 
     public slots:
         void blackout();
@@ -138,6 +158,9 @@ class UBDisplayManager : public QObject
 
         void initScreenIndexes();
         void createScreenLabels();
+        void positionControlWindow(QWidget* controlWidget);
+        QRect defaultControlWindowGeometry() const;
+        static bool isOnScreen(const QRect& geometry);
 
         QList<UBBlackoutWidget*> mBlackoutWidgets;
         QList<Ui::BlackoutWidget*> mBlackoutUiList;
@@ -150,6 +173,11 @@ class UBDisplayManager : public QObject
         QWidget* mLabelParent{nullptr};
 
         bool mUseMultiScreen;
+
+        bool mControlFullScreen{false};
+        bool mControlWindowInitialized{false};
+        QRect mWindowedGeometry;            // normal geometry in window mode before switching to full screen
+        bool mWindowedMaximized{false};     // maximised state in window mode before switching to full screen
 };
 
 #endif /* UBDISPLAYMANAGER_H_ */

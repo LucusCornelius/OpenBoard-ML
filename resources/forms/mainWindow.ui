@@ -2121,6 +2121,20 @@
     <string>Fill Shapes</string>
    </property>
   </action>
+  <action name="actionToggleFullScreen">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Full screen</string>
+   </property>
+   <property name="toolTip">
+    <string>Toggle between full screen and window mode</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+F</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="../OpenBoard.qrc"/>

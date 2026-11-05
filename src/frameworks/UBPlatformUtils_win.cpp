@@ -147,6 +147,11 @@ void UBPlatformUtils::hideMenuBarAndDock()
 
 }
 
+void UBPlatformUtils::showMenuBarAndDock()
+{
+    // NOOP
+}
+
 void UBPlatformUtils::setWindowNonActivableFlag(QWidget* widget, bool nonAcivable)
 {/*
     long exStyle = (nonAcivable) ? GetWindowLong(widget->winId(), GWL_EXSTYLE) | WS_EX_NOACTIVATE
@@ -456,7 +461,7 @@ void UBPlatformUtils::setFrontProcess()
 
 void UBPlatformUtils::showFullScreen(QWidget *pWidget)
 {
-    if (UBSettings::settings()->appRunInWindow->get().toBool()
+    if (!UBApplication::displayManager->isControlFullScreen()
         && pWidget == UBApplication::displayManager->widget(ScreenRole::Control))
     {
         pWidget->show();

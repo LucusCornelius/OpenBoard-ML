@@ -186,6 +186,11 @@ void UBPlatformUtils::hideMenuBarAndDock()
     // NOOP
 }
 
+void UBPlatformUtils::showMenuBarAndDock()
+{
+    // NOOP
+}
+
 #define KEYBTDECL(s1, s2, clSwitch, code) KEYBT(QChar(s1), QChar(s2), clSwitch, 0, 0, KEYCODE(s1, code, 0), KEYCODE(s2, code, 1))
 #define KEYBTDECLEX6(s1, s2, clSwitch, code, cs1, cs2, cs3, cs4, cs5, cs6) KEYBT(QChar(s1), QChar(s2), clSwitch, 0, 0, KEYCODE(cs1, code, 0), KEYCODE(cs2, code, 1), KEYCODE(cs3, code, 2), KEYCODE(cs4, code, 3), KEYCODE(cs5, code, 4), KEYCODE(cs6, code, 5))
 #define KEYBTDECLEX8(s1, s2, clSwitch, code, cs1, cs2, cs3, cs4, cs5, cs6, cs7, cs8) KEYBT(QChar(s1), QChar(s2), clSwitch, 0, 0, KEYCODE(cs1, code, 0), KEYCODE(cs2, code, 1), KEYCODE(cs3, code, 2), KEYCODE(cs4, code, 3), KEYCODE(cs5, code, 4), KEYCODE(cs6, code, 5), KEYCODE(cs7, code, 6), KEYCODE(cs8, code, 7))
@@ -491,7 +496,7 @@ void UBPlatformUtils::setFrontProcess()
 
 void UBPlatformUtils::showFullScreen(QWidget *pWidget)
 {
-    if (UBSettings::settings()->appRunInWindow->get().toBool() &&
+    if (!UBApplication::displayManager->isControlFullScreen() &&
             pWidget == UBApplication::displayManager->widget(ScreenRole::Control)) {
         pWidget->show();
     } else {
