@@ -378,6 +378,8 @@ class UBSettings : public QObject
         UBSetting* boardShowMathPalette;
         UBSetting* boardMathPalettePosition;
         UBSetting* boardMathPaletteTab;
+        UBSetting* boardMathInkSizeCm;
+        UBSetting* boardMathInkJitter;
 
         QMap<DocumentSizeRatio::Enum, QSize> documentSizes;
 

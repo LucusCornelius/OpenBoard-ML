@@ -20,46 +20,35 @@
 #include "UBMathPalette.h"
 
 #include <QButtonGroup>
-#include <QFontDatabase>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QPainterPath>
+#include <QSlider>
 #include <QStackedWidget>
-#include <QTextDocument>
-#include <QTextTable>
 #include <QToolButton>
 #include <QVBoxLayout>
 
 #include "board/UBBoardController.h"
 #include "board/UBBoardView.h"
-#include "board/UBDrawingController.h"
 #include "core/UBApplication.h"
 #include "core/UBSettings.h"
-#include "domain/UBGraphicsScene.h"
-#include "domain/UBGraphicsTextItem.h"
+#include "gui/UBInkWriter.h"
 
 #include "core/memcheck.h"
 
 namespace
 {
-    // markup of the stacked fraction, which is built as a two-row table instead of inline text
-    const QString sStackedFractionMarkup = QStringLiteral("@fraction");
-
     const int sColumns = 10;
-    const int sButtonWidth = 40;
-    const int sButtonHeight = 34;
-
-    // Characters after which an "optional base" (e.g. the x of x²) is still inserted,
-    // because there is no operand directly before the cursor.
-    const QString sNoBaseBefore = QStringLiteral(" \t(=+-−*×·/÷,;:[{<>≤≥≈≠→⇒⇔");
+    const int sButtonSize = 44;
+    const int sIconSize = 40;
 }
 
 UBMathPalette::UBMathPalette(QWidget* parent)
     : UBFloatingPalette(Qt::TopLeftCorner, parent)
-    , mPageButtons(nullptr)
-    , mPages(nullptr)
-    , mHasPreferredPos(false)
 {
     setObjectName("MathPalette");
     setAttribute(Qt::WA_ShowWithoutActivating);
@@ -68,28 +57,20 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     // the palette keeps the position where the user dropped it
     setCustomPosition(true);
 
-    setStyleSheet(
-        "QToolButton#MathPaletteButton {"
-        "  background-color: rgba(255, 255, 255, 220); color: #202020;"
-        "  border: 1px solid #8f8f8f; border-radius: 5px; padding: 0px 3px; }"
-        "QToolButton#MathPaletteButton:hover { background-color: #ffffff; border-color: #2f6fd6; }"
-        "QToolButton#MathPaletteButton:pressed { background-color: #cfdcf5; }"
-        "QToolButton#MathPaletteTab {"
-        "  color: #202020; background: transparent; border: none;"
-        "  border-bottom: 2px solid transparent; padding: 3px 7px; }"
-        "QToolButton#MathPaletteTab:hover { background-color: rgba(255, 255, 255, 110); }"
-        "QToolButton#MathPaletteTab:checked { border-bottom: 2px solid #2f6fd6; font-weight: bold; }");
+    mWriter = new UBInkWriter(this);
+    connect(mWriter, &UBInkWriter::placementStarted, this, &UBMathPalette::placementStarted);
+    connect(mWriter, &UBInkWriter::placementFinished, this, &UBMathPalette::placementFinished);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(sLayoutContentMargin, sLayoutContentMargin / 2 + 2,
                                    sLayoutContentMargin, sLayoutContentMargin);
-    mainLayout->setSpacing(6);
+    mainLayout->setSpacing(8);
 
-    QHBoxLayout* headerLayout = new QHBoxLayout();
-    headerLayout->setContentsMargins(0, 0, 0, 0);
-    headerLayout->setSpacing(2);
-    // room for the close button of the floating palette (top left corner)
-    headerLayout->addSpacing(closeButtonMargin() + 28 - sLayoutContentMargin + 4);
+    // tab row, with room for the close button of the floating palette (top left corner)
+    QHBoxLayout* tabLayout = new QHBoxLayout();
+    tabLayout->setContentsMargins(0, 0, 0, 0);
+    tabLayout->setSpacing(4);
+    tabLayout->addSpacing(closeButtonMargin() + 28 - sLayoutContentMargin + 4);
 
     mPageButtons = new QButtonGroup(this);
     mPageButtons->setExclusive(true);
@@ -103,13 +84,13 @@ UBMathPalette::UBMathPalette(QWidget* parent)
         const MathPage& page = pages.at(p);
 
         QToolButton* tab = new QToolButton(this);
-        tab->setObjectName("MathPaletteTab");
+        tab->setObjectName("glassButton");
         tab->setText(page.title);
         tab->setCheckable(true);
         tab->setFocusPolicy(Qt::NoFocus);
-        tab->setCursor(Qt::PointingHandCursor);
+        tab->setToolButtonStyle(Qt::ToolButtonTextOnly);
         mPageButtons->addButton(tab, p);
-        headerLayout->addWidget(tab);
+        tabLayout->addWidget(tab);
 
         QWidget* pageWidget = new QWidget(mPages);
         pageWidget->setFocusPolicy(Qt::NoFocus);
@@ -120,27 +101,66 @@ UBMathPalette::UBMathPalette(QWidget* parent)
 
         for (int i = 0; i < page.templates.size(); ++i)
         {
-            QToolButton* button = createTemplateButton(page.templates.at(i), pageWidget);
-            grid->addWidget(button, i / sColumns, i % sColumns);
+            grid->addWidget(createTemplateButton(page.templates.at(i), pageWidget), i / sColumns, i % sColumns);
         }
 
         mPages->addWidget(pageWidget);
     }
 
-    headerLayout->addStretch(1);
-
-    QToolButton* normalButton = new QToolButton(this);
-    normalButton->setObjectName("MathPaletteButton");
-    normalButton->setText(tr("Normal"));
-    normalButton->setToolTip(tr("Continue in normal text: leave superscript, subscript or overline\n"
-                                "(with a selection: make the selected text normal)"));
-    normalButton->setFocusPolicy(Qt::NoFocus);
-    normalButton->setFixedHeight(sButtonHeight - 6);
-    connect(normalButton, &QToolButton::clicked, this, &UBMathPalette::normalTextClicked);
-    headerLayout->addWidget(normalButton);
-
-    mainLayout->addLayout(headerLayout);
+    tabLayout->addStretch(1);
+    mainLayout->addLayout(tabLayout);
     mainLayout->addWidget(mPages);
+
+    // bottom row: size and ink text
+    QHBoxLayout* bottomLayout = new QHBoxLayout();
+    bottomLayout->setContentsMargins(0, 0, 0, 0);
+    bottomLayout->setSpacing(8);
+
+    QLabel* sizeTitle = new QLabel(tr("Size"), this);
+    bottomLayout->addWidget(sizeTitle);
+
+    mSizeSlider = new QSlider(Qt::Horizontal, this);
+    mSizeSlider->setFocusPolicy(Qt::NoFocus);
+    mSizeSlider->setRange(2, 12); // half centimetres: 1 to 6 cm
+    mSizeSlider->setPageStep(2);
+    mSizeSlider->setFixedWidth(110);
+    mSizeSlider->setToolTip(tr("Height of capital letters and digits on the board"));
+    bottomLayout->addWidget(mSizeSlider);
+
+    mSizeLabel = new QLabel(this);
+    mSizeLabel->setMinimumWidth(QFontMetrics(mSizeLabel->font()).horizontalAdvance(tr("%1 cm").arg(QLocale().toString(5.5, 'f', 1))) + 4);
+    bottomLayout->addWidget(mSizeLabel);
+    bottomLayout->addSpacing(8);
+
+    mInkText = new QLineEdit(this);
+    mInkText->setFocusPolicy(Qt::ClickFocus);
+    mInkText->setClearButtonEnabled(true);
+    mInkText->setPlaceholderText(tr("Ink text, e.g. f(x) = x^2 + 1/(x-1)"));
+    mInkText->setToolTip(tr("Type a formula and press Enter, then tap the board to write it by hand.\n"
+                            "x^2 superscript, x_1 subscript, a/b fraction, sqrt(x), int_a^b, sum_(n=1)^inf,\n"
+                            "lim_(x->0), vec(v), pi, alpha, ..., -> => <= >= != +-, # leaves an empty box"));
+    connect(mInkText, &QLineEdit::returnPressed, this, &UBMathPalette::inkTextEntered);
+    bottomLayout->addWidget(mInkText, 1);
+
+    QToolButton* writeButton = new QToolButton(this);
+    writeButton->setObjectName("glassButton");
+    writeButton->setFocusPolicy(Qt::NoFocus);
+    writeButton->setText(tr("Write"));
+    writeButton->setToolTip(tr("Write the ink text on the board"));
+    connect(writeButton, &QToolButton::clicked, this, &UBMathPalette::inkTextEntered);
+    bottomLayout->addWidget(writeButton);
+
+    mainLayout->addLayout(bottomLayout);
+
+    mHint = new QLabel(this);
+    mHint->setWordWrap(true);
+    mainLayout->addWidget(mHint);
+    showHint();
+
+    const qreal sizeCm = qBound(1.0, UBSettings::settings()->boardMathInkSizeCm->get().toDouble(), 6.0);
+    mSizeSlider->setValue(qRound(sizeCm * 2));
+    sizeChanged(mSizeSlider->value());
+    connect(mSizeSlider, &QSlider::valueChanged, this, &UBMathPalette::sizeChanged);
 
     connect(mPageButtons, &QButtonGroup::idClicked, this, &UBMathPalette::pageSelected);
 
@@ -178,221 +198,200 @@ UBMathPalette::~UBMathPalette()
     // NOOP
 }
 
-QString UBMathPalette::mathFontFamily()
-{
-    static bool initialized = false;
-    static QString family;
-
-    if (!initialized)
-    {
-        initialized = true;
-
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-        const QStringList available = QFontDatabase::families();
-#else
-        const QStringList available = QFontDatabase().families();
-#endif
-        const QStringList candidates = {
-            "Cambria Math", "Cambria", "STIX Two Math", "STIX Two Text", "STIXGeneral",
-            "DejaVu Serif", "Noto Sans Math"
-        };
-
-        for (const QString& candidate : candidates)
-        {
-            if (!available.contains(candidate, Qt::CaseInsensitive))
-            {
-                continue;
-            }
-
-            // Some maths fonts declare a huge line spacing (to make room for big operators),
-            // which would make every line of the text item very tall. Skip those.
-            QFont font(candidate);
-            font.setPixelSize(100);
-            QFontMetricsF metrics(font);
-
-            if (metrics.height() > 160.)
-            {
-                continue;
-            }
-
-            family = candidate;
-            break;
-        }
-    }
-
-    return family;
-}
-
-QList<UBMathPalette::MathPage> UBMathPalette::buildPages() const
+QList<UBMathPalette::MathPage> UBMathPalette::buildPages()
 {
     QList<MathPage> pages;
 
-    // the label is shown on the button, the markup is inserted (see class documentation)
-    MathPage calculus{tr("Calculus"), {
-        {QString::fromUtf8("√x̅"), tr("Square root"), QString::fromUtf8("√~{[x]} "), false},
-        {QString::fromUtf8("ⁿ√x̅"), tr("n-th root"), QString::fromUtf8("^{[n]}√~{x} "), false},
-        {QString::fromUtf8("∫"), tr("Integral"), QString::fromUtf8("∫"), false},
-        {QString::fromUtf8("∫ₐᵇ"), tr("Definite integral with bounds: ∫ f(x) dx from a to b"), QString::fromUtf8("∫_{[a]}^{b} f(x) dx"), false},
-        {QString::fromUtf8("∬"), tr("Double integral"), QString::fromUtf8("∬"), false},
-        {QString::fromUtf8("∮"), tr("Contour integral"), QString::fromUtf8("∮"), false},
-        {QString::fromUtf8("[F]ₐᵇ"), tr("Evaluate a primitive between bounds: [F(x)] from a to b"), QString::fromUtf8("\\[[F(x)]\\]_{a}^{b}"), false},
-        {QString::fromUtf8("∑ᵢⁿ"), tr("Sum with bounds"), QString::fromUtf8("∑_{[i=1]}^{n} "), false},
-        {QString::fromUtf8("∏ᵢⁿ"), tr("Product with bounds"), QString::fromUtf8("∏_{[i=1]}^{n} "), false},
-        {QString::fromUtf8("lim"), tr("Limit: lim x → a"), QString::fromUtf8("lim_{[x→a]} "), false},
-        {QString::fromUtf8("d⁄dx"), tr("Derivative d/dx"), QString::fromUtf8("^{d}⁄_{d[x]} "), false},
-        {QString::fromUtf8("∂⁄∂x"), tr("Partial derivative ∂/∂x"), QString::fromUtf8("^{∂}⁄_{∂[x]} "), false},
-        {QString::fromUtf8("f′(x)"), tr("Derivative f′(x)"), QString::fromUtf8("f′([x])"), false},
-        {QString::fromUtf8("f″(x)"), tr("Second derivative f″(x)"), QString::fromUtf8("f″([x])"), false},
-        {QString::fromUtf8("dx"), tr("dx"), QString::fromUtf8("dx"), false},
-        {QString::fromUtf8("dy"), tr("dy"), QString::fromUtf8("dy"), false},
-        {QString::fromUtf8("dt"), tr("dt"), QString::fromUtf8("dt"), false},
-        {QString::fromUtf8("∞"), tr("Infinity"), QString::fromUtf8("∞"), false},
-        {QString::fromUtf8("Δ"), tr("Delta (difference)"), QString::fromUtf8("Δ"), false},
-        {QString::fromUtf8("→"), tr("Tends to"), QString::fromUtf8("→"), false}
-    }};
+    // sources use the ink text syntax of UBMathInkLayout, # is an empty box to write into
+    MathPage calculus;
+    calculus.title = tr("Calculus");
+    calculus.templates = {
+        {"sqrt(#)", tr("Square root")},
+        {"#/#", tr("Fraction")},
+        {"int_#^#", tr("Integral with bounds")},
+        {"int", tr("Integral")},
+        {"iint", tr("Double integral")},
+        {"oint", tr("Contour integral")},
+        {"sum_#^#", tr("Sum with bounds")},
+        {"prod_#^#", tr("Product with bounds")},
+        {"lim_(x->a)", tr("Limit for x towards a")},
+        {"lim_(x->inf)", tr("Limit for x towards infinity")},
+        {"d/(dx)", tr("Derivative d/dx")},
+        {"partial/(partial x)", tr("Partial derivative")},
+        {"f(x)", tr("Function f(x)")},
+        {"f'(x)", tr("Derivative f′(x)")},
+        {"dx", tr("dx")},
+        {"dy", tr("dy")},
+        {"dt", tr("dt")},
+        {"inf", tr("Infinity")},
+        {"partial", tr("Partial")},
+        {"nabla", tr("Nabla")},
+        {"Delta", tr("Delta")},
+        {"vec(#)", tr("Vector arrow")},
+        {"vec(v)", tr("Vector v")}
+    };
 
-    MathPage algebra{tr("Algebra"), {
-        {QString::fromUtf8("( )"), tr("Parentheses"), QString::fromUtf8("(|)"), false},
-        {QString::fromUtf8("[ ]"), tr("Square brackets"), QString::fromUtf8("\\[|\\]"), false},
-        {QString::fromUtf8("{ }"), tr("Braces"), QString::fromUtf8("\\{|\\}"), false},
-        {QString::fromUtf8("| |"), tr("Absolute value"), QString::fromUtf8("\\||\\|"), false},
-        {QString::fromUtf8("a⁄b"), tr("Fraction (inline)"), QString::fromUtf8("^{[a]}⁄_{b} "), false},
-        {QString(), tr("Fraction (stacked, on its own line)"), sStackedFractionMarkup, false},
-        {QString::fromUtf8("x²"), tr("Square"), QString::fromUtf8("[x]^{2}"), true},
-        {QString::fromUtf8("x³"), tr("Cube"), QString::fromUtf8("[x]^{3}"), true},
-        {QString::fromUtf8("xⁿ"), tr("Power (use \"Normal\" to leave the exponent)"), QString::fromUtf8("[x]^{[n]}"), true},
-        {QString::fromUtf8("x⁻¹"), tr("Inverse"), QString::fromUtf8("[x]^{−1}"), true},
-        {QString::fromUtf8("x₁"), tr("Index"), QString::fromUtf8("[x]_{1}"), true},
-        {QString::fromUtf8("xₙ"), tr("Index n (use \"Normal\" to leave the index)"), QString::fromUtf8("[x]_{[n]}"), true},
-        {QString::fromUtf8("±"), tr("Plus or minus"), QString::fromUtf8("±"), false},
-        {QString::fromUtf8("×"), tr("Times"), QString::fromUtf8("×"), false},
-        {QString::fromUtf8("÷"), tr("Divided by"), QString::fromUtf8("÷"), false},
-        {QString::fromUtf8("·"), tr("Dot (multiplication)"), QString::fromUtf8("·"), false},
-        {QString::fromUtf8("≤"), tr("Less than or equal to"), QString::fromUtf8("≤"), false},
-        {QString::fromUtf8("≥"), tr("Greater than or equal to"), QString::fromUtf8("≥"), false},
-        {QString::fromUtf8("≠"), tr("Not equal to"), QString::fromUtf8("≠"), false},
-        {QString::fromUtf8("≈"), tr("Approximately equal to"), QString::fromUtf8("≈"), false},
-        {QString::fromUtf8("≡"), tr("Identical to"), QString::fromUtf8("≡"), false},
-        {QString::fromUtf8("→"), tr("Arrow"), QString::fromUtf8("→"), false},
-        {QString::fromUtf8("⇒"), tr("Implies"), QString::fromUtf8("⇒"), false},
-        {QString::fromUtf8("⇔"), tr("If and only if"), QString::fromUtf8("⇔"), false},
-        {QString::fromUtf8("∈"), tr("Element of"), QString::fromUtf8("∈"), false},
-        {QString::fromUtf8("∉"), tr("Not an element of"), QString::fromUtf8("∉"), false},
-        {QString::fromUtf8("⊂"), tr("Subset of"), QString::fromUtf8("⊂"), false},
-        {QString::fromUtf8("∪"), tr("Union"), QString::fromUtf8("∪"), false},
-        {QString::fromUtf8("∩"), tr("Intersection"), QString::fromUtf8("∩"), false},
-        {QString::fromUtf8("∅"), tr("Empty set"), QString::fromUtf8("∅"), false},
-        {QString::fromUtf8("∀"), tr("For all"), QString::fromUtf8("∀"), false},
-        {QString::fromUtf8("∃"), tr("There exists"), QString::fromUtf8("∃"), false},
-        {QString::fromUtf8("ℕ"), tr("Natural numbers"), QString::fromUtf8("ℕ"), false},
-        {QString::fromUtf8("ℤ"), tr("Integers"), QString::fromUtf8("ℤ"), false},
-        {QString::fromUtf8("ℚ"), tr("Rational numbers"), QString::fromUtf8("ℚ"), false},
-        {QString::fromUtf8("ℝ"), tr("Real numbers"), QString::fromUtf8("ℝ"), false},
-        {QString::fromUtf8("°"), tr("Degree"), QString::fromUtf8("°"), false},
-        {QString::fromUtf8("%"), tr("Percent"), QString::fromUtf8("%"), false},
-        {QString::fromUtf8("‰"), tr("Per mille"), QString::fromUtf8("‰"), false},
-        {QString::fromUtf8("∠"), tr("Angle"), QString::fromUtf8("∠"), false},
-        {QString::fromUtf8("⊥"), tr("Perpendicular to"), QString::fromUtf8("⊥"), false},
-        {QString::fromUtf8("∥"), tr("Parallel to"), QString::fromUtf8("∥"), false}
-    }};
+    MathPage algebra;
+    algebra.title = tr("Algebra");
+    algebra.templates = {
+        {"x^2", tr("x squared")},
+        {"x^n", tr("x to the power n")},
+        {"x_1", tr("x with index 1")},
+        {"x_n", tr("x with index n")},
+        {"|#|", tr("Absolute value")},
+        {"(", tr("Left parenthesis")},
+        {")", tr("Right parenthesis")},
+        {"[", tr("Left bracket")},
+        {"]", tr("Right bracket")},
+        {"\\{", tr("Left brace")},
+        {"\\}", tr("Right brace")},
+        {"|", tr("Vertical bar")},
+        {"±", tr("Plus or minus")},
+        {"×", tr("Times")},
+        {"÷", tr("Divided by")},
+        {"·", tr("Dot")},
+        {"≠", tr("Not equal")},
+        {"≈", tr("Approximately equal")},
+        {"≡", tr("Identical")},
+        {"≤", tr("Less than or equal")},
+        {"≥", tr("Greater than or equal")},
+        {"→", tr("Arrow")},
+        {"⇒", tr("Implies")},
+        {"⇔", tr("If and only if")},
+        {"∈", tr("Element of")},
+        {"∉", tr("Not an element of")},
+        {"⊂", tr("Subset")},
+        {"∪", tr("Union")},
+        {"∩", tr("Intersection")},
+        {"∅", tr("Empty set")},
+        {"∀", tr("For all")},
+        {"∃", tr("There exists")},
+        {"°", tr("Degree")},
+        {"ℕ", tr("Natural numbers")},
+        {"ℤ", tr("Integers")},
+        {"ℚ", tr("Rational numbers")},
+        {"ℝ", tr("Real numbers")}
+    };
 
-    MathPage greek{tr("Greek"), {
-        {QString::fromUtf8("α"), tr("alpha"), QString::fromUtf8("α"), false},
-        {QString::fromUtf8("β"), tr("beta"), QString::fromUtf8("β"), false},
-        {QString::fromUtf8("γ"), tr("gamma"), QString::fromUtf8("γ"), false},
-        {QString::fromUtf8("δ"), tr("delta"), QString::fromUtf8("δ"), false},
-        {QString::fromUtf8("ε"), tr("epsilon"), QString::fromUtf8("ε"), false},
-        {QString::fromUtf8("ζ"), tr("zeta"), QString::fromUtf8("ζ"), false},
-        {QString::fromUtf8("η"), tr("eta"), QString::fromUtf8("η"), false},
-        {QString::fromUtf8("θ"), tr("theta"), QString::fromUtf8("θ"), false},
-        {QString::fromUtf8("λ"), tr("lambda"), QString::fromUtf8("λ"), false},
-        {QString::fromUtf8("μ"), tr("mu"), QString::fromUtf8("μ"), false},
-        {QString::fromUtf8("π"), tr("pi"), QString::fromUtf8("π"), false},
-        {QString::fromUtf8("ρ"), tr("rho"), QString::fromUtf8("ρ"), false},
-        {QString::fromUtf8("σ"), tr("sigma"), QString::fromUtf8("σ"), false},
-        {QString::fromUtf8("τ"), tr("tau"), QString::fromUtf8("τ"), false},
-        {QString::fromUtf8("φ"), tr("phi"), QString::fromUtf8("φ"), false},
-        {QString::fromUtf8("χ"), tr("chi"), QString::fromUtf8("χ"), false},
-        {QString::fromUtf8("ψ"), tr("psi"), QString::fromUtf8("ψ"), false},
-        {QString::fromUtf8("ω"), tr("omega"), QString::fromUtf8("ω"), false},
-        {QString::fromUtf8("Δ"), tr("capital Delta"), QString::fromUtf8("Δ"), false},
-        {QString::fromUtf8("Σ"), tr("capital Sigma"), QString::fromUtf8("Σ"), false},
-        {QString::fromUtf8("Π"), tr("capital Pi"), QString::fromUtf8("Π"), false},
-        {QString::fromUtf8("Ω"), tr("capital Omega"), QString::fromUtf8("Ω"), false},
-        {QString::fromUtf8("Φ"), tr("capital Phi"), QString::fromUtf8("Φ"), false},
-        {QString::fromUtf8("Θ"), tr("capital Theta"), QString::fromUtf8("Θ"), false},
-        {QString::fromUtf8("Λ"), tr("capital Lambda"), QString::fromUtf8("Λ"), false}
-    }};
+    MathPage greek;
+    greek.title = tr("Greek");
+    const QStringList greekLetters = {
+        "alpha", "beta", "gamma", "delta", "epsilon", "theta", "lambda", "mu", "pi", "rho",
+        "sigma", "tau", "phi", "chi", "psi", "omega", "Gamma", "Delta", "Theta", "Lambda",
+        "Sigma", "Pi", "Phi", "Omega"
+    };
 
-    MathPage functions{tr("Functions"), {
-        {QString::fromUtf8("sin"), tr("Sine"), QString::fromUtf8("sin(|)"), false},
-        {QString::fromUtf8("cos"), tr("Cosine"), QString::fromUtf8("cos(|)"), false},
-        {QString::fromUtf8("tan"), tr("Tangent"), QString::fromUtf8("tan(|)"), false},
-        {QString::fromUtf8("ln"), tr("Natural logarithm"), QString::fromUtf8("ln(|)"), false},
-        {QString::fromUtf8("log"), tr("Logarithm"), QString::fromUtf8("log(|)"), false},
-        {QString::fromUtf8("ᵍlog"), tr("Logarithm with base g (written before log)"), QString::fromUtf8("^{[g]}log(x)"), false},
-        {QString::fromUtf8("eˣ"), tr("Exponential function (use \"Normal\" to leave the exponent)"), QString::fromUtf8("e^{[x]}"), false},
-        {QString::fromUtf8("f(x)"), tr("Function"), QString::fromUtf8("[f](x)"), false},
-        {QString::fromUtf8("v⃗"), tr("Vector (arrow)"), QString::fromUtf8("[v]⃗"), false},
-        {QString::fromUtf8("AB̅"), tr("Vector or line segment (overline)"), QString::fromUtf8("~{[AB]} "), false}
-    }};
+    for (const QString& letter : greekLetters)
+    {
+        greek.templates << MathTemplate{letter, letter};
+    }
+
+    MathPage functions;
+    functions.title = tr("Functions");
+    functions.templates = {
+        {"sin", tr("Sine")},
+        {"cos", tr("Cosine")},
+        {"tan", tr("Tangent")},
+        {"ln", tr("Natural logarithm")},
+        {"log", tr("Logarithm")},
+        {"log_#", tr("Logarithm with base")},
+        {"e^x", tr("Exponential")},
+        {"e^#", tr("e to the power")},
+        {"f(x)", tr("Function f(x)")},
+        {"g(x)", tr("Function g(x)")}
+    };
+
+    for (const QString& c : QStringList{"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+                                        "x", "y", "z", "a", "b", "c", "n", "k", "t", "A"})
+    {
+        functions.templates << MathTemplate{c, c};
+    }
 
     pages << calculus << algebra << greek << functions;
-
     return pages;
+}
+
+QPixmap UBMathPalette::formulaPixmap(const UBMathInkLayout::Formula& formula, const QSize& size,
+                                     const QColor& color, qreal devicePixelRatio)
+{
+    QPixmap pixmap(size * devicePixelRatio);
+    pixmap.setDevicePixelRatio(devicePixelRatio);
+    pixmap.fill(Qt::transparent);
+
+    const QList<QPolygonF> ink = UBInkWriter::inkStrokes(formula);
+    QRectF bounds;
+
+    for (const QPolygonF& stroke : ink)
+    {
+        bounds = bounds.isNull() ? stroke.boundingRect() : bounds.united(stroke.boundingRect());
+    }
+
+    for (const QRectF& rect : formula.placeholders)
+    {
+        bounds = bounds.isNull() ? rect : bounds.united(rect);
+    }
+
+    if (bounds.isEmpty() && bounds.isNull())
+    {
+        return pixmap;
+    }
+
+    const qreal margin = 1;
+    const qreal available = qMin(size.width(), size.height()) - 2 * margin;
+    // single small symbols are not blown up: at most 44 px per em
+    const qreal scale = qMin(44.0, available / qMax(qMax(bounds.width(), bounds.height()), 0.01));
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.translate(size.width() / 2.0, size.height() / 2.0);
+    painter.scale(scale, scale);
+    painter.translate(-bounds.center());
+
+    QColor placeholderColor = color;
+    placeholderColor.setAlphaF(0.7);
+    QPen placeholderPen(placeholderColor, 1.0 / scale, Qt::DashLine);
+    painter.setPen(placeholderPen);
+    painter.setBrush(Qt::NoBrush);
+
+    for (const QRectF& rect : formula.placeholders)
+    {
+        painter.drawRect(rect.adjusted(0.03, 0.03, -0.03, -0.03));
+    }
+
+    QPen inkPen(color, 2.0 / scale, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    painter.setPen(inkPen);
+
+    for (const QPolygonF& stroke : ink)
+    {
+        painter.drawPolyline(stroke);
+    }
+
+    return pixmap;
 }
 
 QToolButton* UBMathPalette::createTemplateButton(const MathTemplate& tmpl, QWidget* parent)
 {
     QToolButton* button = new QToolButton(parent);
-    button->setObjectName("MathPaletteButton");
+    button->setObjectName("glassButton");
     button->setFocusPolicy(Qt::NoFocus);
-    button->setAutoRaise(false);
-    button->setMinimumSize(sButtonWidth, sButtonHeight);
-    button->setMaximumHeight(sButtonHeight);
-    button->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-
-    QFont font = button->font();
-    const QString family = mathFontFamily();
-
-    if (!family.isEmpty())
-    {
-        font.setFamily(family);
-    }
-
-    font.setPointSize(13);
-    button->setFont(font);
-
-    if (tmpl.markup == sStackedFractionMarkup)
-    {
-        // no good text label exists for a stacked fraction: draw it
-        const qreal dpr = devicePixelRatioF();
-        QPixmap pixmap(QSize(28, 28) * dpr);
-        pixmap.setDevicePixelRatio(dpr);
-        pixmap.fill(Qt::transparent);
-
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-        QFont small = font;
-        small.setPixelSize(12);
-        painter.setFont(small);
-        painter.setPen(QColor("#202020"));
-        painter.drawText(QRectF(0, 0, 28, 13), Qt::AlignCenter, "a");
-        painter.drawLine(QPointF(7, 14), QPointF(21, 14));
-        painter.drawText(QRectF(0, 15, 28, 13), Qt::AlignCenter, "b");
-        painter.end();
-
-        button->setIcon(QIcon(pixmap));
-        button->setIconSize(QSize(28, 28));
-    }
-    else
-    {
-        button->setText(tmpl.label);
-    }
-
+    button->setFixedSize(sButtonSize, sButtonSize);
+    button->setCheckable(true);
     button->setToolTip(tmpl.toolTip);
-    button->setProperty("templateIndex", mTemplates.size());
-    mTemplates << tmpl;
+
+    QString error;
+    const UBMathInkLayout::Formula formula = UBMathInkLayout::layout(tmpl.source, &error);
+
+    if (!error.isEmpty())
+    {
+        qWarning() << "UBMathPalette: cannot lay out" << tmpl.source << error;
+    }
+
+    const QColor color = button->palette().color(QPalette::ButtonText);
+    button->setIcon(QIcon(formulaPixmap(formula, QSize(sIconSize, sIconSize), color, devicePixelRatioF())));
+    button->setIconSize(QSize(sIconSize, sIconSize));
+
+    button->setProperty("formulaIndex", mFormulas.size());
+    mFormulas << formula;
 
     connect(button, &QToolButton::clicked, this, &UBMathPalette::templateButtonClicked);
 
@@ -438,6 +437,12 @@ void UBMathPalette::showEvent(QShowEvent* event)
 {
     placeInsideParent();
     UBFloatingPalette::showEvent(event);
+}
+
+void UBMathPalette::hideEvent(QHideEvent* event)
+{
+    mWriter->cancelPlacement();
+    UBFloatingPalette::hideEvent(event);
 }
 
 bool UBMathPalette::eventFilter(QObject* watched, QEvent* event)
@@ -506,478 +511,98 @@ void UBMathPalette::updatePageSize()
     resize(sizeHint());
 }
 
-UBGraphicsTextItem* UBMathPalette::activeTextItem() const
+void UBMathPalette::showHint(const QString& text)
 {
-    if (!UBApplication::boardController)
-    {
-        return nullptr;
-    }
-
-    std::shared_ptr<UBGraphicsScene> scene = UBApplication::boardController->activeScene();
-
-    if (!scene)
-    {
-        return nullptr;
-    }
-
-    auto usable = [&scene](UBGraphicsTextItem* item) {
-        return item
-                && item->scene() == scene
-                && item->isVisible()
-                && item->data(UBGraphicsItemData::ItemEditable).toBool();
-    };
-
-    // the text item being edited has the focus of the scene (the palette never takes the focus)
-    UBGraphicsTextItem* item = qgraphicsitem_cast<UBGraphicsTextItem*>(scene->focusItem());
-
-    if (usable(item) && (item->textInteractionFlags() & Qt::TextEditable))
-    {
-        return item;
-    }
-
-    // fall back to the item we inserted into last, as long as it is still selected
-    item = mLastTextItem.data();
-
-    if (usable(item) && item->isSelected())
-    {
-        return item;
-    }
-
-    return nullptr;
-}
-
-UBGraphicsTextItem* UBMathPalette::createTextItem()
-{
-    UBBoardController* controller = UBApplication::boardController;
-    std::shared_ptr<UBGraphicsScene> scene = controller ? controller->activeScene() : nullptr;
-    UBBoardView* view = controller ? controller->controlView() : nullptr;
-
-    if (!scene || !view)
-    {
-        return nullptr;
-    }
-
-    // Same sequence as creating a text zone with the Text tool (see UBBoardView::mouseReleaseEvent):
-    // the stylus tool ends up as Selector, so that the new text item stays in edit mode.
-    // Switching the tool deselects all items, so do it before creating the item.
-    UBDrawingController::drawingController()->setStylusTool(UBStylusTool::Selector);
-
-    const qreal width = scene->nominalSize().width() / controller->currentZoom() / 4.;
-    // centre of the visible board, avoiding the part covered by this palette
-    QRect freeArea = view->viewport()->rect();
-
-    if (isVisible())
-    {
-        const QRect paletteRect(view->viewport()->mapFromGlobal(mapToGlobal(QPoint(0, 0))), size());
-
-        if (paletteRect.intersects(freeArea))
-        {
-            QRect above = freeArea;
-            above.setBottom(paletteRect.top());
-            QRect below = freeArea;
-            below.setTop(paletteRect.bottom());
-
-            const QRect& larger = above.height() >= below.height() ? above : below;
-
-            if (larger.height() > 100)
-            {
-                freeArea = larger;
-            }
-        }
-    }
-
-    const QPointF center = view->mapToScene(freeArea.center());
-
-    UBGraphicsTextItem* item = scene->addTextHtml("", center - QPointF(width / 2., 0.));
-
-    if (!item)
-    {
-        return nullptr;
-    }
-
-    item->setTextInteractionFlags(Qt::TextEditorInteraction);
-    item->setSelected(true);
-    item->setTextWidth(width);
-
-    // prefer a font with good maths coverage for this item only (the default font setting is untouched)
-    const QString family = mathFontFamily();
-
-    if (!family.isEmpty())
-    {
-        QFont font = item->font();
-        font.setFamily(family);
-        item->setFont(font);
-
-        QTextCursor cursor = item->textCursor();
-        QTextCharFormat format;
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 1, 0))
-        format.setFontFamilies(QStringList() << family);
-#else
-        format.setFontFamily(family);
-#endif
-        cursor.mergeCharFormat(format);
-        item->setTextCursor(cursor);
-    }
-
-    item->setFocus();
-
-    return item;
-}
-
-void UBMathPalette::focusTextItem(UBGraphicsTextItem* item)
-{
-    item->setTextInteractionFlags(Qt::TextEditorInteraction);
-
-    if (!item->isSelected())
-    {
-        item->setSelected(true);
-    }
-
-    item->setFocus();
-
-    UBBoardView* view = UBApplication::boardController->controlView();
-
-    if (view && !view->hasFocus())
-    {
-        view->setFocus();
-    }
-
-    mLastTextItem = item;
+    mHint->setText(text.isEmpty() ? tr("Tap a symbol, then tap the board where it should be written.") : text);
 }
 
 void UBMathPalette::templateButtonClicked()
 {
-    QObject* button = sender();
+    QToolButton* button = qobject_cast<QToolButton*>(sender());
 
     if (!button)
     {
         return;
     }
 
-    bool ok = false;
-    const int index = button->property("templateIndex").toInt(&ok);
+    if (mWriter->isPlacing() && mActiveButton == button)
+    {
+        // second tap on the same symbol: cancel
+        mWriter->cancelPlacement();
+        return;
+    }
 
-    if (!ok || index < 0 || index >= mTemplates.size())
+    const int index = button->property("formulaIndex").toInt();
+
+    if (index < 0 || index >= mFormulas.size() || mFormulas.at(index).isEmpty())
+    {
+        button->setChecked(false);
+        return;
+    }
+
+    mWriter->cancelPlacement();
+    mActiveButton = button;
+    button->setChecked(true);
+    mWriter->beginPlacement(mFormulas.at(index));
+
+    if (!mWriter->isPlacing())
+    {
+        button->setChecked(false);
+        mActiveButton = nullptr;
+    }
+}
+
+void UBMathPalette::inkTextEntered()
+{
+    const QString text = mInkText->text().trimmed();
+
+    if (text.isEmpty())
     {
         return;
     }
 
-    UBGraphicsTextItem* item = activeTextItem();
+    QString error;
+    const UBMathInkLayout::Formula formula = UBMathInkLayout::layout(text, &error);
 
-    if (!item)
+    if (!error.isEmpty() || formula.isEmpty())
     {
-        item = createTextItem();
-    }
-
-    if (item)
-    {
-        insertTemplate(item, mTemplates.at(index));
-        focusTextItem(item);
-    }
-}
-
-void UBMathPalette::normalTextClicked()
-{
-    UBGraphicsTextItem* item = activeTextItem();
-
-    if (!item)
-    {
+        showHint(error.isEmpty() ? tr("Nothing to write.") : error);
         return;
     }
 
-    QTextCursor cursor = item->textCursor();
-    QTextCharFormat normal;
-    normal.setVerticalAlignment(QTextCharFormat::AlignNormal);
-    normal.setFontOverline(false);
+    mWriter->cancelPlacement();
+    mInkText->selectAll();
 
-    if (cursor.hasSelection())
+    // give the keyboard back to the board
+    if (UBApplication::boardController && UBApplication::boardController->controlView())
     {
-        cursor.mergeCharFormat(normal);
-    }
-    else
-    {
-        // only changes the format used for the next typed characters
-        QTextCharFormat format = cursor.charFormat();
-        format.merge(normal);
-        cursor.setCharFormat(format);
+        UBApplication::boardController->controlView()->setFocus();
     }
 
-    item->setTextCursor(cursor);
-    focusTextItem(item);
+    mWriter->beginPlacement(formula);
 }
 
-void UBMathPalette::insertTemplate(UBGraphicsTextItem* item, const MathTemplate& tmpl)
+void UBMathPalette::sizeChanged(int halfCentimetres)
 {
-    QTextCursor cursor = item->textCursor();
-    QString wrapText;
-
-    if (cursor.hasSelection())
-    {
-        const QString selected = cursor.selectedText();
-
-        // only wrap a selection within a single paragraph; otherwise just replace it
-        if (!selected.contains(QChar::ParagraphSeparator) && !selected.contains(QChar::ObjectReplacementCharacter))
-        {
-            wrapText = selected;
-        }
-    }
-
-    cursor.beginEditBlock();
-
-    if (cursor.hasSelection())
-    {
-        cursor.removeSelectedText();
-    }
-
-    if (tmpl.markup == sStackedFractionMarkup)
-    {
-        QTextCharFormat format = cursor.charFormat();
-        QColor color = item->defaultTextColor();
-
-        if (format.hasProperty(QTextFormat::ForegroundBrush))
-        {
-            color = format.foreground().color();
-        }
-
-        insertStackedFraction(cursor, color, wrapText);
-    }
-    else
-    {
-        bool skipBase = false;
-
-        if (tmpl.optionalBase && wrapText.isEmpty() && !cursor.atBlockStart())
-        {
-            // there is already an operand before the cursor: x² only adds the ²
-            const QChar previous = item->document()->characterAt(cursor.position() - 1);
-            skipBase = !sNoBaseBefore.contains(previous);
-        }
-
-        insertMarkup(cursor, tmpl.markup, skipBase, wrapText);
-    }
-
-    cursor.endEditBlock();
-
-    item->setTextCursor(cursor);
+    const qreal sizeCm = halfCentimetres / 2.0;
+    mSizeLabel->setText(tr("%1 cm").arg(QLocale().toString(sizeCm, 'f', halfCentimetres % 2 ? 1 : 0)));
+    UBSettings::settings()->boardMathInkSizeCm->set(sizeCm);
 }
 
-void UBMathPalette::insertMarkup(QTextCursor& cursor, const QString& markup, bool skipBase, const QString& wrapText) const
+void UBMathPalette::placementStarted()
 {
-    // templates are always inserted relative to the normal base line
-    QTextCharFormat base = cursor.charFormat();
-    base.setVerticalAlignment(QTextCharFormat::AlignNormal);
-    base.setFontOverline(false);
-
-    QList<QTextCharFormat> formats;
-    formats << base;
-
-    bool wrapPending = !wrapText.isEmpty();
-    bool skipPending = skipBase;
-    bool skipping = false;
-    bool inPlaceholder = false;
-    int placeholderStart = -1;
-
-    // where the cursor goes after the insertion: a selected placeholder or a caret
-    int targetStart = -1;
-    int targetEnd = -1;
-    bool targetIsCaret = false;
-    QTextCharFormat targetFormat;
-
-    for (int i = 0; i < markup.size(); ++i)
-    {
-        const QChar ch = markup.at(i);
-        const QChar next = i + 1 < markup.size() ? markup.at(i + 1) : QChar();
-
-        if (skipping)
-        {
-            // skip the content of a placeholder that is omitted or replaced by the selection
-            if (ch == '\\')
-            {
-                ++i;
-            }
-            else if (ch == ']')
-            {
-                skipping = false;
-            }
-
-            continue;
-        }
-
-        if (ch == '\\' && !next.isNull())
-        {
-            cursor.insertText(QString(next), formats.last());
-            ++i;
-            continue;
-        }
-
-        if ((ch == '^' || ch == '_' || ch == '~') && next == '{')
-        {
-            QTextCharFormat format = formats.last();
-
-            if (ch == '^')
-            {
-                format.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
-            }
-            else if (ch == '_')
-            {
-                format.setVerticalAlignment(QTextCharFormat::AlignSubScript);
-            }
-            else
-            {
-                format.setFontOverline(true);
-            }
-
-            formats << format;
-            ++i;
-            continue;
-        }
-
-        if (ch == '}' && formats.size() > 1)
-        {
-            formats.removeLast();
-            continue;
-        }
-
-        if (ch == '[')
-        {
-            if (skipPending)
-            {
-                skipPending = false;
-                skipping = true;
-            }
-            else if (wrapPending)
-            {
-                wrapPending = false;
-                cursor.insertText(wrapText, formats.last());
-                skipping = true;
-            }
-            else
-            {
-                inPlaceholder = true;
-                placeholderStart = cursor.position();
-            }
-
-            continue;
-        }
-
-        if (ch == ']' && inPlaceholder)
-        {
-            inPlaceholder = false;
-
-            if (targetStart < 0)
-            {
-                targetStart = placeholderStart;
-                targetEnd = cursor.position();
-            }
-
-            continue;
-        }
-
-        if (ch == '|')
-        {
-            if (wrapPending)
-            {
-                wrapPending = false;
-                cursor.insertText(wrapText, formats.last());
-            }
-            else if (targetStart < 0)
-            {
-                targetStart = targetEnd = cursor.position();
-                targetIsCaret = true;
-                targetFormat = formats.last();
-            }
-
-            continue;
-        }
-
-        cursor.insertText(QString(ch), formats.last());
-    }
-
-    if (targetStart >= 0)
-    {
-        cursor.setPosition(targetStart);
-
-        if (targetIsCaret)
-        {
-            // the next typed characters get the format of the slot (e.g. superscript)
-            cursor.setCharFormat(targetFormat);
-        }
-        else
-        {
-            cursor.setPosition(targetEnd, QTextCursor::KeepAnchor);
-        }
-    }
-    else
-    {
-        // continue in normal text after the template
-        cursor.setCharFormat(base);
-    }
+    showHint(tr("Tap the board where it should be written (Esc cancels)."));
 }
 
-void UBMathPalette::insertStackedFraction(QTextCursor& cursor, const QColor& color, const QString& wrapText) const
+void UBMathPalette::placementFinished(bool written)
 {
-    QTextCharFormat base = cursor.charFormat();
-    base.setVerticalAlignment(QTextCharFormat::AlignNormal);
-    base.setFontOverline(false);
+    Q_UNUSED(written);
 
-    QTextTableFormat tableFormat;
-    tableFormat.setBorder(0);
-    tableFormat.setBorderStyle(QTextFrameFormat::BorderStyle_None);
-    tableFormat.setCellPadding(2);
-    tableFormat.setCellSpacing(0);
-    tableFormat.setBorderCollapse(true);
-    tableFormat.setAlignment(Qt::AlignLeft);
-
-    QTextTable* table = cursor.insertTable(2, 1, tableFormat);
-
-    if (!table)
+    if (mActiveButton)
     {
-        return;
+        mActiveButton->setChecked(false);
     }
 
-    // the fraction bar is the bottom border of the numerator cell
-    const QFont font = base.font();
-    qreal lineWidth = 1.;
-
-    if (font.pointSizeF() > 0)
-    {
-        lineWidth = qMax(1., font.pointSizeF() / 12.);
-    }
-    else if (font.pixelSize() > 0)
-    {
-        lineWidth = qMax(1., font.pixelSize() / 16.);
-    }
-
-    QTextTableCell numerator = table->cellAt(0, 0);
-    QTextTableCellFormat numeratorFormat = numerator.format().toTableCellFormat();
-    numeratorFormat.setBottomBorder(lineWidth);
-    numeratorFormat.setBottomBorderStyle(QTextFrameFormat::BorderStyle_Solid);
-    numeratorFormat.setBottomBorderBrush(color);
-    numerator.setFormat(numeratorFormat);
-
-    QTextBlockFormat centered;
-    centered.setAlignment(Qt::AlignHCenter);
-
-    QTextCursor numeratorCursor = numerator.firstCursorPosition();
-    numeratorCursor.setBlockFormat(centered);
-    const int numeratorStart = numeratorCursor.position();
-    numeratorCursor.insertText(wrapText.isEmpty() ? QStringLiteral("a") : wrapText, base);
-    const int numeratorEnd = numeratorCursor.position();
-
-    QTextCursor denominatorCursor = table->cellAt(1, 0).firstCursorPosition();
-    denominatorCursor.setBlockFormat(centered);
-    const int denominatorStart = denominatorCursor.position();
-    denominatorCursor.insertText(QStringLiteral("b"), base);
-    const int denominatorEnd = denominatorCursor.position();
-
-    // select the placeholder to be typed over: the numerator, or the denominator if the selection was wrapped
-    if (wrapText.isEmpty())
-    {
-        cursor.setPosition(numeratorStart);
-        cursor.setPosition(numeratorEnd, QTextCursor::KeepAnchor);
-    }
-    else
-    {
-        cursor.setPosition(denominatorStart);
-        cursor.setPosition(denominatorEnd, QTextCursor::KeepAnchor);
-    }
+    mActiveButton = nullptr;
+    showHint();
 }

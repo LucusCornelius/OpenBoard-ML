@@ -54,7 +54,8 @@ HEADERS +=  \
     src/gui/UBMathPalette.h \
     src/gui/UBColorPickerPopup.h \
     src/gui/UBColorPaletteDialog.h \
-    src/gui/UBScreenCalibration.h
+    src/gui/UBScreenCalibration.h \
+    src/gui/UBInkWriter.h
 SOURCES +=  \
     src/gui/UBThumbnail.cpp \
     src/gui/UBThumbnailArranger.cpp \
@@ -111,7 +112,8 @@ SOURCES +=  \
     src/gui/UBMathPalette.cpp \
     src/gui/UBColorPickerPopup.cpp \
     src/gui/UBColorPaletteDialog.cpp \
-    src/gui/UBScreenCalibration.cpp
+    src/gui/UBScreenCalibration.cpp \
+    src/gui/UBInkWriter.cpp
 
 win32:SOURCES += src/gui/UBKeyboardPalette_win.cpp
 macx:OBJECTIVE_SOURCES += src/gui/UBKeyboardPalette_mac.mm

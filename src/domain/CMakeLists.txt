@@ -61,4 +61,6 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBGraphicsShapeItem.h
     UBGraphicsShapeItemDelegate.cpp
     UBGraphicsShapeItemDelegate.h
+    UBMathInkLayout.cpp
+    UBMathInkLayout.h
 )
