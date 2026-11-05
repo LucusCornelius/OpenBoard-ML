@@ -1,0 +1,13 @@
+{
+    "name": "Wacom Intuos M (ExpressKeys)",
+    "description": "Configure the four ExpressKeys in Wacom Center (Windows/macOS) or with xsetwacom (Linux) to send these keystrokes (on macOS use Cmd instead of Ctrl):\n  ExpressKey 1: Ctrl+Shift+F9 = Undo\n  ExpressKey 2: Ctrl+Shift+F10 = Toggle pen / eraser\n  ExpressKey 3: Ctrl+Shift+F11 = Next page\n  ExpressKey 4: Ctrl+Shift+F12 = Previous page\nPen buttons: set the lower pen button to \"Right click\" (temporary eraser while pressed) and the upper pen button to \"Middle click\" (pan while pressed).\nThe usual keyboard shortcuts (Ctrl+Z, PgUp, PgDown, ...) are kept. See docs/INPUT-DEVICES.md for details.",
+    "order": 10,
+    "rightClickAction": "temporaryEraser",
+    "middleClickAction": "pan",
+    "shortcuts": [
+        { "action": "actionUndo",            "extraKeys": [ "Ctrl+Shift+F9" ] },
+        { "action": "actionTogglePenEraser", "extraKeys": [ "Ctrl+Shift+F10" ] },
+        { "action": "actionForward",         "extraKeys": [ "Ctrl+Shift+F11" ] },
+        { "action": "actionBack",            "extraKeys": [ "Ctrl+Shift+F12" ] }
+    ]
+}

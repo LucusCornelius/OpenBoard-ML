@@ -1,0 +1,11 @@
+{
+    "name": "Medion P82030 / Waltop hotkey tablet",
+    "description": "For Medion (Aldi) graphics tablets made by Waltop, e.g. P82030 (MD 86336) and P82012 (MD 85637). On Windows the printed hotkey fields are handled by the Medion/Waltop MacroKeyManager; according to the manual they offer functions such as Undo, Cut, Copy, Paste, Open, Save and Close, which presumably arrive as the standard shortcuts (Ctrl+Z, Ctrl+X, Ctrl+C, Ctrl+V, ...). The exact key codes are not documented publicly, so this is a conservative preset: Undo/Redo use the standard keys (Ctrl+Z, Ctrl+Y) and the pen buttons are configured: right click = temporary eraser while pressed, middle click (pen rocker on Linux) = previous tool. See docs/INPUT-DEVICES.md.",
+    "order": 20,
+    "rightClickAction": "temporaryEraser",
+    "middleClickAction": "previousTool",
+    "shortcuts": [
+        { "action": "actionUndo", "keys": "Ctrl+Z" },
+        { "action": "actionRedo", "keys": "Ctrl+Y" }
+    ]
+}

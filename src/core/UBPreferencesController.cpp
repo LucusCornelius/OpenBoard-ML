@@ -41,6 +41,8 @@
 #include "core/UBDisplayManager.h"
 #include "core/UBThemeManager.h"
 #include "core/UBShortcutManager.h"
+#include "core/UBClickBehavior.h"
+#include "core/UBInputDevicePreferences.h"
 #include "frameworks/UBPlatformUtils.h"
 
 #include "frameworks/UBStringUtils.h"
@@ -415,6 +417,7 @@ void UBPreferencesController::wire()
     connect(mPreferencesUI->abortButton, &QPushButton::clicked, this, &UBPreferencesController::abortClicked);
     connect(mPreferencesUI->resetButton, &QPushButton::clicked, this, &UBPreferencesController::resetClicked);
     connect(mPreferencesUI->noCtrl, &QCheckBox::toggled, UBShortcutManager::shortcutManager(), &UBShortcutManager::ignoreCtrl);
+    new UBInputDevicePreferences(mPreferencesUI, mPreferencesWindow); // click behavior and device profiles, deleted with dialog
     connect(mPreferencesUI->mainTabWidget, &QTabWidget::currentChanged, [this](int tab){
         auto shortcutTab = mPreferencesUI->mainTabWidget->indexOf(mPreferencesUI->shortcutTab);
 
@@ -632,6 +635,8 @@ void UBPreferencesController::defaultSettings()
             QModelIndex rowIndex = sm->index(row, 0);
             sm->resetData(rowIndex);
         }
+
+        UBClickBehavior::instance()->resetActions();
 
         resetClicked();
     }
