@@ -384,7 +384,6 @@ int UBApplication::exec(const QString& pFileToImport)
     mPreferencesController = new UBPreferencesController(mainWindow);
 
     connect(mainWindow->actionPreferences, SIGNAL(triggered()), mPreferencesController, SLOT(show()));
-    connect(mainWindow->actionCheckUpdate, SIGNAL(triggered()), applicationController, SLOT(checkUpdateRequest()));
 
 
     toolBarPositionChanged(UBSettings::settings()->appToolBarPositionedAtTop->get());
@@ -592,8 +591,6 @@ void UBApplication::decorateActionMenu(QAction* action)
             menu->addSeparator();
             menu->addAction(mainWindow->actionPreferences);
             menu->addAction(mainWindow->actionMultiScreen);
-            if (!UBSettings::settings()->appHideCheckForSoftwareUpdate->get().toBool())
-                menu->addAction(mainWindow->actionCheckUpdate);
             menu->addSeparator();
 
             menu->addAction(mainWindow->actionPodcast);

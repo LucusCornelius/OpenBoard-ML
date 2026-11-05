@@ -1785,15 +1785,6 @@
     <string>Erase all Annotations</string>
    </property>
   </action>
-  <action name="actionCheckUpdate">
-   <property name="icon">
-    <iconset resource="../OpenBoard.qrc">
-     <normaloff>:/images/toolbar/updates.png</normaloff>:/images/toolbar/updates.png</iconset>
-   </property>
-   <property name="text">
-    <string>Check Update</string>
-   </property>
-  </action>
   <action name="actionHideApplication">
    <property name="icon">
     <iconset resource="../OpenBoard.qrc">

@@ -55,9 +55,6 @@ class UBDocumentProxy;
 class UBEmbedController;
 class UBBlackoutWidget;
 class UBToolWidget;
-class UBVersion;
-class UBSoftwareUpdate;
-class UBSoftwareUpdateDialog;
 class UBGraphicsMediaItem;
 class UBGraphicsWidgetItem;
 class UBBoardPaletteManager;
@@ -167,7 +164,6 @@ class UBBoardController : public UBDocumentContainer
         void persistViewPositionOnCurrentScene() const;
         void restoreViewPositionOnCurrentScene() const;
         void persistCurrentScene(bool isAnAutomaticBackup = false, bool forceImmediateSave = false);
-        void showNewVersionAvailable(bool automatic, const UBVersion &installedVersion, const UBSoftwareUpdate &softwareUpdate);
         void setBoxing(QRect displayRect);
         void setCursorFromAngle(qreal angle, const QPoint offset = {});
         void setToolbarTexts();
@@ -312,7 +308,6 @@ class UBBoardController : public UBDocumentContainer
         int mSwitchToSceneIndex{-1};
         UBBoardPaletteManager *mPaletteManager;
         UBBackgroundManager* mBgManager{nullptr};
-        UBSoftwareUpdateDialog *mSoftwareUpdateDialog;
         UBMessageWindow *mMessageWindow;
         UBEmbedController *mEmbedController;
         UBBoardView *mControlView;

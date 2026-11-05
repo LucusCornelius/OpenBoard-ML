@@ -46,10 +46,6 @@ class UBGraphicsScene;
 class UBDesktopAnnotationController;
 class UBScreenMirror;
 class UBMainWindow;
-class UBVersion;
-class UBSoftwareUpdate;
-class QNetworkAccessManager;
-class QNetworkReply;
 class UBRightPalette;
 
 class UBApplicationController : public QObject
@@ -105,8 +101,6 @@ class UBApplicationController : public QObject
             return mMainMode;
         }
 
-        bool isCheckingForSoftwareUpdate() const;
-
         bool isShowingDesktop()
         {
             return mIsShowingDesktop;
@@ -141,13 +135,6 @@ class UBApplicationController : public QObject
         void actionCopy();
         void actionPaste();
 
-        void checkUpdateRequest();
-        void checkAtLaunch();
-
-    private slots:
-        void updateRequestFinished(QNetworkReply * reply);
-
-
     protected:
         void initPreviousViews();
 
@@ -169,18 +156,7 @@ class UBApplicationController : public QObject
 
         MainMode mMainMode;
 
-        bool mAutomaticCheckForUpdates;
-        bool mCheckingForUpdates;
-
-        void setCheckingForUpdates(bool value);
-
         bool mIsShowingDesktop;
-
-        bool isNoUpdateDisplayed;
-        void checkUpdate(const QUrl &url = QUrl());
-        QNetworkAccessManager * mNetworkAccessManager;
-
-        void downloadJsonFinished(QString updateString);
 };
 
 #endif /* UBAPPLICATIONCONTROLLER_H_ */

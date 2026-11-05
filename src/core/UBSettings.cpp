@@ -270,9 +270,6 @@ void UBSettings::init()
 
     appToolBarPositionedAtTop = new UBSetting(this, "App", "ToolBarPositionedAtTop", true);
     appToolBarDisplayText = new UBSetting(this, "App", "ToolBarDisplayText", true);
-    appEnableAutomaticSoftwareUpdates = new UBSetting(this, "App", "EnableAutomaticSoftwareUpdates", false);
-    appSoftwareUpdateURL = new UBSetting(this, "App", "SoftwareUpdateURL", "http://www.openboard.ch/update.json");
-    appHideCheckForSoftwareUpdate = new UBSetting(this, "App", "HideCheckForSoftwareUpdate", false);
     appToolBarOrientationVertical = new UBSetting(this, "App", "ToolBarOrientationVertical", false);
     appPreferredLanguage = new UBSetting(this,"App","PreferredLanguage", "");
     appThemeMode = new UBSetting(this, "App", "ThemeMode", 0);
@@ -289,7 +286,6 @@ void UBSettings::init()
     leftLibPaletteDesktopModeWidth = new UBSetting(this, "Board", "LeftLibPaletteDesktopModeWidth",270);
     leftLibPaletteDesktopModeIsCollapsed = new UBSetting(this,"Board","LeftLibPaletteDesktopModeIsCollapsed",true);
 
-    appIsInSoftwareUpdateProcess = new UBSetting(this, "App", "IsInSoftwareUpdateProcess", false);
     appLastSessionDocumentUUID = new UBSetting(this, "App", "LastSessionDocumentUUID", "");
     appLastSessionPageIndex = new UBSetting(this, "App", "LastSessionPageIndex", 0);
     appUseMultiscreen = new UBSetting(this, "App", "UseMultiscreenMode", true);

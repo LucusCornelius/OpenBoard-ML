@@ -29,7 +29,6 @@
 #include "UBApplicationController.h"
 
 #include "frameworks/UBPlatformUtils.h"
-#include "frameworks/UBVersion.h"
 
 #include "core/UBApplication.h"
 #include "core/UBPersistenceManager.h"
@@ -77,8 +76,6 @@ UBApplicationController::UBApplicationController(UBBoardView *pControlView,
     , mDisplayView(pDisplayView)
     , mMirror(0)
     , mMainMode(Board)
-    , mAutomaticCheckForUpdates(false)
-    , mCheckingForUpdates(false)
     , mIsShowingDesktop(false)
 {
     mUninoteController = new UBDesktopAnnotationController(this, rightPalette);
@@ -105,9 +102,6 @@ UBApplicationController::UBApplicationController(UBBoardView *pControlView,
 
     connect(UBApplication::webController, SIGNAL(imageCaptured(const QPixmap &, bool, const QUrl&))
             , this, SLOT(addCapturedPixmap(const QPixmap &, bool, const QUrl&)));
-
-    mNetworkAccessManager = new QNetworkAccessManager (this);
-    QTimer::singleShot (1000, this, SLOT (checkAtLaunch()));
 }
 
 
@@ -480,56 +474,6 @@ void UBApplicationController::showDesktop(bool dontSwitchFrontProcess)
 }
 
 
-void UBApplicationController::checkUpdate(const QUrl& url)
-{
-    QUrl jsonUrl = url;
-    if (url.isEmpty())
-        jsonUrl = UBSettings::settings()->appSoftwareUpdateURL->get().toUrl();
-
-    qDebug() << "Checking for update at url: " << jsonUrl.toString();
-
-    connect(mNetworkAccessManager, SIGNAL(finished(QNetworkReply*)),
-            this, SLOT(updateRequestFinished(QNetworkReply*)));
-
-    mNetworkAccessManager->get(QNetworkRequest(jsonUrl));
-
-}
-
-
-
-void UBApplicationController::updateRequestFinished(QNetworkReply * reply)
-{
-    if (reply->error()) {
-        qWarning() << "Error downloading update file: " << reply->errorString();
-        return;
-    }
-
-    // Check if we are being redirected. If so, call checkUpdate again
-
-    QVariant redirect_target = reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
-    if (!redirect_target.isNull()) {
-        // The returned URL might be relative. resolved() creates an absolute url from it
-        QUrl redirect_url(reply->url().resolved(redirect_target.toUrl()));
-
-        checkUpdate(redirect_url);
-        return;
-    }
-
-    // No error and no redirect => we read the whole response
-
-    QString responseString = QString(reply->readAll());
-
-    if (!responseString.isEmpty() &&
-            responseString.contains("version") &&
-            responseString.contains("url")) {
-
-        reply->close();
-        reply->deleteLater();
-
-        downloadJsonFinished(responseString);
-    }
-}
-
 void UBApplicationController::initPreviousViews()
 {
     int numPreviousViews = UBApplication::displayManager->numPreviousViews();
@@ -550,53 +494,6 @@ void UBApplicationController::initPreviousViews()
     }
 }
 
-
-void UBApplicationController::downloadJsonFinished(QString currentJson)
-{
-    /*
-      The .json files simply specify the latest version number available, and
-      the URL to send the user to, so they can download it.
-
-      They look like:
-
-          {
-            "version": "1.3.5",
-            "url": "http://openboard.ch"
-          }
-    */
-
-    QJsonObject jsonObject = QJsonDocument::fromJson(currentJson.toUtf8()).object();
-
-    UBVersion installedVersion (qApp->applicationVersion());
-    UBVersion jsonVersion (jsonObject.value("version").toString());
-
-    qDebug() << "json version: " << jsonVersion.toUInt();
-    qDebug() << "installed version: " << installedVersion.toUInt();
-
-    if (jsonVersion > installedVersion) {
-        if (UBApplication::mainWindow->yesNoQuestion(tr("Update available"), tr ("New update available, would you go to the web page ?"))){
-            QUrl url(jsonObject.value("url").toString());
-            QDesktopServices::openUrl(url);
-        }
-    }
-    else if (isNoUpdateDisplayed) {
-        mMainWindow->information(tr("Update"), tr("No update available"));
-    }
-}
-
-void UBApplicationController::checkAtLaunch()
-{
-    if(UBSettings::settings()->appEnableAutomaticSoftwareUpdates->get().toBool()){
-        isNoUpdateDisplayed = false;
-        checkUpdate();
-    }
-}
-
-void UBApplicationController::checkUpdateRequest()
-{
-    isNoUpdateDisplayed = true;
-    checkUpdate();
-}
 
 void UBApplicationController::hideDesktop()
 {

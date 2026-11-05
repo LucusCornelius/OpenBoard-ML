@@ -420,9 +420,6 @@ void UBPreferencesController::wire()
         markerLayout->addWidget(UBColorPaletteDialog::createLauncherButton(mPreferencesUI->markerTab), 1, Qt::AlignLeft | Qt::AlignTop);
     }
 
-    // about tab
-    connect(mPreferencesUI->checkSoftwareUpdateAtLaunchCheckBox, SIGNAL(clicked(bool)), settings->appEnableAutomaticSoftwareUpdates, SLOT(setBool(bool)));
-
     // shortcut tab
     connect(mPreferencesUI->shortcutTableView, &QTableView::clicked, this, &UBPreferencesController::actionSelected);
     connect(mPreferencesUI->shortcutTableView, &QTableView::doubleClicked, this, [this](){
@@ -470,9 +467,6 @@ void UBPreferencesController::wire()
 void UBPreferencesController::init()
 {
     UBSettings* settings = UBSettings::settings();
-
-    // about tab
-    mPreferencesUI->checkSoftwareUpdateAtLaunchCheckBox->setChecked(settings->appEnableAutomaticSoftwareUpdates->get().toBool());
 
     // display tab
     for(int i=0; i<mPreferencesUI->keyboardPaletteKeyButtonSize->count(); i++)
@@ -596,12 +590,6 @@ void UBPreferencesController::defaultSettings()
         mMarkerProperties->mediumSlider->setValue(settings->boardMarkerMediumWidth->reset().toDouble() * sSliderRatio);
         mMarkerProperties->strongSlider->setValue(settings->boardMarkerStrongWidth->reset().toDouble() * sSliderRatio);
         mMarkerProperties->pressureSensitiveCheckBox->setChecked(settings->boardMarkerPressureSensitive->reset().toBool());
-    }
-    else if (mPreferencesUI->mainTabWidget->currentWidget() == mPreferencesUI->aboutTab)
-    {
-        bool defaultValue = settings->appEnableAutomaticSoftwareUpdates->reset().toBool();
-        mPreferencesUI->checkSoftwareUpdateAtLaunchCheckBox->setChecked(defaultValue);
-
     }
     else if(mPreferencesUI->mainTabWidget->currentWidget() == mPreferencesUI->networkTab)
     {
