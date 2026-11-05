@@ -384,6 +384,9 @@ void UBSettings::init()
     boardMarkerLightBackgroundSelectedColors = new UBColorListSetting(this, "Board", "MarkerLightBackgroundSelectedColors", markerLightBackgroundSelectedColors, boardMarkerAlpha->get().toDouble());
     boardMarkerDarkBackgroundSelectedColors = new UBColorListSetting(this, "Board", "MarkerDarkBackgroundSelectedColors", markerDarkBackgroundSelectedColors, boardMarkerAlpha->get().toDouble());
 
+    boardColorPalettes = new UBSetting(this, "Board", "ColorPalettes", QString());
+    boardActiveColorPalette = new UBSetting(this, "Board", "ActiveColorPalette", QString());
+
     showEraserPreviewCircle = new UBSetting(this, "Board", "ShowEraserPreviewCircle", true);
     showMarkerPreviewCircle = new UBSetting(this, "Board", "ShowMarkerPreviewCircle", true);
     showPenPreviewCircle = new UBSetting(this, "Board", "ShowPenPreviewCircle", true);

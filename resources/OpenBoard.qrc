@@ -386,5 +386,6 @@
         <file>images/backgroundPalette/bgButtonTemplateLightOff.svg</file>
         <file>images/backgroundPalette/bgButtonTemplateLightOn.svg</file>
         <file>images/toolbar/mathPalette.svg</file>
+        <file>images/toolbar/colorPicker.svg</file>
     </qresource>
 </RCC>

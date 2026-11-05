@@ -35,6 +35,7 @@
 #include <QScreen>
 
 #include "gui/UBCircleFrame.h"
+#include "gui/UBColorPaletteDialog.h"
 
 #include "core/UBSetting.h"
 #include "core/UBApplicationController.h"
@@ -399,6 +400,19 @@ void UBPreferencesController::wire()
     connect(mMarkerProperties->mediumSlider, SIGNAL(valueChanged(int)), this, SLOT(widthSliderChanged(int)));
     connect(mMarkerProperties->strongSlider, SIGNAL(valueChanged(int)), this, SLOT(widthSliderChanged(int)));
     connect(mMarkerProperties->pressureSensitiveCheckBox, SIGNAL(clicked(bool)), settings, SLOT(setMarkerPressureSensitive(bool)));
+
+    // named color palettes
+    if (QGridLayout* penLayout = qobject_cast<QGridLayout*>(mPreferencesUI->penTab->layout()))
+    {
+        const int row = penLayout->rowCount();
+        penLayout->addWidget(UBColorPaletteDialog::createLauncherButton(mPreferencesUI->penTab), row, 0, Qt::AlignLeft | Qt::AlignTop);
+        penLayout->setRowStretch(row, 1);
+    }
+
+    if (QBoxLayout* markerLayout = qobject_cast<QBoxLayout*>(mPreferencesUI->markerTab->layout()))
+    {
+        markerLayout->addWidget(UBColorPaletteDialog::createLauncherButton(mPreferencesUI->markerTab), 1, Qt::AlignLeft | Qt::AlignTop);
+    }
 
     // about tab
     connect(mPreferencesUI->checkSoftwareUpdateAtLaunchCheckBox, SIGNAL(clicked(bool)), settings->appEnableAutomaticSoftwareUpdates, SLOT(setBool(bool)));

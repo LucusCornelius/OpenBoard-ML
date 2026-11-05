@@ -37,6 +37,8 @@
 #include "board/UBBoardPaletteManager.h"
 #include "board/UBBoardView.h"
 #include "board/UBColorPreferencesDialog.h"
+#include "core/UBColorPalette.h"
+#include "gui/UBColorPickerPopup.h"
 #include "board/UBDrawingController.h"
 #include "board/UBFeaturesController.h"
 
@@ -371,6 +373,9 @@ void UBBoardController::setupToolbar()
     mColorChoice->displayText(QVariant(settings->appToolBarDisplayText->get().toBool()));
     updateColorButtonsForPaletteSize();
 
+    // full spectrum color picker, named color palettes
+    UBColorPickerPopup::setupIntegration(mMainWindow, mColorActions);
+
     // Setup line width choice widget
     QList<QAction *> lineWidthActions;
     lineWidthActions.append(mMainWindow->actionLineSmall);
@@ -448,6 +453,7 @@ void UBBoardController::buildColorActions()
                   << mMainWindow->actionColor7
                   << mMainWindow->actionColor8
                   << mMainWindow->actionColor9
+                  << mMainWindow->actionCustomColor
                   << mMainWindow->actionColorPreferences;
 }
 
@@ -1986,6 +1992,21 @@ void UBBoardController::colorPaletteChanged()
     mPenColorOnLightBackground = UBSettings::settings()->penColor(false);
     mMarkerColorOnDarkBackground = UBSettings::settings()->markerColor(true);
     mMarkerColorOnLightBackground = UBSettings::settings()->markerColor(false);
+
+    // keep a custom color chosen with the color picker
+    UBColorPaletteManager* paletteManager = UBColorPaletteManager::manager();
+
+    if (paletteManager->hasCustomColor(false))
+    {
+        mPenColorOnDarkBackground = paletteManager->customColor(false, true);
+        mPenColorOnLightBackground = paletteManager->customColor(false, false);
+    }
+
+    if (paletteManager->hasCustomColor(true))
+    {
+        mMarkerColorOnDarkBackground = paletteManager->customColor(true, true);
+        mMarkerColorOnLightBackground = paletteManager->customColor(true, false);
+    }
 }
 
 

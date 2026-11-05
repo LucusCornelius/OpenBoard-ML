@@ -35,6 +35,7 @@
 #include "gui/UBMainWindow.h"
 #include "gui/UBToolbarButtonGroup.h"
 #include "gui/UBRightPalette.h"
+#include "gui/UBColorPickerPopup.h"
 
 #include "core/memcheck.h"
 
@@ -68,6 +69,7 @@ UBDesktopPenPalette::UBDesktopPenPalette(QWidget *parent, UBRightPalette* rightP
     colorActions.append(UBApplication::mainWindow->actionColor7);
     colorActions.append(UBApplication::mainWindow->actionColor8);
     colorActions.append(UBApplication::mainWindow->actionColor9);
+    colorActions.append(UBApplication::mainWindow->actionCustomColor);
     colorActions.append(UBApplication::mainWindow->actionColorPreferences);
 
     UBToolbarButtonGroup *colorChoice =
@@ -82,6 +84,9 @@ UBDesktopPenPalette::UBDesktopPenPalette(QWidget *parent, UBRightPalette* rightP
     connect(UBDrawingController::drawingController(), SIGNAL(colorPaletteChanged()), this, SLOT(close()));
 
     layout()->addWidget(colorChoice);
+
+    // right click / long press on a swatch opens the color picker
+    UBColorPickerPopup::installSwatchHandlers(colorActions);
 
     // Setup line width choice widget
     QList<QAction *> lineWidthActions;
@@ -171,6 +176,7 @@ UBDesktopMarkerPalette::UBDesktopMarkerPalette(QWidget *parent, UBRightPalette* 
     colorActions.append(UBApplication::mainWindow->actionColor7);
     colorActions.append(UBApplication::mainWindow->actionColor8);
     colorActions.append(UBApplication::mainWindow->actionColor9);
+    colorActions.append(UBApplication::mainWindow->actionCustomColor);
     colorActions.append(UBApplication::mainWindow->actionColorPreferences);
 
     UBToolbarButtonGroup *colorChoice = new UBToolbarButtonGroup(UBApplication::mainWindow->boardToolBar, colorActions, objectNamePrefix, UBSettings::settings()->colorPaletteSize);
@@ -183,6 +189,9 @@ UBDesktopMarkerPalette::UBDesktopMarkerPalette(QWidget *parent, UBRightPalette* 
     connect(UBDrawingController::drawingController(), SIGNAL(colorPaletteChanged()), this, SLOT(close()));
 
     layout()->addWidget(colorChoice);
+
+    // right click / long press on a swatch opens the color picker
+    UBColorPickerPopup::installSwatchHandlers(colorActions);
 
     // Setup line width choice widget
     QList<QAction *> lineWidthActions;

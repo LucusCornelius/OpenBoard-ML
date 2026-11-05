@@ -37,4 +37,6 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBThemeManager.h
     UBWidgetInspector.cpp
     UBWidgetInspector.h
+    UBColorPalette.cpp
+    UBColorPalette.h
 )
