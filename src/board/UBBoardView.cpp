@@ -352,6 +352,12 @@ void UBBoardView::tabletEvent (QTabletEvent * event)
             mTabletButtonPressPending = true;
             mTabletButtonPressInContact = event->pressure() > 0. || event->buttons().testFlag(Qt::LeftButton);
         }
+        else
+        {
+            // the synthesized mouse press (if any) has been delivered by now; do not let a
+            // stale flag mis-classify the next real mouse press as a stylus button
+            mTabletButtonPressPending = false;
+        }
 
         event->setAccepted(false);
         return;
@@ -1697,6 +1703,8 @@ void UBBoardView::mouseReleaseEvent (QMouseEvent *event)
 
 void UBBoardView::forcedTabletRelease ()
 {
+    mTabletButtonPressPending = false;
+
     if (mMouseButtonIsPressed || mTabletStylusIsPressed || mPendingStylusReleaseEvent)
     {
         qWarning () << "dirty mouse/tablet state:";

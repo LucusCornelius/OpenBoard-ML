@@ -772,7 +772,8 @@ void UBColorPaletteManager::useColor(const QColor& color)
     const bool marker = isMarkerToolActive();
 
     if (!marker && drawingController->stylusTool() != UBStylusTool::Pen
-            && drawingController->stylusTool() != UBStylusTool::Line)
+            && drawingController->stylusTool() != UBStylusTool::Line
+            && drawingController->stylusTool() != UBStylusTool::Shape)
     {
         drawingController->setStylusTool(UBStylusTool::Pen);
     }
