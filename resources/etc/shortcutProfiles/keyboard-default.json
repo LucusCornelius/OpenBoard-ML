@@ -1,0 +1,9 @@
+{
+    "name": "Keyboard default",
+    "description": "Restores the default key sequences of all commands, removes all mouse and tablet button assignments and restores the default click behavior (right click: context menu, middle click: nothing).",
+    "order": 0,
+    "resetAll": true,
+    "rightClickAction": "contextMenu",
+    "middleClickAction": "nothing",
+    "shortcuts": []
+}

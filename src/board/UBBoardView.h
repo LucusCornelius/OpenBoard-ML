@@ -107,6 +107,7 @@ protected:
     virtual void leaveEvent ( QEvent * event);
 
     virtual void focusOutEvent ( QFocusEvent * event );
+    virtual void contextMenuEvent(QContextMenuEvent *event);
 
     virtual void drawItems(QPainter *painter, int numItems,
                            QGraphicsItem *items[],
@@ -212,6 +213,19 @@ private:
     UBSnapIndicator* mSnapIndicator{nullptr};
 
     static bool hasSelectedParents(QGraphicsItem * item);
+
+    // configurable right/middle button behaviour, see UBClickBehavior
+    bool handleButtonBehaviorPress(QMouseEvent* event);
+    bool handleButtonBehaviorRelease(QMouseEvent* event);
+    void handleTemporaryToolTabletMove(QTabletEvent* event);
+    void finishTemporaryTool(const QPointF& localPos, const QPointF& globalPos, Qt::KeyboardModifiers modifiers);
+    void sendLeftButtonEvent(QEvent::Type type, const QPointF& localPos, const QPointF& globalPos, Qt::KeyboardModifiers modifiers);
+
+    Qt::MouseButton mTemporaryToolButton{Qt::NoButton};     // button holding a temporary tool (eraser, hand)
+    Qt::MouseButton mSwallowedReleaseButton{Qt::NoButton};  // button whose release must be ignored
+    bool mTemporaryToolFollowsPenContact{false};            // stylus: temporary tool acts only while the tip touches
+    bool mTabletButtonPressPending{false};                  // next mouse press originates from a stylus button
+    bool mTabletButtonPressInContact{false};                // stylus tip was touching when the button was pressed
 
 private slots:
     void settingChanged(QVariant newValue);

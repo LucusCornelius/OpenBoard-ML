@@ -39,4 +39,10 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBWidgetInspector.h
     UBColorPalette.cpp
     UBColorPalette.h
+    UBClickBehavior.cpp
+    UBClickBehavior.h
+    UBShortcutProfile.cpp
+    UBShortcutProfile.h
+    UBInputDevicePreferences.cpp
+    UBInputDevicePreferences.h
 )

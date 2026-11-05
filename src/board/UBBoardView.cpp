@@ -45,6 +45,7 @@
 #include "core/UBSetting.h"
 #include "core/UBPersistenceManager.h"
 #include "core/UB.h"
+#include "core/UBClickBehavior.h"
 
 #include "network/UBHttpGet.h"
 
@@ -178,6 +179,9 @@ void UBBoardView::init ()
     mTabletStylusIsPressed = false;
     mMouseButtonIsPressed = false;
     mPendingStylusReleaseEvent = false;
+
+    // track tool history for the "previous tool" button behavior
+    UBClickBehavior::instance()->connectToDrawingController();
 
     setCacheMode (QGraphicsView::CacheBackground);
 
@@ -336,6 +340,28 @@ bool UBBoardView::event (QEvent * e)
 
 void UBBoardView::tabletEvent (QTabletEvent * event)
 {
+    // Stylus barrel buttons (right/middle) are handled like mouse buttons: don't start
+    // a stroke here but let Qt deliver the corresponding mouse event, which is then
+    // processed by handleButtonBehaviorPress/Release. Buttons mapped to an action in the
+    // shortcut settings never get here, they are consumed by the application event filter.
+    if ((event->type() == QEvent::TabletPress || event->type() == QEvent::TabletRelease)
+            && event->button() != Qt::LeftButton && event->button() != Qt::NoButton)
+    {
+        if (event->type() == QEvent::TabletPress)
+        {
+            mTabletButtonPressPending = true;
+            mTabletButtonPressInContact = event->pressure() > 0. || event->buttons().testFlag(Qt::LeftButton);
+        }
+
+        event->setAccepted(false);
+        return;
+    }
+
+    if (event->type() == QEvent::TabletMove)
+    {
+        handleTemporaryToolTabletMove(event);
+    }
+
     if (!mUseHighResTabletEvent) {
         event->setAccepted (false);
         return;
@@ -1112,6 +1138,11 @@ void UBBoardView::mousePressEvent (QMouseEvent *event)
         return;
     }
 
+    if (handleButtonBehaviorPress(event))
+    {
+        return;
+    }
+
     mIsDragInProgress = false;
 
     setMultiselection(event->modifiers() & Qt::ControlModifier);
@@ -1387,6 +1418,11 @@ void UBBoardView::movingItemDestroyed(QObject*)
 
 void UBBoardView::mouseReleaseEvent (QMouseEvent *event)
 {
+    if (handleButtonBehaviorRelease(event))
+    {
+        return;
+    }
+
     UBStylusTool::Enum currentTool = (UBStylusTool::Enum)UBDrawingController::drawingController ()->stylusTool ();
 
     setToolCursor (currentTool);
@@ -1983,6 +2019,197 @@ void UBBoardView::virtualKeyboardActivated(bool b)
 void UBBoardView::focusOutEvent (QFocusEvent * event)
 {
     Q_UNUSED (event);
+}
+
+void UBBoardView::contextMenuEvent(QContextMenuEvent *event)
+{
+    // suppress the context menu of the right mouse button if another behavior is configured
+    if (event->reason() == QContextMenuEvent::Mouse
+            && (mTemporaryToolButton == Qt::RightButton
+                || mSwallowedReleaseButton == Qt::RightButton
+                || UBClickBehavior::instance()->action(Qt::RightButton) != UBClickBehavior::ContextMenu))
+    {
+        event->accept();
+        return;
+    }
+
+    QGraphicsView::contextMenuEvent(event);
+}
+
+bool UBBoardView::handleButtonBehaviorPress(QMouseEvent *event)
+{
+    const bool fromTablet = mTabletButtonPressPending;
+    const bool inContact = !fromTablet || mTabletButtonPressInContact;
+    mTabletButtonPressPending = false;
+
+    const Qt::MouseButton button = event->button();
+
+    if ((button != Qt::RightButton && button != Qt::MiddleButton) || !isInteractive() || !scene())
+    {
+        return false;
+    }
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    const QPointF localPos = event->position();
+    const QPointF globalPos = event->globalPosition();
+#else
+    const QPointF localPos = event->localPos();
+    const QPointF globalPos = event->screenPos();
+#endif
+
+    if (mTemporaryToolButton != Qt::NoButton)
+    {
+        if (mTemporaryToolButton != button)
+        {
+            // another button already holds a temporary tool, ignore this one
+            event->accept();
+            return true;
+        }
+
+        // release event was lost, clean up before handling the new press
+        finishTemporaryTool(localPos, globalPos, event->modifiers());
+    }
+
+    mSwallowedReleaseButton = Qt::NoButton;
+
+    if (mMouseButtonIsPressed || mTabletStylusIsPressed)
+    {
+        // a stroke or selection is in progress, keep legacy behavior
+        return false;
+    }
+
+    UBClickBehavior* behavior = UBClickBehavior::instance();
+    UBClickBehavior::Action action = behavior->action(button);
+
+    switch (action)
+    {
+    case UBClickBehavior::ContextMenu:
+        return false;
+
+    case UBClickBehavior::Nothing:
+        break;
+
+    case UBClickBehavior::PreviousTool:
+        behavior->activatePreviousTool();
+        break;
+
+    case UBClickBehavior::SelectTool:
+        UBDrawingController::drawingController()->setStylusTool(UBStylusTool::Selector);
+        break;
+
+    case UBClickBehavior::TemporaryEraser:
+    case UBClickBehavior::Pan:
+    {
+        const int tool = action == UBClickBehavior::TemporaryEraser ? UBStylusTool::Eraser : UBStylusTool::Hand;
+        behavior->beginTemporaryTool(tool);
+        setToolCursor(tool);
+        mTemporaryToolButton = button;
+        mTemporaryToolFollowsPenContact = fromTablet;
+
+        if (inContact)
+        {
+            // start erasing/panning immediately
+            sendLeftButtonEvent(QEvent::MouseButtonPress, localPos, globalPos, event->modifiers());
+        }
+
+        event->accept();
+        return true;
+    }
+    }
+
+    // one-shot behavior: ignore the matching release
+    mSwallowedReleaseButton = button;
+    event->accept();
+    return true;
+}
+
+bool UBBoardView::handleButtonBehaviorRelease(QMouseEvent *event)
+{
+    const Qt::MouseButton button = event->button();
+
+    if (button == Qt::NoButton)
+    {
+        return false;
+    }
+
+    if (button == mSwallowedReleaseButton)
+    {
+        mSwallowedReleaseButton = Qt::NoButton;
+        event->accept();
+        return true;
+    }
+
+    if (button == mTemporaryToolButton)
+    {
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        finishTemporaryTool(event->position(), event->globalPosition(), event->modifiers());
+#else
+        finishTemporaryTool(event->localPos(), event->screenPos(), event->modifiers());
+#endif
+        event->accept();
+        return true;
+    }
+
+    return false;
+}
+
+void UBBoardView::handleTemporaryToolTabletMove(QTabletEvent *event)
+{
+    // A stylus button pressed while hovering activates the temporary tool, but it
+    // should only act while the tip touches the surface. Some platforms (Windows Ink)
+    // don't send a separate press for the tip in this case, so use the pressure.
+    if (mTemporaryToolButton == Qt::NoButton || !mTemporaryToolFollowsPenContact)
+    {
+        return;
+    }
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    const QPointF localPos = event->position();
+    const QPointF globalPos = event->globalPosition();
+#else
+    const QPointF localPos = event->posF();
+    const QPointF globalPos = event->globalPosF();
+#endif
+
+    const bool inContact = event->pressure() > 0.;
+
+    if (inContact && !mMouseButtonIsPressed)
+    {
+        sendLeftButtonEvent(QEvent::MouseButtonPress, localPos, globalPos, event->modifiers());
+    }
+    else if (!inContact && mMouseButtonIsPressed)
+    {
+        sendLeftButtonEvent(QEvent::MouseButtonRelease, localPos, globalPos, event->modifiers());
+    }
+}
+
+void UBBoardView::finishTemporaryTool(const QPointF &localPos, const QPointF &globalPos, Qt::KeyboardModifiers modifiers)
+{
+    if (mMouseButtonIsPressed)
+    {
+        sendLeftButtonEvent(QEvent::MouseButtonRelease, localPos, globalPos, modifiers);
+    }
+
+    mTemporaryToolButton = Qt::NoButton;
+    mTemporaryToolFollowsPenContact = false;
+
+    UBClickBehavior::instance()->endTemporaryTool();
+    setToolCursor(UBDrawingController::drawingController()->stylusTool());
+}
+
+void UBBoardView::sendLeftButtonEvent(QEvent::Type type, const QPointF &localPos, const QPointF &globalPos, Qt::KeyboardModifiers modifiers)
+{
+    const Qt::MouseButtons buttons = type == QEvent::MouseButtonRelease ? Qt::NoButton : Qt::LeftButton;
+    QMouseEvent leftEvent(type, localPos, globalPos, Qt::LeftButton, buttons, modifiers);
+
+    if (type == QEvent::MouseButtonPress)
+    {
+        mousePressEvent(&leftEvent);
+    }
+    else
+    {
+        mouseReleaseEvent(&leftEvent);
+    }
 }
 
 void UBBoardView::setToolCursor (int tool)

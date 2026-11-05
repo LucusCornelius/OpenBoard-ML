@@ -398,4 +398,9 @@
         <file>images/toolbar/shapeFill.svg</file>
         <file>images/textBox.svg</file>
     </qresource>
+    <qresource prefix="/shortcutProfiles">
+        <file alias="keyboard-default.json">etc/shortcutProfiles/keyboard-default.json</file>
+        <file alias="wacom-intuos-m.json">etc/shortcutProfiles/wacom-intuos-m.json</file>
+        <file alias="medion-p82030.json">etc/shortcutProfiles/medion-p82030.json</file>
+    </qresource>
 </RCC>
