@@ -39,6 +39,8 @@
 #include <QToolBar>
 #include <QWidget>
 
+#include "core/UBThemeManager.h"
+
 #import <AppKit/AppKit.h>
 
 namespace
@@ -84,6 +86,22 @@ namespace
         return nil;
     }
 
+    void repolish(QWidget* top)
+    {
+        QList<QWidget*> widgets;
+        widgets << top;
+
+        for (QToolBar* toolBar : top->findChildren<QToolBar*>())
+            widgets << toolBar;
+
+        for (QWidget* w : widgets)
+        {
+            w->style()->unpolish(w);
+            w->style()->polish(w);
+            w->update();
+        }
+    }
+
     void updateWindowChrome(QWidget* top)
     {
         NSWindow* window = nativeWindow(top);
@@ -99,18 +117,28 @@ namespace
             const bool toolBarAtTop = boardToolBar && mainWindow->toolBarArea(boardToolBar) == Qt::TopToolBarArea;
             const bool unified = toolBarAtTop && !fullScreen;
 
-            if (unified)
-            {
-                [window setStyleMask:[window styleMask] | NSWindowStyleMaskFullSizeContentView];
-                [window setTitlebarAppearsTransparent:YES];
-                [window setTitleVisibility:NSWindowTitleHidden];
-            }
-            else
-            {
-                [window setStyleMask:[window styleMask] & ~NSWindowStyleMaskFullSizeContentView];
-                [window setTitlebarAppearsTransparent:NO];
-                [window setTitleVisibility:NSWindowTitleVisible];
-            }
+            // follow the light / dark theme of the application, not only the system appearance
+            NSAppearance* appearance = [NSAppearance appearanceNamed:UBThemeManager::instance()->isDarkMode()
+                    ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
+
+            if (appearance && ![[[window appearance] name] isEqualToString:[appearance name]])
+                [window setAppearance:appearance];
+
+            // only touch the window when something changes, this runs on every resize
+            const NSWindowStyleMask mask = unified
+                    ? ([window styleMask] | NSWindowStyleMaskFullSizeContentView)
+                    : ([window styleMask] & ~NSWindowStyleMaskFullSizeContentView);
+
+            if (mask != [window styleMask])
+                [window setStyleMask:mask];
+
+            if ([window titlebarAppearsTransparent] != (unified ? YES : NO))
+                [window setTitlebarAppearsTransparent:unified ? YES : NO];
+
+            const NSWindowTitleVisibility titleVisibility = unified ? NSWindowTitleHidden : NSWindowTitleVisible;
+
+            if ([window titleVisibility] != titleVisibility)
+                [window setTitleVisibility:titleVisibility];
 
             // the toolbars extend below the transparent title bar: keep their buttons below the traffic lights
             int titleBarHeight = 0;
@@ -137,7 +165,15 @@ namespace
                 return;
 
             NSVisualEffectView* vibrancy = findVibrancyView(frameView);
-            const bool wantVibrancy = unified && !vibrancyDisabled() && top->property("ubGlassVibrancy").toBool();
+            const bool wantVibrancy = unified && !vibrancyDisabled() && top->property("ubGlassTranslucentWindow").toBool();
+
+            // the glass stylesheet makes the window and toolbar backgrounds transparent
+            // only while the vibrancy view is behind them
+            if (top->property("ubGlassVibrancy").toBool() != wantVibrancy)
+            {
+                top->setProperty("ubGlassVibrancy", wantVibrancy);
+                repolish(top);
+            }
 
             if (wantVibrancy)
             {
@@ -226,25 +262,10 @@ void UBGlassEffect::applyToWindow(QWidget* widget)
     if (!vibrancyDisabled() && !top->testAttribute(Qt::WA_WState_Created) && qobject_cast<QMainWindow*>(top))
     {
         top->setAttribute(Qt::WA_TranslucentBackground);
-        top->setProperty("ubGlassVibrancy", true);
+        top->setProperty("ubGlassTranslucentWindow", true);
 
         if (QWidget* central = static_cast<QMainWindow*>(top)->centralWidget())
             central->setAutoFillBackground(true);
-
-        // the glass stylesheet makes the window and toolbar backgrounds transparent
-        // for this property: polish them again
-        QList<QWidget*> widgets;
-        widgets << top;
-
-        for (QToolBar* toolBar : top->findChildren<QToolBar*>())
-            widgets << toolBar;
-
-        for (QWidget* w : widgets)
-        {
-            w->style()->unpolish(w);
-            w->style()->polish(w);
-            w->update();
-        }
     }
 
     top->installEventFilter(new UBMacWindowGlassFilter(top));

@@ -488,6 +488,15 @@ void UBGlassStyle::applyIcons(UBMainWindow* mainWindow)
         {mainWindow->actionEraserMedium, "eraserMedium"},
         {mainWindow->actionEraserLarge, "eraserLarge"},
         {mainWindow->actionColorPreferences, "paletteSettings"},
+        // web mode
+        {mainWindow->actionWebTools, "tools"},
+        {mainWindow->actionWebBack, "previous"},
+        {mainWindow->actionWebForward, "next"},
+        {mainWindow->actionWebReload, "reload"},
+        {mainWindow->actionStopLoading, "stop"},
+        {mainWindow->actionHome, "home"},
+        {mainWindow->actionWebBigger, "zoomIn"},
+        {mainWindow->actionWebSmaller, "zoomOut"},
     };
 
     for (const auto& entry : glassIcons)

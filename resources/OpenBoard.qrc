@@ -430,6 +430,10 @@
         <file>images/glass/web.svg</file>
         <file>images/glass/zoomIn.svg</file>
         <file>images/glass/zoomOut.svg</file>
+        <file>images/glass/home.svg</file>
+        <file>images/glass/reload.svg</file>
+        <file>images/glass/stop.svg</file>
+        <file>images/glass/tools.svg</file>
     </qresource>
     <qresource prefix="/shortcutProfiles">
         <file alias="keyboard-default.json">etc/shortcutProfiles/keyboard-default.json</file>

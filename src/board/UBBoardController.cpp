@@ -1890,6 +1890,10 @@ void UBBoardController::setDisabled(bool disable)
 {
     mMainWindow->boardToolBar->setDisabled(disable);
     mControlView->setDisabled(disable);
+
+    // the pen options moved from the toolbar to the pen panel
+    if (mPaletteManager && mPaletteManager->penPanel())
+        mPaletteManager->penPanel()->setDisabled(disable);
 }
 
 

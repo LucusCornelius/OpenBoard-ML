@@ -439,7 +439,7 @@ bool UBFloatingPalette::backdropActive() const
     // transparent windows (desktop annotation) show the desktop behind, which cannot be captured.
     // The main window on macOS is only translucent for the vibrancy of its title bar (UBGlassEffect).
     QWidget* top = window();
-    return !top->testAttribute(Qt::WA_TranslucentBackground) || top->property("ubGlassVibrancy").toBool();
+    return !top->testAttribute(Qt::WA_TranslucentBackground) || top->property("ubGlassTranslucentWindow").toBool();
 }
 
 
