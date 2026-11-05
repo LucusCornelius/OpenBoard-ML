@@ -78,6 +78,7 @@ UBDrawingController::UBDrawingController(QObject * parent)
     connect(UBApplication::mainWindow->actionLine, SIGNAL(triggered(bool)), this, SLOT(lineToolSelected(bool)));
     connect(UBApplication::mainWindow->actionText, SIGNAL(triggered(bool)), this, SLOT(textToolSelected(bool)));
     connect(UBApplication::mainWindow->actionCapture, SIGNAL(triggered(bool)), this, SLOT(captureToolSelected(bool)));
+    connect(UBApplication::mainWindow->actionShapes, SIGNAL(triggered(bool)), this, SLOT(shapeToolSelected(bool)));
 }
 
 
@@ -110,7 +111,7 @@ void UBDrawingController::setStylusTool(int tool)
             mLatestDrawingTool = mStylusTool;
         }
 
-        if (tool == UBStylusTool::Pen || tool == UBStylusTool::Line)
+        if (tool == UBStylusTool::Pen || tool == UBStylusTool::Line || tool == UBStylusTool::Shape)
         {
              emit lineWidthIndexChanged(UBSettings::settings()->penWidthIndex());
              emit colorIndexChanged(UBSettings::settings()->penColorIndex());
@@ -149,6 +150,8 @@ void UBDrawingController::setStylusTool(int tool)
             UBApplication::mainWindow->actionText->setChecked(true);
         else if (mStylusTool == UBStylusTool::Capture)
             UBApplication::mainWindow->actionCapture->setChecked(true);
+        else if (mStylusTool == UBStylusTool::Shape)
+            UBApplication::mainWindow->actionShapes->setChecked(true);
 
 
         // workaround for #827
@@ -191,7 +194,7 @@ bool UBDrawingController::isSnappingTool() const
 
 int UBDrawingController::currentToolWidthIndex()
 {
-    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line)
+    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line || stylusTool() == UBStylusTool::Shape)
         return UBSettings::settings()->penWidthIndex();
     else if (stylusTool() == UBStylusTool::Marker)
         return UBSettings::settings()->markerWidthIndex();
@@ -202,7 +205,7 @@ int UBDrawingController::currentToolWidthIndex()
 
 qreal UBDrawingController::currentToolWidth()
 {
-    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line)
+    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line || stylusTool() == UBStylusTool::Shape)
         return UBSettings::settings()->currentPenWidth();
     else if (stylusTool() == UBStylusTool::Marker)
         return UBSettings::settings()->currentMarkerWidth();
@@ -223,6 +226,7 @@ void UBDrawingController::setLineWidthIndex(int index)
         UBSettings::settings()->setPenWidthIndex(index);
 
         if(stylusTool() != UBStylusTool::Line
+            && stylusTool() != UBStylusTool::Shape
             && stylusTool() != UBStylusTool::Selector)
         {
             setStylusTool(UBStylusTool::Pen);
@@ -235,7 +239,7 @@ void UBDrawingController::setLineWidthIndex(int index)
 
 int UBDrawingController::currentToolColorIndex()
 {
-    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line)
+    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line || stylusTool() == UBStylusTool::Shape)
     {
         return UBSettings::settings()->penColorIndex();
     }
@@ -258,7 +262,7 @@ QColor UBDrawingController::currentToolColor()
 
 QColor UBDrawingController::toolColor(bool onDarkBackground)
 {
-    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line)
+    if (stylusTool() == UBStylusTool::Pen || stylusTool() == UBStylusTool::Line || stylusTool() == UBStylusTool::Shape)
     {
         return UBSettings::settings()->penColor(onDarkBackground);
     }
@@ -454,4 +458,11 @@ void UBDrawingController::captureToolSelected(bool checked)
 {
     if (checked)
         setStylusTool(UBStylusTool::Capture);
+}
+
+
+void UBDrawingController::shapeToolSelected(bool checked)
+{
+    if (checked)
+        setStylusTool(UBStylusTool::Shape);
 }

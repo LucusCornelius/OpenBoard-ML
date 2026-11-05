@@ -1928,6 +1928,127 @@
     <string>Ctrl+S</string>
    </property>
   </action>
+  <action name="actionShapes">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolPalette/shapes.svg</normaloff>
+     <normalon>:/images/toolPalette/shapesOn.svg</normalon>:/images/toolPalette/shapes.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Shapes</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Shapes</string>
+   </property>
+  </action>
+  <action name="actionShapeRect">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeRect.svg</normaloff>:/images/toolbar/shapeRect.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Rectangle</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Rectangles</string>
+   </property>
+  </action>
+  <action name="actionShapeRoundedRect">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeRoundedRect.svg</normaloff>:/images/toolbar/shapeRoundedRect.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Rounded</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Rounded Rectangles</string>
+   </property>
+  </action>
+  <action name="actionShapeEllipse">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeEllipse.svg</normaloff>:/images/toolbar/shapeEllipse.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Ellipse</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Ellipses and Circles</string>
+   </property>
+  </action>
+  <action name="actionShapeTriangle">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeTriangle.svg</normaloff>:/images/toolbar/shapeTriangle.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Triangle</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Triangles</string>
+   </property>
+  </action>
+  <action name="actionShapeLine">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeLine.svg</normaloff>:/images/toolbar/shapeLine.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Line</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Straight Lines</string>
+   </property>
+  </action>
+  <action name="actionShapeArrow">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeArrow.svg</normaloff>:/images/toolbar/shapeArrow.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Arrow</string>
+   </property>
+   <property name="toolTip">
+    <string>Draw Arrows</string>
+   </property>
+  </action>
+  <action name="actionShapeFill">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset resource="../OpenBoard.qrc">
+     <normaloff>:/images/toolbar/shapeFill.svg</normaloff>:/images/toolbar/shapeFill.svg</iconset>
+   </property>
+   <property name="text">
+    <string>Fill</string>
+   </property>
+   <property name="toolTip">
+    <string>Fill Shapes</string>
+   </property>
+  </action>
  </widget>
  <resources>
   <include location="../OpenBoard.qrc"/>

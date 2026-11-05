@@ -39,6 +39,7 @@
 #include "board/UBColorPreferencesDialog.h"
 #include "board/UBDrawingController.h"
 #include "board/UBFeaturesController.h"
+#include "board/UBShapeToolController.h"
 
 #include "frameworks/UBFileSystemUtils.h"
 #include "frameworks/UBPlatformUtils.h"
@@ -413,6 +414,11 @@ void UBBoardController::setupToolbar()
     eraserWidthChoice->displayText(QVariant(settings->appToolBarDisplayText->get().toBool()));
     eraserWidthChoice->setCurrentIndex(settings->eraserWidthIndex());
     eraserWidthActions.at(settings->eraserWidthIndex())->setChecked(true);
+
+    //-----------------------------------------------------------//
+    // Setup shape kind choice widget, visible while the shapes tool is active
+
+    new UBShapeToolController(mMainWindow, mMainWindow->boardToolBar, mMainWindow->actionBackgrounds, this);
 
     mMainWindow->boardToolBar->insertSeparator(mMainWindow->actionBackgrounds);
 
@@ -1943,6 +1949,7 @@ void UBBoardController::setColorIndex(int pColorIndex)
 
     if (UBDrawingController::drawingController()->stylusTool() != UBStylusTool::Marker &&
             UBDrawingController::drawingController()->stylusTool() != UBStylusTool::Line &&
+            UBDrawingController::drawingController()->stylusTool() != UBStylusTool::Shape &&
             UBDrawingController::drawingController()->stylusTool() != UBStylusTool::Text &&
             UBDrawingController::drawingController()->stylusTool() != UBStylusTool::Selector)
     {
@@ -1951,6 +1958,7 @@ void UBBoardController::setColorIndex(int pColorIndex)
 
     if (UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Pen ||
             UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Line ||
+            UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Shape ||
             UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Text ||
             UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Selector)
     {

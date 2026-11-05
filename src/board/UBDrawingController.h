@@ -113,6 +113,7 @@ class UBDrawingController : public QObject
         void lineToolSelected(bool checked);
         void textToolSelected(bool checked);
         void captureToolSelected(bool checked);
+        void shapeToolSelected(bool checked);
 };
 
 #endif /* UBDRAWINGCONTROLLER_H_ */

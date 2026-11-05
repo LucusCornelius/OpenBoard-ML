@@ -185,8 +185,20 @@ class UBGraphicsTextItemDelegate : public UBGraphicsItemDelegate
         void onModificationChanged(bool ch);
         void onContentChanged();
 
+        // text box style
+        void cycleBoxStyle();
+        void setBoxBorder(bool border);
+        void setBoxFill(bool fill);
+        void pickBoxFillColor();
+
 private:
       const int delta;
+
+      void boxStyleChanged();
+
+      DelegateButton* mBoxButton{nullptr};
+      QAction* mBoxBorderAction{nullptr};
+      QAction* mBoxFillAction{nullptr};
 };
 
 #endif /* UBGRAPHICSTEXTITEMDELEGATE_H_ */

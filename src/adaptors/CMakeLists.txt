@@ -31,4 +31,6 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBThumbnailAdaptor.h
     UBWidgetUpgradeAdaptor.cpp
     UBWidgetUpgradeAdaptor.h
+    UBShapeSvgSerializer.cpp
+    UBShapeSvgSerializer.h
 )

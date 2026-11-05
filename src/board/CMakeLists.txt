@@ -11,4 +11,6 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBDrawingController.h
     UBFeaturesController.cpp
     UBFeaturesController.h
+    UBShapeToolController.cpp
+    UBShapeToolController.h
 )

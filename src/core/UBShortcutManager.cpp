@@ -192,6 +192,8 @@ void UBShortcutManager::addMainActions(UBMainWindow *mainWindow)
 
     addActions(tr("Stylus Palette"),{ mainWindow->actionSnap }, mainWindow);
 
+    addActions(tr("Stylus Palette"),{ mainWindow->actionShapes }, mainWindow);
+
     addActions(tr("Lines and colours"), {
                    mainWindow->actionLineSmall,
                    mainWindow->actionLineMedium,

@@ -76,6 +76,7 @@
 #include "domain/UBGraphicsGroupContainerItem.h"
 
 #include "UBGraphicsStroke.h"
+#include "UBGraphicsShapeItem.h"
 
 #include "core/memcheck.h"
 
@@ -485,6 +486,9 @@ bool UBGraphicsScene::inputDevicePress(const QPointF& scenePos, const qreal& pre
             drawPointer(scenePos, true);
             accepted = true;
         }
+        else if (currentTool == UBStylusTool::Shape) {
+            accepted = shapeToolPress(scenePos);
+        }
     }
 
     if (mCurrentStroke && mCurrentStroke->polygons().empty()){
@@ -677,6 +681,10 @@ bool UBGraphicsScene::inputDeviceMove(const QPointF& scenePos, const qreal& pres
         {
             drawPointer(position);
         }
+        else if (currentTool == UBStylusTool::Shape)
+        {
+            shapeToolMove(position, modifiers);
+        }
 
         accepted = true;
     }
@@ -771,6 +779,11 @@ bool UBGraphicsScene::inputDeviceRelease(int tool, Qt::KeyboardModifiers modifie
             }
             mCurrentPolygon = 0;
         }
+    }
+
+    if (mCurrentShape)
+    {
+        shapeToolRelease();
     }
 
     if (mRemovedItems.size() > 0 || mAddedItems.size() > 0)
@@ -2552,6 +2565,14 @@ QRectF UBGraphicsScene::itemRect(const QGraphicsItem* item)
     // the nature of nominal lines
     QRectF bounds = item->boundingRect();
 
+    // shapes: use the geometry of the shape without stroke and arrow heads
+    const UBGraphicsShapeItem* ubShapeItem = qgraphicsitem_cast<const UBGraphicsShapeItem*>(item);
+
+    if (ubShapeItem)
+    {
+        return ubShapeItem->box();
+    }
+
     const QAbstractGraphicsShapeItem* shapeItem = dynamic_cast<const QAbstractGraphicsShapeItem*>(item);
 
     if (shapeItem && shapeItem->pen().style() != Qt::NoPen)
@@ -3096,4 +3117,108 @@ void UBGraphicsScene::setToolCursor(int tool)
 void UBGraphicsScene::initStroke()
 {
     mCurrentStroke = new UBGraphicsStroke(shared_from_this());
+}
+
+bool UBGraphicsScene::shapeToolPress(const QPointF& scenePos)
+{
+    mAddedItems.clear();
+    mRemovedItems.clear();
+
+    if (mCurrentShape)
+    {
+        // a previous shape was not finished, discard it
+        removeItem(mCurrentShape);
+        deleteItem(mCurrentShape);
+        mCurrentShape = nullptr;
+    }
+
+    QPointF pos = scenePos;
+
+    if (isSnapping())
+    {
+        pos += snap(scenePos);
+    }
+
+    mShapeStartPoint = pos;
+
+    UBSettings* settings = UBSettings::settings();
+    const int kindIndex = qBound(0, settings->value("Board/ShapeKind", 0).toInt(), UBGraphicsShapeItem::KindCount - 1);
+    const bool fill = settings->value("Board/ShapeFill", false).toBool();
+
+    UBGraphicsShapeItem* shape = new UBGraphicsShapeItem(UBGraphicsShapeItem::Kind(kindIndex));
+
+    qreal width = UBDrawingController::drawingController()->currentToolWidth();
+    width /= UBApplication::boardController->systemScaleFactor();
+    width /= UBApplication::boardController->currentZoom();
+    shape->setStrokeWidth(width);
+
+    shape->setColorOnDarkBackground(UBApplication::boardController->penColorOnDarkBackground());
+    shape->setColorOnLightBackground(UBApplication::boardController->penColorOnLightBackground());
+    shape->setFilled(fill && shape->isFillable());
+
+    shape->setGeometryFromPoints(pos, pos);
+
+    addItem(shape);
+    mCurrentShape = shape;
+
+    return true;
+}
+
+void UBGraphicsScene::shapeToolMove(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
+{
+    if (!mCurrentShape)
+    {
+        return;
+    }
+
+    QPointF pos = scenePos;
+
+    if (isSnapping())
+    {
+        pos += snap(scenePos);
+    }
+
+    if (modifiers & Qt::ShiftModifier)
+    {
+        if (mCurrentShape->isLinear())
+        {
+            // constrain the angle to multiples of 45 degrees
+            QLineF line(mShapeStartPoint, pos);
+            line.setAngle(qRound(line.angle() / 45.) * 45.);
+            pos = line.p2();
+        }
+        else
+        {
+            // constrain to square / circle
+            const QPointF delta = pos - mShapeStartPoint;
+            const qreal side = qMax(qAbs(delta.x()), qAbs(delta.y()));
+            pos = mShapeStartPoint + QPointF(delta.x() < 0 ? -side : side, delta.y() < 0 ? -side : side);
+        }
+    }
+
+    mCurrentShape->setGeometryFromPoints(mShapeStartPoint, pos);
+}
+
+void UBGraphicsScene::shapeToolRelease()
+{
+    UBGraphicsShapeItem* shape = mCurrentShape;
+    mCurrentShape = nullptr;
+
+    if (!shape)
+    {
+        return;
+    }
+
+    const qreal antiScale = 1. / (UBApplication::boardController->systemScaleFactor() * UBApplication::boardController->currentZoom());
+    const QSizeF size = shape->boxSize();
+
+    if (size.width() < 4 * antiScale && size.height() < 4 * antiScale)
+    {
+        // just a click: create a shape with a default size centered at the click position
+        const qreal half = 60 * antiScale;
+        const QPointF offset = shape->isLinear() ? QPointF(half, 0) : QPointF(half, half);
+        shape->setGeometryFromPoints(mShapeStartPoint - offset, mShapeStartPoint + offset);
+    }
+
+    mAddedItems << shape;
 }

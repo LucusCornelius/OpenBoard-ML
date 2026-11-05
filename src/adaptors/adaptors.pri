@@ -14,7 +14,8 @@ HEADERS      += src/adaptors/UBExportAdaptor.h\
                 src/adaptors/UBExportWeb.h \
                 src/adaptors/UBPageMapper.h \
     $$PWD/UBExportDocumentSetAdaptor.h \
-    $$PWD/UBImportDocumentSetAdaptor.h
+    $$PWD/UBImportDocumentSetAdaptor.h \
+    $$PWD/UBShapeSvgSerializer.h
 
 
 SOURCES      += src/adaptors/UBExportAdaptor.cpp\
@@ -32,4 +33,5 @@ SOURCES      += src/adaptors/UBExportAdaptor.cpp\
                 src/adaptors/UBExportWeb.cpp \
                 src/adaptors/UBPageMapper.cpp \
     $$PWD/UBExportDocumentSetAdaptor.cpp \
-    $$PWD/UBImportDocumentSetAdaptor.cpp
+    $$PWD/UBImportDocumentSetAdaptor.cpp \
+    $$PWD/UBShapeSvgSerializer.cpp

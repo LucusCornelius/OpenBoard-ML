@@ -50,6 +50,8 @@
 #include "domain/UBGraphicsGroupContainerItem.h"
 #include "domain/UBGraphicsGroupContainerItemDelegate.h"
 #include "domain/UBItem.h"
+#include "domain/UBGraphicsShapeItem.h"
+#include "adaptors/UBShapeSvgSerializer.h"
 
 #include "gui/UBBackgroundRuling.h"
 #include "gui/UBBackgroundManager.h"
@@ -635,6 +637,17 @@ void UBSvgSubsetAdaptor::UBSvgSubsetReader::processElement()
 
             if (!mStrokesList.contains(uuid_stripped))
                 mStrokesList.insert(uuid_stripped, strokesGroup);
+        }
+        else if ((name == "rect" || name == "ellipse" || name == "polygon" || name == "line" || name == "path")
+                 && UBShapeSvgSerializer::isShapeElement(mXmlReader, mNamespaceUri))
+        {
+            // shapes are written as native SVG elements marked with ub:type="shape"
+            UBGraphicsShapeItem* shapeItem = UBShapeSvgSerializer::createShape(mXmlReader, mNamespaceUri);
+            graphicsItemFromSvg(shapeItem);
+            UBShapeSvgSerializer::readShape(mXmlReader, mNamespaceUri, shapeItem);
+
+            mScene->addItem(shapeItem);
+            shapeItem->show();
         }
         else if (name == "polygon" || name == "line")
         {
@@ -1449,6 +1462,15 @@ bool UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistScene(std::shared_ptr<UBDocum
         if (textItem && textItem->isVisible())
         {
             textItemToSvg(textItem);
+            continue;
+        }
+
+        // Is the item a geometric shape?
+        UBGraphicsShapeItem *shapeItem = qgraphicsitem_cast<UBGraphicsShapeItem*> (item);
+        if (shapeItem && shapeItem->isVisible())
+        {
+            UBShapeSvgSerializer::writeShape(mXmlWriter, UBSettings::uniboardDocumentNamespaceUri, shapeItem,
+                                             mScene->isDarkBackground(), mScene->isBackgroundObject(shapeItem));
             continue;
         }
 
@@ -2761,6 +2783,14 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::textItemToSvg(UBGraphicsTextItem* it
     mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri
                               , "fill-on-light-background", colorLightBg.name());
 
+    // text box style
+    if (item->hasBoxBorder())
+        mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "boxBorder", xmlTrue);
+
+    if (item->hasBoxFill())
+        mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "boxFill",
+                                  item->boxFillColor().isValid() ? item->boxFillColor().name() : QString("auto"));
+
     //for new documents from version 4.5.0
     mXmlWriter.writeStartElement("itemTextContent");
 
@@ -2783,6 +2813,27 @@ UBGraphicsTextItem* UBSvgSubsetAdaptor::UBSvgSubsetReader::textItemFromSvg()
     UBGraphicsTextItem* textItem = new UBGraphicsTextItem();
 
     graphicsItemFromSvg(textItem);
+
+    // text box style
+    textItem->setBoxBorder(mXmlReader.attributes().value(mNamespaceUri, "boxBorder").toString() == xmlTrue);
+
+    auto ubBoxFill = mXmlReader.attributes().value(mNamespaceUri, "boxFill");
+
+    if (!ubBoxFill.isNull() && !ubBoxFill.isEmpty())
+    {
+        textItem->setBoxFill(true);
+
+        if (ubBoxFill.toString() != "auto")
+        {
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 4, 0))
+            QColor boxFillColor = QColor::fromString(ubBoxFill.toString());
+#else
+            QColor boxFillColor;
+            boxFillColor.setNamedColor(ubBoxFill.toString());
+#endif
+            textItem->setBoxFillColor(boxFillColor);
+        }
+    }
 
     auto ubFillOnDarkBackground = mXmlReader.attributes().value(mNamespaceUri, "fill-on-dark-background");
     auto ubFillOnLightBackground = mXmlReader.attributes().value(mNamespaceUri, "fill-on-light-background");
