@@ -169,22 +169,60 @@ macx {
    LIBS += -lcrypto
 
 
-   LIBS += -L/usr/local/lib -lquazip1-qt6.1.4
-   INCLUDEPATH += /opt/local/include/QuaZip-Qt6-1.4/quazip
-   
-   LIBS += -L/opt/local/lib
-   INCLUDEPATH += /usr/local/opt/openssl/include
-   INCLUDEPATH += /opt/local/include
+   # Third-party libraries (poppler, quazip, openssl, ffmpeg): auto-detect the
+   # package manager prefix. Override with: qmake OpenBoard.pro MAC_LIB_PREFIX=/some/prefix
+   isEmpty(MAC_LIB_PREFIX) {
+       exists(/opt/homebrew/include/poppler): MAC_LIB_PREFIX = /opt/homebrew   # Homebrew, Apple Silicon
+       else:exists(/usr/local/include/poppler): MAC_LIB_PREFIX = /usr/local    # Homebrew, Intel
+       else:exists(/opt/local/include/poppler): MAC_LIB_PREFIX = /opt/local    # MacPorts
+       else: MAC_LIB_PREFIX = /opt/local
+   }
+   message("macOS third-party library prefix: $$MAC_LIB_PREFIX")
 
-   LIBS        += -L/opt/local/lib -lpoppler
-   INCLUDEPATH += /opt/local/include/poppler
+   LIBS += -L$$MAC_LIB_PREFIX/lib
+   INCLUDEPATH += $$MAC_LIB_PREFIX/include
+
+   # OpenSSL (Homebrew keeps it keg-only under opt/openssl@3)
+   exists($$MAC_LIB_PREFIX/opt/openssl@3/include) {
+       INCLUDEPATH += $$MAC_LIB_PREFIX/opt/openssl@3/include
+       LIBS += -L$$MAC_LIB_PREFIX/opt/openssl@3/lib
+   } else:exists($$MAC_LIB_PREFIX/opt/openssl/include) {
+       INCLUDEPATH += $$MAC_LIB_PREFIX/opt/openssl/include
+       LIBS += -L$$MAC_LIB_PREFIX/opt/openssl/lib
+   }
+
+   # QuaZip: find the installed QuaZip-Qt6-<version> include dir and matching library
+   QUAZIP_INCLUDE_DIRS = $$files($$MAC_LIB_PREFIX/include/QuaZip-Qt6-*)
+   isEmpty(QUAZIP_INCLUDE_DIRS) {
+       warning("QuaZip for Qt6 not found under $$MAC_LIB_PREFIX/include - install it (brew install quazip / port install quazip)")
+       INCLUDEPATH += $$MAC_LIB_PREFIX/include/QuaZip-Qt6-1.4/quazip
+       LIBS += -lquazip1-qt6
+   } else {
+       QUAZIP_INCLUDE_DIR = $$last(QUAZIP_INCLUDE_DIRS)
+       INCLUDEPATH += $$QUAZIP_INCLUDE_DIR/quazip
+       QUAZIP_VERSION = $$replace(QUAZIP_INCLUDE_DIR, .*QuaZip-Qt6-, )
+       QUAZIP_LIBS = $$files($$MAC_LIB_PREFIX/lib/libquazip1-qt6.$${QUAZIP_VERSION}.dylib)
+       isEmpty(QUAZIP_LIBS): QUAZIP_LIBS = $$files($$MAC_LIB_PREFIX/lib/libquazip1-qt6*.dylib)
+       isEmpty(QUAZIP_LIBS) {
+           LIBS += -lquazip1-qt6
+       } else {
+           QUAZIP_LIB = $$basename(QUAZIP_LIBS)
+           QUAZIP_LIB = $$first(QUAZIP_LIB)
+           QUAZIP_LIB = $$replace(QUAZIP_LIB, ^lib, )
+           QUAZIP_LIB = $$replace(QUAZIP_LIB, \\.dylib$, )
+           LIBS += -l$$QUAZIP_LIB
+       }
+   }
+
+   LIBS        += -lpoppler
+   INCLUDEPATH += $$MAC_LIB_PREFIX/include/poppler
 
    QMAKE_MAC_SDK = macosx
    QMAKE_MACOSX_DEPLOYMENT_TARGET = 12
 
-   # For universal builds
-   QMAKE_APPLE_DEVICE_ARCHS=x86_64 arm64
-   #QMAKE_APPLE_DEVICE_ARCHS = arm64
+   # Universal (x86_64 + arm64) builds only on request: qmake ... CONFIG+=universal
+   # Homebrew / MacPorts libraries are normally built for the host architecture only.
+   universal: QMAKE_APPLE_DEVICE_ARCHS = x86_64 arm64
 
    QMAKE_CXXFLAGS += -Wno-overloaded-virtual
    #VERSION_RC_PATH = "$$BUILD_DIR/version_rc"

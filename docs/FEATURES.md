@@ -84,6 +84,44 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
 
 ## Building
 
-Follow the upstream wiki (Build OpenBoard from source). On Debian/Ubuntu the extra dev
-packages needed by the `dev` base are `libpipewire-0.3-dev`, `libxkbcommon-dev` and
-`libpoppler-private-dev`. Both `CMakeLists.txt` and `OpenBoard.pro` list all new sources.
+Follow the upstream wiki (Build OpenBoard from source). Both `CMakeLists.txt` and
+`OpenBoard.pro` list all new sources.
+
+### Linux (CMake)
+
+Debian/Ubuntu: in addition to the usual Qt 6 dev packages the `dev` base needs
+`libpipewire-0.3-dev`, `libxkbcommon-dev` and `libpoppler-private-dev`.
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j8
+sudo cmake --install build      # rulings/profiles are read from the install prefix
+```
+
+### macOS (qmake)
+
+The CMake build requires PipeWire and is Linux-only; use qmake. `OpenBoard.pro` detects
+the library prefix automatically: `/opt/homebrew` (Homebrew on Apple Silicon),
+`/usr/local` (Homebrew on Intel) or `/opt/local` (MacPorts), and finds the installed
+QuaZip version. Override with `qmake OpenBoard.pro MAC_LIB_PREFIX=/some/prefix`.
+
+1. Xcode + `xcode-select --install`.
+2. Qt 6 from the Qt Online Installer with the modules *Qt WebEngine*, *Qt Multimedia* and
+   *Qt 5 Compatibility Module*.
+3. Libraries: `brew install poppler quazip openssl@3 ffmpeg pkg-config`
+   (or `sudo port install poppler quazip openssl3 ffmpeg`).
+4. Build:
+
+```bash
+~/Qt/6.9.3/macos/bin/qmake OpenBoard.pro -spec macx-clang CONFIG+=release
+make -j8 release
+~/Qt/6.9.3/macos/bin/macdeployqt build/macx/release/product/OpenBoard.app
+```
+
+Add `CONFIG+=universal` to the qmake line for an x86_64 + arm64 build (needs universal
+libraries). `release_scripts/osx/package.sh` builds a DMG; set `BASE_QT_DIR` in it first.
+
+### Windows
+
+Use qmake with Qt 6 (MSVC) as described in the upstream wiki; the third-party layout
+(`../OpenBoard-ThirdParty`) is unchanged.
