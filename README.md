@@ -9,6 +9,11 @@
 
 OpenBoard is an open source cross-platform interactive white board application designed primarily for use in schools. It was originally forked from Open-Sankoré, which was itself based on Uniboard.
 
+### OpenBoard-ML additions
+This fork adds a full-spectrum colour picker with multiple palettes, configurable mouse/pen/tablet
+shortcuts with device profiles (Wacom Intuos M, Medion P82030), real-centimetre grid backgrounds,
+a maths notation palette and a shapes/text-box tool. See [docs/FEATURES.md](docs/FEATURES.md).
+
 ### Installing
 1.7.4 installers are available for Windows, macOS and Debian on the [Download's page](https://github.com/OpenBoard-org/OpenBoard/wiki/Downloads).
 
