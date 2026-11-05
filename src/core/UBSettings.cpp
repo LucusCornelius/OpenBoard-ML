@@ -452,6 +452,8 @@ void UBSettings::init()
     boardShowMathPalette = new UBSetting(this, "Board", "ShowMathPalette", false);
     boardMathPalettePosition = new UBSetting(this, "Board", "MathPalettePosition", QVariant());
     boardMathPaletteTab = new UBSetting(this, "Board", "MathPaletteTab", 0);
+    boardMathInkSizeCm = new UBSetting(this, "Board", "MathInkSizeCm", 2.0);
+    boardMathInkJitter = new UBSetting(this, "Board", "MathInkJitter", 1.0);
     magnifierDrawingMode = new UBSetting(this, "Board", "MagnifierDrawingMode", "0");
     autoSaveInterval = new UBSetting(this, "Board", "AutoSaveIntervalInMinutes", "3");
 

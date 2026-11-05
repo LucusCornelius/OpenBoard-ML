@@ -21,26 +21,24 @@
 #define UBMATHPALETTE_H
 
 #include <QPointer>
-#include <QTextCursor>
 
+#include "domain/UBMathInkLayout.h"
 #include "gui/UBFloatingPalette.h"
 
 class QButtonGroup;
+class QLabel;
+class QLineEdit;
+class QSlider;
 class QStackedWidget;
 class QToolButton;
-class UBGraphicsTextItem;
+class UBInkWriter;
 
 /**
- * Floating palette offering one-tap insertion of maths notation (roots,
- * integrals, sums, limits, fractions, powers, Greek letters, ...) into a
- * text item on the board.
- *
- * Templates are described with a tiny markup language:
- *   ^{...}  superscript         _{...}  subscript
- *   ~{...}  overline            [...]   placeholder (the first one is selected after insertion)
- *   |       caret position      \c      literal character c (for { } [ ] | ^ _ ~ \)
- * The first placeholder or caret is the "slot": a selection in the text item is
- * wrapped into it (e.g. select "x+1", tap the square root).
+ * Floating palette that writes maths notation on the board as handwriting:
+ * tapping a symbol (root, integral, sum, limit, fraction, Greek letter, ...) and then
+ * the board draws it there with pen strokes in the current pen colour and width.
+ * The "ink text" field writes a whole formula typed with a simple syntax
+ * (see UBMathInkLayout), e.g. f(x) = x^2 + 1/(x-1).
  */
 class UBMathPalette : public UBFloatingPalette
 {
@@ -50,8 +48,9 @@ class UBMathPalette : public UBFloatingPalette
         explicit UBMathPalette(QWidget* parent = nullptr);
         virtual ~UBMathPalette();
 
-        /** Family of an installed font with good maths coverage, or an empty string. */
-        static QString mathFontFamily();
+        /** Render a formula as it will be written, for button icons. */
+        static QPixmap formulaPixmap(const UBMathInkLayout::Formula& formula, const QSize& size,
+                                     const QColor& color, qreal devicePixelRatio);
 
     public slots:
         /** Show or hide the palette and remember the state in the settings. */
@@ -65,20 +64,22 @@ class UBMathPalette : public UBFloatingPalette
         void onCloseButtonClicked() override;
         void mouseReleaseEvent(QMouseEvent* event) override;
         void showEvent(QShowEvent* event) override;
+        void hideEvent(QHideEvent* event) override;
         bool eventFilter(QObject* watched, QEvent* event) override;
 
     private slots:
         void templateButtonClicked();
-        void normalTextClicked();
+        void inkTextEntered();
+        void sizeChanged(int halfCentimetres);
         void pageSelected(int index);
+        void placementStarted();
+        void placementFinished(bool written);
 
     private:
         struct MathTemplate
         {
-            QString label;
+            QString source;
             QString toolTip;
-            QString markup;
-            bool optionalBase; // first placeholder is a base that is omitted if text precedes the cursor
         };
 
         struct MathPage
@@ -87,24 +88,23 @@ class UBMathPalette : public UBFloatingPalette
             QList<MathTemplate> templates;
         };
 
-        QList<MathPage> buildPages() const;
+        static QList<MathPage> buildPages();
         QToolButton* createTemplateButton(const MathTemplate& tmpl, QWidget* parent);
         void placeInsideParent();
         void updatePageSize();
+        void showHint(const QString& text = QString());
 
-        UBGraphicsTextItem* activeTextItem() const;
-        UBGraphicsTextItem* createTextItem();
-        void insertTemplate(UBGraphicsTextItem* item, const MathTemplate& tmpl);
-        void insertMarkup(QTextCursor& cursor, const QString& markup, bool skipBase, const QString& wrapText) const;
-        void insertStackedFraction(QTextCursor& cursor, const QColor& color, const QString& wrapText) const;
-        void focusTextItem(UBGraphicsTextItem* item);
-
-        QButtonGroup* mPageButtons;
-        QStackedWidget* mPages;
-        QList<MathTemplate> mTemplates;
-        QPointer<UBGraphicsTextItem> mLastTextItem;
+        QButtonGroup* mPageButtons{nullptr};
+        QStackedWidget* mPages{nullptr};
+        QSlider* mSizeSlider{nullptr};
+        QLabel* mSizeLabel{nullptr};
+        QLineEdit* mInkText{nullptr};
+        QLabel* mHint{nullptr};
+        UBInkWriter* mWriter{nullptr};
+        QList<UBMathInkLayout::Formula> mFormulas;
+        QPointer<QToolButton> mActiveButton;
         QPoint mPreferredPos;
-        bool mHasPreferredPos;
+        bool mHasPreferredPos{false};
 };
 
 #endif // UBMATHPALETTE_H

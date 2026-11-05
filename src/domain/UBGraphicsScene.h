@@ -61,6 +61,7 @@ class UBMediaAssetItem;
 class UBSelectionFrame;
 class UBBoardView;
 class UBGraphicsShapeItem;
+class UBGraphicsStrokesGroup;
 
 const double PI = 4.0 * atan(1.0);
 
@@ -327,6 +328,14 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         void deselectAllItemsExcept(QGraphicsItem* graphicsItem);
 
         QRectF annotationsBoundingRect() const;
+
+        /**
+         * Add ready-made pen strokes (e.g. handwritten maths) as one strokes group, using the
+         * pen tool's polygon pipeline, with a single undo step. Every polyline becomes a stroke
+         * of constant width. Returns nullptr if nothing was added (e.g. while drawing).
+         */
+        UBGraphicsStrokesGroup* addInkStrokes(const QList<QPolygonF>& strokes, qreal width,
+                                              const QColor& colorOnLightBackground, const QColor& colorOnDarkBackground);
 
 public slots:
         void updateSelectionFrame();

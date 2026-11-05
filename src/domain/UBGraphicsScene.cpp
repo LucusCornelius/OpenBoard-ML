@@ -3222,3 +3222,102 @@ void UBGraphicsScene::shapeToolRelease()
 
     mAddedItems << shape;
 }
+
+UBGraphicsStrokesGroup* UBGraphicsScene::addInkStrokes(const QList<QPolygonF>& strokes, qreal width,
+                                                       const QColor& colorOnLightBackground, const QColor& colorOnDarkBackground)
+{
+    // never interfere with a stroke that is being drawn
+    if (mInputDeviceIsPressed || strokes.isEmpty())
+    {
+        return nullptr;
+    }
+
+    if (mCurrentStroke && mCurrentStroke->polygons().empty())
+    {
+        delete mCurrentStroke;
+    }
+
+    mCurrentStroke = nullptr;
+    mAddedItems.clear();
+    mRemovedItems.clear();
+
+    // long polylines are drawn as several curve polygons, like the pen tool does while drawing
+    const int maxPointsPerPolygon = 16;
+    UBGraphicsStrokesGroup* group = new UBGraphicsStrokesGroup();
+    bool hasPolygons = false;
+
+    for (const QPolygonF& stroke : strokes)
+    {
+        if (stroke.size() < 2)
+        {
+            continue;
+        }
+
+        mCurrentStroke = new UBGraphicsStroke(shared_from_this());
+        moveTo(stroke.first());
+
+        for (int start = 0; start + 1 < stroke.size(); start += maxPointsPerPolygon - 1)
+        {
+            const int count = qMin(maxPointsPerPolygon, int(stroke.size()) - start);
+            QList<QPointF> points;
+
+            for (int i = start; i < start + count; ++i)
+            {
+                points << stroke.at(i);
+            }
+
+            UBGraphicsPolygonItem* polygonItem = polygonToPolygonItem(UBGeometryUtils::curveToPolygon(points, width, width));
+            polygonItem->setColorOnLightBackground(colorOnLightBackground);
+            polygonItem->setColorOnDarkBackground(colorOnDarkBackground);
+            polygonItem->setColor(mDarkBackground ? colorOnDarkBackground : colorOnLightBackground);
+            addPolygonItemToCurrentStroke(polygonItem);
+
+            mPreviousPoint = points.last();
+            mPreviousWidth = width;
+        }
+
+        // move the polygons of this stroke into the group, as inputDeviceRelease() does
+        foreach(UBGraphicsPolygonItem* poly, mCurrentStroke->polygons())
+        {
+            mPreviousPolygonItems.removeAll(poly);
+            removeItem(poly);
+            UBCoreGraphicsScene::removeItemFromDeletion(poly);
+            poly->setStrokesGroup(group);
+            group->addToGroup(poly);
+            hasPolygons = true;
+        }
+
+        if (mCurrentStroke->polygons().empty())
+        {
+            delete mCurrentStroke;
+        }
+
+        mCurrentStroke = nullptr;
+    }
+
+    mPreviousPolygonItems.clear();
+    mpLastPolygon = nullptr;
+    mCurrentPolygon = nullptr;
+
+    if (!hasPolygons)
+    {
+        delete group;
+        mAddedItems.clear();
+        return nullptr;
+    }
+
+    mAddedItems.clear();
+    mAddedItems << group;
+    addItem(group);
+
+    if (mUndoRedoStackEnabled && UBApplication::undoStack)
+    {
+        UBApplication::undoStack->push(new UBGraphicsItemUndoCommand(shared_from_this(), mRemovedItems, mAddedItems));
+    }
+
+    mAddedItems.clear();
+    mRemovedItems.clear();
+    setDocumentUpdated();
+
+    return group;
+}
