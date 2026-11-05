@@ -28,7 +28,9 @@
 #include <QPainterPath>
 #include <QPalette>
 #include <QPixmapCache>
+#include <QStyle>
 #include <QSvgRenderer>
+#include <QToolBar>
 
 #include <vector>
 
@@ -513,6 +515,31 @@ void UBGlassStyle::applyIcons(UBMainWindow* mainWindow)
 }
 
 
+void UBGlassStyle::setToolBarTextMode(QToolBar* toolBar, bool textUnderIcon)
+{
+    if (!toolBar)
+        return;
+
+    const QVariant current = toolBar->property("glassText");
+
+    if (current.isValid() && current.toBool() == textUnderIcon)
+        return;
+
+    toolBar->setProperty("glassText", textUnderIcon);
+
+    // descendant selectors depend on the property of the toolbar: polish the buttons again
+    QList<QWidget*> widgets = toolBar->findChildren<QWidget*>();
+    widgets.prepend(toolBar);
+
+    for (QWidget* widget : std::as_const(widgets))
+    {
+        widget->style()->unpolish(widget);
+        widget->style()->polish(widget);
+        widget->updateGeometry();
+    }
+}
+
+
 QString UBGlassStyle::styleSheet(bool dark)
 {
     const QColor fg = dark ? QColor(242, 242, 247) : QColor(28, 28, 30);
@@ -566,6 +593,14 @@ QToolBar#documentToolBar QToolButton
     margin: 0px;
     min-width: 30px;
     min-height: 30px;
+    height: 28px;
+}
+
+QToolBar#boardToolBar[glassText="true"] QToolButton,
+QToolBar#webToolBar[glassText="true"] QToolButton,
+QToolBar#documentToolBar[glassText="true"] QToolButton
+{
+    height: 44px;
 }
 
 QToolBar#boardToolBar QToolButton:hover,
@@ -827,6 +862,35 @@ UBPenPanel QToolButton[colorSwatch="true"]:checked:hover,
 QToolButton#desktop-ubButtonGroupLeft[colorSwatch="true"]:checked:hover,
 QToolButton#desktop-ubButtonGroupCenter[colorSwatch="true"]:checked:hover,
 QToolButton#desktop-ubButtonGroupRight[colorSwatch="true"]:checked:hover
+{
+    background: @HOVER@;
+}
+
+QToolButton#desktop-ubButtonGroupRight[colorPaletteConfigButton="true"],
+QToolButton#glass-ubButtonGroupRight[colorPaletteConfigButton="true"]
+{
+    background: transparent;
+    border: none;
+}
+
+QToolButton#desktop-ubButtonGroupRight[colorPaletteConfigButton="true"]:hover,
+QToolButton#glass-ubButtonGroupRight[colorPaletteConfigButton="true"]:hover
+{
+    background: @HOVER@;
+}
+
+QPushButton#zoomPaletteButton
+{
+    color: @FG@;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+QPushButton#zoomPaletteButton:hover
 {
     background: @HOVER@;
 }

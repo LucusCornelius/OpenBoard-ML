@@ -30,6 +30,7 @@
 
 class QPainter;
 class QPainterPath;
+class QToolBar;
 class UBMainWindow;
 
 /**
@@ -85,6 +86,9 @@ class UBGlassStyle
         static void applyIcons(UBMainWindow* mainWindow);
 
         static QPainterPath roundedPath(const QRectF& rect, qreal radius);
+
+        /** tell the stylesheet whether the buttons of a toolbar show their text under the icon */
+        static void setToolBarTextMode(QToolBar* toolBar, bool textUnderIcon);
 };
 
 #endif /* UBGLASSSTYLE_H_ */

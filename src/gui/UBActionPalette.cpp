@@ -210,20 +210,15 @@ void UBActionPalette::setToolButtonStyle(Qt::ToolButtonStyle tbs)
 
 void UBActionPalette::updateLayout()
 {
-    if (mToolButtonStyle == Qt::ToolButtonIconOnly)
-    {
-        layout()->setContentsMargins (sLayoutContentMargin / 2  + border(), sLayoutContentMargin / 2  + border()
-                , sLayoutContentMargin / 2  + border(), sLayoutContentMargin / 2  + border());
-    }
-    else
-    {
-        layout()->setContentsMargins (sLayoutContentMargin  + border(), sLayoutContentMargin  + border()
-                , sLayoutContentMargin  + border(), sLayoutContentMargin + border());
+    const int margin = (mToolButtonStyle == Qt::ToolButtonIconOnly ? sLayoutContentMargin / 2 : sLayoutContentMargin) + border();
 
-    }
+    // keep the close button of the glass panel free from the content
+    const int top = isClosable() ? qMax(margin, closeButtonTop()) : margin;
+
+    layout()->setContentsMargins(margin, top, margin, margin);
+
    update();
 }
-
 
 void UBActionPalette::setClosable(bool pClosable)
 {

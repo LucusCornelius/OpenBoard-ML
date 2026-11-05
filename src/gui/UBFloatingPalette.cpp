@@ -205,6 +205,12 @@ int UBFloatingPalette::closeButtonMargin() const
     return 14;
 }
 
+int UBFloatingPalette::closeButtonTop() const
+{
+    // close button (22 px) plus a small gap
+    return closeButtonMargin() + 22 + 4;
+}
+
 void UBFloatingPalette::onCloseButtonClicked()
 {
     hide();

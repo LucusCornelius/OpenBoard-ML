@@ -507,6 +507,17 @@ void UBBoardController::setupToolbar()
     initToolbarTexts();
 
     UBApplication::app()->toolBarDisplayTextChanged(QVariant(settings->appToolBarDisplayText->get().toBool()));
+
+    // the glass stylesheet sizes the top bar buttons for icons with or without text
+    auto updateToolBarTextMode = [this](const QVariant& display) {
+        for (QToolBar* toolBar : {mMainWindow->boardToolBar, mMainWindow->webToolBar, mMainWindow->documentToolBar})
+        {
+            UBGlassStyle::setToolBarTextMode(toolBar, display.toBool());
+        }
+    };
+
+    connect(settings->appToolBarDisplayText, &UBSetting::changed, this, updateToolBarTextMode);
+    updateToolBarTextMode(settings->appToolBarDisplayText->get());
 }
 
 

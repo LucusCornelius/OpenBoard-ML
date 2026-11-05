@@ -108,6 +108,9 @@ class UBFloatingPalette : public QWidget
         virtual int border();
         virtual int gripSize();
         virtual int closeButtonMargin() const;
+
+        /** top layout margin leaving room for the close button above the content */
+        int closeButtonTop() const;
         virtual void onCloseButtonClicked();
 
         QBrush mBackgroundBrush;

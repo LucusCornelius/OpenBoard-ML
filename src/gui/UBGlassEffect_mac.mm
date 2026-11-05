@@ -35,6 +35,7 @@
 #include <QtGlobal>
 #include <QEvent>
 #include <QMainWindow>
+#include <QStyle>
 #include <QToolBar>
 #include <QWidget>
 
@@ -229,6 +230,21 @@ void UBGlassEffect::applyToWindow(QWidget* widget)
 
         if (QWidget* central = static_cast<QMainWindow*>(top)->centralWidget())
             central->setAutoFillBackground(true);
+
+        // the glass stylesheet makes the window and toolbar backgrounds transparent
+        // for this property: polish them again
+        QList<QWidget*> widgets;
+        widgets << top;
+
+        for (QToolBar* toolBar : top->findChildren<QToolBar*>())
+            widgets << toolBar;
+
+        for (QWidget* w : widgets)
+        {
+            w->style()->unpolish(w);
+            w->style()->polish(w);
+            w->update();
+        }
     }
 
     top->installEventFilter(new UBMacWindowGlassFilter(top));
