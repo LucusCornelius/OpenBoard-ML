@@ -35,6 +35,7 @@
 #include "gui/UBMainWindow.h"
 #include "gui/UBBoardThumbnailsView.h"
 #include "gui/UBFloatingPalette.h"
+#include "gui/UBGlassStyle.h"
 #include "gui/UBPageNavigationWidget.h"
 #include "gui/UBStartupHintsPalette.h"
 #include "gui/UBDocumentThumbnailsView.h"
@@ -285,6 +286,10 @@ void UBThemeManager::loadStylesheets()
         fullStylesheet += css;
     }
     
+    // Layer 4: Liquid Glass controls (top bar, floating palettes, pen panel, menus)
+    fullStylesheet += "\n";
+    fullStylesheet += UBGlassStyle::styleSheet(mIsDarkMode);
+
     // Apply the combined stylesheet once
     qApp->setStyleSheet(fullStylesheet);
 }
@@ -303,6 +308,7 @@ void UBThemeManager::updateWidgets()
     for (auto floatingPalette: std::as_const(floatingPalettes))
     {
         floatingPalette->setBackgroundBrush(QBrush(UBSettings::paletteColor));
+        floatingPalette->scheduleBackdropUpdate();
     }
 
     // Update left and right dock palettes

@@ -30,7 +30,8 @@
 #include "UBShapeToolController.h"
 
 #include <QAction>
-#include <QToolBar>
+#include <QHBoxLayout>
+#include <QToolButton>
 
 #include "core/UB.h"
 #include "core/UBSettings.h"
@@ -50,11 +51,11 @@ namespace
     const QString shapeFillSetting("Board/ShapeFill");
 }
 
-UBShapeToolController::UBShapeToolController(UBMainWindow* mainWindow, QToolBar* toolBar, QAction* insertBefore, QObject* parent)
+UBShapeToolController::UBShapeToolController(UBMainWindow* mainWindow, QWidget* host, QObject* parent)
     : QObject(parent)
     , mMainWindow(mainWindow)
     , mKindChoice(nullptr)
-    , mKindChoiceAction(nullptr)
+    , mWidget(nullptr)
     , mFillAction(mainWindow->actionShapeFill)
 {
     // order must match UBGraphicsShapeItem::Kind
@@ -65,22 +66,28 @@ UBShapeToolController::UBShapeToolController(UBMainWindow* mainWindow, QToolBar*
                  << mainWindow->actionShapeLine
                  << mainWindow->actionShapeArrow;
 
-    mKindChoice = new UBToolbarButtonGroup(toolBar, mKindActions);
-    mKindChoice->setLabel(tr("Shape"));
+    mWidget = new QWidget(host);
+    mWidget->setObjectName("shapeToolWidget");
+    QHBoxLayout* layout = new QHBoxLayout(mWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(2);
+
+    mKindChoice = new UBToolbarButtonGroup(mWidget, mKindActions, QStringLiteral("glass"), -1, QSize(22, 22));
+    layout->addWidget(mKindChoice);
+
+    QToolButton* fillButton = new QToolButton(mWidget);
+    fillButton->setObjectName("glass-shapeFill");
+    fillButton->setDefaultAction(mFillAction);
+    fillButton->setIconSize(QSize(22, 22));
+    fillButton->setFocusPolicy(Qt::NoFocus);
+    layout->addWidget(fillButton);
 
     const int kind = currentKind();
     mKindChoice->setCurrentIndex(kind);
     mKindActions.at(kind)->setChecked(true);
 
-    mKindChoiceAction = toolBar->insertWidget(insertBefore, mKindChoice);
-    toolBar->insertAction(insertBefore, mFillAction);
-
     mFillAction->setChecked(fillEnabled());
 
-    UBSettings* settings = UBSettings::settings();
-    mKindChoice->displayText(QVariant(settings->appToolBarDisplayText->get().toBool()));
-
-    connect(settings->appToolBarDisplayText, SIGNAL(changed(QVariant)), this, SLOT(displayText(QVariant)));
     connect(mKindChoice, SIGNAL(activated(int)), this, SLOT(kindActivated(int)));
     connect(mFillAction, SIGNAL(triggered(bool)), this, SLOT(fillToggled(bool)));
     connect(UBDrawingController::drawingController(), SIGNAL(stylusToolChanged(int,int)), this, SLOT(stylusToolChanged(int,int)));
@@ -130,17 +137,10 @@ void UBShapeToolController::stylusToolChanged(int tool, int previousTool)
     updateVisibility(tool);
 }
 
-void UBShapeToolController::displayText(const QVariant& display)
-{
-    mKindChoice->displayText(display);
-}
-
 void UBShapeToolController::updateVisibility(int tool)
 {
     const bool visible = (tool == UBStylusTool::Shape);
 
-    if (mKindChoiceAction)
-        mKindChoiceAction->setVisible(visible);
-
-    mFillAction->setVisible(visible);
+    if (mWidget)
+        mWidget->setVisible(visible);
 }

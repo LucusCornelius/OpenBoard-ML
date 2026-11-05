@@ -32,7 +32,7 @@
 #include <QList>
 
 class QAction;
-class QToolBar;
+class QWidget;
 class UBMainWindow;
 class UBToolbarButtonGroup;
 
@@ -49,8 +49,15 @@ class UBShapeToolController : public QObject
     Q_OBJECT
 
     public:
-        UBShapeToolController(UBMainWindow* mainWindow, QToolBar* toolBar, QAction* insertBefore, QObject* parent = nullptr);
+        /**
+         * Creates the shape kind choice and the fill button in a widget owned by
+         * host (the pen panel), see widget().
+         */
+        UBShapeToolController(UBMainWindow* mainWindow, QWidget* host, QObject* parent = nullptr);
         virtual ~UBShapeToolController();
+
+        /** the widget holding the shape kind choice and the fill button, visible while the shapes tool is active */
+        QWidget* widget() const { return mWidget; }
 
         static int currentKind();
         static bool fillEnabled();
@@ -59,7 +66,6 @@ class UBShapeToolController : public QObject
         void kindActivated(int index);
         void fillToggled(bool checked);
         void stylusToolChanged(int tool, int previousTool);
-        void displayText(const QVariant& display);
 
     private:
         void updateVisibility(int tool);
@@ -67,7 +73,7 @@ class UBShapeToolController : public QObject
         UBMainWindow* mMainWindow;
         QList<QAction*> mKindActions;
         UBToolbarButtonGroup* mKindChoice;
-        QAction* mKindChoiceAction;
+        QWidget* mWidget;
         QAction* mFillAction;
 };
 

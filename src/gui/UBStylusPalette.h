@@ -45,6 +45,10 @@ class UBStylusPalette : public UBActionPalette
 
         void initPosition();
 
+    protected:
+        /** capsule shaped glass pill */
+        int radius() override;
+
     private slots:
 
         void stylusToolDoubleClicked();

@@ -235,10 +235,11 @@ void UBActionPalette::setClosable(bool pClosable)
 
 int UBActionPalette::border()
 {
+    // room for the drop shadow of the glass panel
     if (isClosable())
         return 10;
     else
-        return 5;
+        return 8;
 }
 
 
@@ -301,7 +302,7 @@ UBActionPaletteButton::UBActionPaletteButton(QAction* action, QWidget * parent)
 {
     setIconSize(QSize(32, 32));
     setDefaultAction(action);
-    setStyleSheet(QString("QToolButton {color: palette(button-text); font-weight: bold; font-family: Arial; background-color: transparent; border: none}"));
+    // look defined by the glass stylesheet (UBGlassStyle)
 
     setFocusPolicy(Qt::NoFocus);
 

@@ -35,6 +35,7 @@
 
 #include "core/UBApplication.h"
 #include "core/UBSettings.h"
+#include "gui/UBGlassStyle.h"
 
 #include "board/UBDrawingController.h"
 
@@ -42,20 +43,49 @@
 
 UBToolbarButtonGroup::UBToolbarButtonGroup(QToolBar *toolBar, const QList<QAction*> &actions, QString objectNameprefix, int selectableCount)
     : QWidget(toolBar)
+    , mToolButton(nullptr)
     , mActions(actions)
     , mCurrentIndex(-1)
     , mSelectableCount(selectableCount <= 0 ? actions.size() : qMin(selectableCount, actions.size()))
     , mDisplayLabel(true)
     , mActionGroup(0)
 {
-    Q_ASSERT(actions.size() > 0);
+    if (toolBar && toolBar->layout() && toolBar->layout()->count() > 0)
+    {
+        mToolButton = qobject_cast<QToolButton*>(toolBar->layout()->itemAt(0)->widget());
+    }
 
-    mToolButton = qobject_cast<QToolButton*>(toolBar->layout()->itemAt(0)->widget());
-    Q_ASSERT(mToolButton);
+    init(objectNameprefix, QSize());
+}
+
+UBToolbarButtonGroup::UBToolbarButtonGroup(QWidget *parent, const QList<QAction*> &actions, const QString& objectNameprefix, int selectableCount, const QSize& buttonIconSize)
+    : QWidget(parent)
+    , mToolButton(nullptr)
+    , mActions(actions)
+    , mCurrentIndex(-1)
+    , mSelectableCount(selectableCount <= 0 ? actions.size() : qMin(selectableCount, actions.size()))
+    , mDisplayLabel(false)
+    , mActionGroup(0)
+{
+    init(objectNameprefix, buttonIconSize);
+}
+
+void UBToolbarButtonGroup::init(QString objectNameprefix, const QSize& buttonIconSize)
+{
+    Q_ASSERT(mActions.size() > 0);
 
     QVBoxLayout *verticalLayout = new QVBoxLayout(this);
     QHBoxLayout *horizontalLayout = new QHBoxLayout();
     horizontalLayout->setSpacing(0);
+
+    if (!mToolButton)
+    {
+        // hosted in a glass panel: no label, compact and evenly spaced
+        verticalLayout->setContentsMargins(0, 0, 0, 0);
+        verticalLayout->setSpacing(0);
+        horizontalLayout->setSpacing(2);
+    }
+
     verticalLayout->addStretch();
     verticalLayout->addLayout(horizontalLayout);
     verticalLayout->addStretch();
@@ -63,11 +93,9 @@ UBToolbarButtonGroup::UBToolbarButtonGroup(QToolBar *toolBar, const QList<QActio
     mActionGroup = new QActionGroup(this);
     mActionGroup->setExclusive(true);
 
-    QSize buttonSize;
-
     int i = 0;
 
-    foreach(QAction *action, actions)
+    foreach(QAction *action, mActions)
     {
         if (action->isCheckable())
             mActionGroup->addAction(action);
@@ -76,6 +104,13 @@ UBToolbarButtonGroup::UBToolbarButtonGroup(QToolBar *toolBar, const QList<QActio
         mButtons.append(button);
         button->setDefaultAction(action);
         button->setCheckable(action->isCheckable());
+        button->setFocusPolicy(Qt::NoFocus);
+
+        if (buttonIconSize.isValid())
+        {
+            button->setIconSize(buttonIconSize);
+        }
+
         if (action->objectName() == QLatin1String("actionColorPreferences"))
         {
             button->setProperty("colorPaletteConfigButton", true);
@@ -87,7 +122,7 @@ UBToolbarButtonGroup::UBToolbarButtonGroup(QToolBar *toolBar, const QList<QActio
                 button->setObjectName(objectNameprefix + "-ubButtonGroupLeft")
                 : button->setObjectName("ubButtonGroupLeft");
         }
-        else if (i == actions.size() - 1)
+        else if (i == mActions.size() - 1)
         {
             objectNameprefix.length() > 0 ?
                 button->setObjectName(objectNameprefix + "-ubButtonGroupRight")
@@ -105,7 +140,6 @@ UBToolbarButtonGroup::UBToolbarButtonGroup(QToolBar *toolBar, const QList<QActio
 
         horizontalLayout->addWidget(button);
         mLabel = action->text();
-        buttonSize = button->sizeHint();
         i++;
     }
 
@@ -173,10 +207,17 @@ void UBToolbarButtonGroup::setIcon(const QIcon &icon, int index)
 
 void UBToolbarButtonGroup::setColor(const QColor &color, int index)
 {
-    QPixmap pixmap(12, 12);
-    pixmap.fill(color);
-    QIcon icon(pixmap);
-    setIcon(icon, index);
+    setIcon(UBGlassStyle::swatchIcon(color), index);
+
+    // round swatches show the selection with a ring instead of a filled capsule
+    if (index >= 0 && index < mButtons.size() && !mButtons.at(index)->property("colorSwatch").toBool())
+    {
+        QToolButton* button = mButtons.at(index);
+        button->setProperty("colorSwatch", true);
+        button->style()->unpolish(button);
+        button->style()->polish(button);
+        button->update();
+    }
 }
 
 void UBToolbarButtonGroup::setSelected(QAction *action)
@@ -217,6 +258,9 @@ void UBToolbarButtonGroup::setCurrentIndex(int index)
 
 void UBToolbarButtonGroup::paintEvent(QPaintEvent *)
 {
+    if (!mToolButton || !mDisplayLabel)
+        return;
+
     QPainter painter(this);
     QStyleOptionToolButton option;
     QPixmap emptyPixmap(32, 32);

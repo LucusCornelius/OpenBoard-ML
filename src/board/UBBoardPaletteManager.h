@@ -42,6 +42,7 @@
 
 class UBWebToolsPalette;
 class UBStylusPalette;
+class UBPenPanel;
 class UBClockPalette;
 class UBPageNumberPalette;
 class UBZoomPalette;
@@ -68,6 +69,7 @@ class UBBoardPaletteManager : public QObject
         UBLeftPalette* leftPalette(){return mLeftPalette;}
         UBRightPalette* rightPalette(){return mRightPalette;}
         UBStylusPalette* stylusPalette(){return mStylusPalette;}
+        UBPenPanel* penPanel(){return mPenPanel;}
         UBActionPalette *addItemPalette() {return mAddItemPalette;}
         UBFeaturesWidget *featuresWidget() { return mpFeaturesWidget; }
         UBStartupHintsPalette *tipsPalette() { return mTipPalette; }
@@ -122,6 +124,7 @@ class UBBoardPaletteManager : public QObject
         UBActionPalette* mErasePalette;
         UBActionPalette* mPagePalette;
         UBMathPalette* mMathPalette{nullptr};
+        UBPenPanel* mPenPanel{nullptr};
 
         QUrl mItemUrl;
         QPixmap mPixmap;

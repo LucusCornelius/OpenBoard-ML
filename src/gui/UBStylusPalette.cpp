@@ -77,7 +77,7 @@ UBStylusPalette::UBStylusPalette(QWidget *parent, Qt::Orientation orient)
     UBApplication::mainWindow->actionSnap->setProperty("ungrouped", true);
 
     setActions(actions);
-    setButtonIconSize(QSize(42, 42));
+    setButtonIconSize(QSize(32, 32));
     groupActions();
 
     // the id of an action is its index in the palette. Keep the ids equal to the
@@ -123,6 +123,12 @@ void UBStylusPalette::initPosition()
         pos.setY(posY);
     }
     moveInsideParent(pos);
+}
+
+int UBStylusPalette::radius()
+{
+    // clamped to half the height (or width when vertical) by the glass painting
+    return 1000;
 }
 
 UBStylusPalette::~UBStylusPalette()
