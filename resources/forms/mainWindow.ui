@@ -1947,6 +1947,8 @@
     <font>
      <pointsize>9</pointsize>
     </font>
+   </property>
+  </action>
   <action name="actionCustomColor">
    <property name="icon">
     <iconset resource="../OpenBoard.qrc">
@@ -1973,6 +1975,8 @@
    </property>
    <property name="toolTip">
     <string>Switch to the previous color palette</string>
+   </property>
+  </action>
   <action name="actionBackgroundBlank">
    <property name="text">
     <string>Blank background</string>
