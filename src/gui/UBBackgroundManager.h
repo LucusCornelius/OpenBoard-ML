@@ -26,10 +26,12 @@
 #include "gui/UBBackgroundRuling.h"
 
 #include <QObject>
+#include <QIcon>
+#include <QPixmap>
+#include <QSize>
 
 // forward
 class QAction;
-class QDomDocument;
 
 class UBBackgroundManager : public QObject
 {
@@ -46,7 +48,8 @@ public:
     void updateAction(QAction* action, bool dark) const;
     const UBBackgroundRuling* background(const QUuid& uuid) const;
     const UBBackgroundRuling* guessBackground(bool crossed, bool ruled, bool intermediateLines) const;
-    QPixmap createButtonPixmap(const UBBackgroundRuling& background, bool dark, bool on) const;
+    /** swatch of a background (sSwatchSize logical pixels), with a ring when on */
+    QPixmap createButtonPixmap(const UBBackgroundRuling& background, bool dark, bool on, qreal dpr = 2.0) const;
     QIcon createButtonIcon(const UBBackgroundRuling& background, bool dark) const;
     void savePreferredBackgrounds(QList<QUuid>& uuidList);
     const QList<const UBBackgroundRuling*> preferredBackgrounds() const;
@@ -57,14 +60,15 @@ public:
     static const QUuid grid1cmBackground;
     static const QUuid grid5mmBackground;
 
+    /** logical size of the background swatches */
+    static constexpr QSize sSwatchSize{60, 46};
+
 signals:
     void preferredBackgroundChanged();
     void backgroundListChanged();
 
 private:
     void scan(const QString& dirname, bool userProvided);
-    QByteArray renderToSvg(const UBBackgroundRuling& background, bool dark) const;
-    QPixmap createButtonPixmap(const QDomDocument& bgDoc, bool dark, bool on) const;
 
 private:
     QList<UBBackgroundRuling> mBackgrounds;

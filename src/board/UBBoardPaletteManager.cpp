@@ -53,6 +53,7 @@
 #include "gui/UBZoomPalette.h"
 #include "gui/UBWebToolsPalette.h"
 #include "gui/UBActionPalette.h"
+#include "gui/UBBackgroundManager.h"
 #include "gui/UBBackgroundPalette.h"
 #include "gui/UBMathPalette.h"
 #include "gui/UBFavoriteToolPalette.h"
@@ -313,7 +314,7 @@ void UBBoardPaletteManager::setupPalettes()
     UBApplication::mainWindow->actionHintsAndTips->setEnabled(mTipPalette != nullptr);
 
     mBackgroundsPalette = new UBBackgroundPalette(mContainer);
-    mBackgroundsPalette->setButtonIconSize(QSize(128, 128));
+    mBackgroundsPalette->setButtonIconSize(UBBackgroundManager::sSwatchSize);
     mBackgroundsPalette->groupActions();
     mBackgroundsPalette->setClosable(true);
     mBackgroundsPalette->setAutoClose(false);

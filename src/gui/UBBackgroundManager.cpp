@@ -26,9 +26,10 @@
 #include "core/UBSettings.h"
 #include "frameworks/UBPlatformUtils.h"
 #include "gui/UBBackgroundRuling.h"
+#include "gui/UBGlassStyle.h"
 
-#include <QDomDocument>
-#include <QSvgGenerator>
+#include <QPainter>
+#include <QPainterPath>
 
 
 // uuids of the rulings offered by default in the background palette
@@ -232,38 +233,58 @@ const UBBackgroundRuling* UBBackgroundManager::guessBackground(bool crossed, boo
     return nullptr;
 }
 
-QPixmap UBBackgroundManager::createButtonPixmap(const UBBackgroundRuling& background, bool dark, bool on) const
+QPixmap UBBackgroundManager::createButtonPixmap(const UBBackgroundRuling& background, bool dark, bool on, qreal dpr) const
 {
-    QByteArray bgSvg{renderToSvg(background, dark)};
-    QDomDocument bgDoc;
+    // compact swatch: the page with its ruling in a rounded rectangle, an accent ring when selected
+    const QSizeF swatch(sSwatchSize);
+    const qreal ring = 2.5;
+    const QRectF page = QRectF(QPointF(0, 0), swatch).adjusted(ring + 1, ring + 1, -ring - 1, -ring - 1);
+    const qreal radius = 7.0;
 
-    if (!bgDoc.setContent(bgSvg))
+    QPixmap pixmap((swatch * dpr).toSize());
+    pixmap.setDevicePixelRatio(dpr);
+    pixmap.fill(Qt::transparent);
+
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QPainterPath pagePath;
+    pagePath.addRoundedRect(page, radius, radius);
+    painter.fillPath(pagePath, dark ? QColor(28, 28, 30) : QColor(Qt::white));
+
+    // the ruling as drawn on the board, scaled from the reference thumbnail size
+    painter.save();
+    painter.setClipPath(pagePath);
+    painter.translate(page.topLeft());
+    painter.scale(page.width() / 93.0, page.height() / 75.0);
+    background.draw(&painter, {0, 0, 93, 75}, 0., {0, 0, 193, 75}, dark);
+    painter.restore();
+
+    painter.setPen(QPen(QColor(128, 128, 128, 110), 1.0));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(pagePath);
+
+    if (on)
     {
-        qWarning() << "Cannot load rendered ruling" << background.description();
-        return {};
+        const qreal inset = ring / 2.0;
+        painter.setPen(QPen(UBGlassStyle::accent(), ring));
+        painter.drawRoundedRect(QRectF(QPointF(0, 0), swatch).adjusted(inset, inset, -inset, -inset),
+                                radius + ring, radius + ring);
     }
 
-    return createButtonPixmap(bgDoc, dark, on);
+    return pixmap;
 }
 
 QIcon UBBackgroundManager::createButtonIcon(const UBBackgroundRuling &background, bool dark) const
 {
-    QByteArray bgSvg{renderToSvg(background, dark)};
-    QDomDocument bgDoc;
-
-    if (!bgDoc.setContent(bgSvg))
-    {
-        qWarning() << "Cannot load rendered ruling" << background.description();
-        return {};
-    }
-
     QIcon icon;
 
-    QPixmap pix{createButtonPixmap(bgDoc, dark, false)};
-    icon.addPixmap(pix, QIcon::Normal, QIcon::Off);
-
-    pix = createButtonPixmap(bgDoc, dark, true);
-    icon.addPixmap(pix, QIcon::Normal, QIcon::On);
+    // the 1x pixmap first: its size is the logical size of the icon (availableSizes)
+    for (const qreal dpr : {1.0, 2.0})
+    {
+        icon.addPixmap(createButtonPixmap(background, dark, false, dpr), QIcon::Normal, QIcon::Off);
+        icon.addPixmap(createButtonPixmap(background, dark, true, dpr), QIcon::Normal, QIcon::On);
+    }
 
     return icon;
 }
@@ -316,82 +337,4 @@ void UBBackgroundManager::scan(const QString &dirname, bool userProvided)
             }
         }
     }
-}
-
-QByteArray UBBackgroundManager::renderToSvg(const UBBackgroundRuling &background, bool dark) const
-{
-    QSvgGenerator generator;
-    QBuffer buffer;
-    generator.setOutputDevice(&buffer);
-    generator.setSize(QSize(93, 75));
-    generator.setViewBox(QRect(0, 0, 93, 75));
-
-    QPainter painter;
-
-    painter.begin(&generator);
-    background.draw(&painter, {0, 0, 93, 75}, 0., {0, 0, 193, 75}, dark);
-    painter.end();
-
-    return buffer.buffer();
-}
-
-QPixmap UBBackgroundManager::createButtonPixmap(const QDomDocument& bgDoc, bool dark, bool on) const
-{
-    QString filename{"bgButtonTemplate"};
-
-    filename += dark ? "Dark" : "Light";
-    filename += on ? "On" : "Off";
-    filename += ".svg";
-
-    QFile templateFile{":/images/backgroundPalette/" + filename};
-
-    if (!templateFile.open(QFile::ReadOnly))
-    {
-        qWarning() << "Cannot find template file" << templateFile.fileName();
-        return {};
-    }
-
-    QDomDocument doc;
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 5, 0))
-    auto result = doc.setContent(&templateFile, QDomDocument::ParseOption::UseNamespaceProcessing);
-#else
-    auto result = doc.setContent(&templateFile, true);
-#endif
-    if (!result)
-    {
-        qWarning() << "Cannot load template file" << templateFile.fileName();
-        return {};
-    }
-
-    // find <g> element with id="placeholder"
-    auto plist{doc.documentElement().elementsByTagName("g")};
-
-    QDomElement placeholder;
-
-    for (int i = 0; i < plist.size(); ++i)
-    {
-        const auto item{plist.at(i).toElement()};
-
-        if (item.attribute("id") == "placeholder")
-        {
-            placeholder = item;
-            break;
-        }
-    }
-
-    // now process background SVG
-    // find first <g> element
-    const auto bgElement{bgDoc.documentElement().firstChildElement("g")};
-
-    // replace element in original document
-    const auto bg{doc.importNode(bgElement, true)};
-    placeholder.parentNode().replaceChild(bg, placeholder);
-
-    QByteArray replaced{doc.toByteArray(2)};
-
-    // render SVG to pixmap by using an QImageReader
-    QBuffer buffer{&replaced};
-    QImageReader reader{&buffer, "svg"};
-
-    return QPixmap::fromImageReader(&reader);
 }
