@@ -58,6 +58,9 @@ class UBToolClusterPalette : public UBFloatingPalette
 
         QToolButton* buttonForAction(QAction* action) const;
 
+        /** keep this horizontal distance from the anchored board edge (an open dock palette) */
+        void setEdgeInset(int inset);
+
         /** glass bodies of the visible clusters of a board, in the coordinates of the board */
         static QList<QRect> clusterBodies(QWidget* parent);
 
@@ -94,6 +97,7 @@ class UBToolClusterPalette : public UBFloatingPalette
         bool mTextUnderIcon;
         bool mRepositionPending;
         QSize mLastSize;
+        int mEdgeInset;
 };
 
 #endif /* UBTOOLCLUSTERPALETTE_H_ */

@@ -613,7 +613,8 @@ void UBBoardPaletteManager::containerResized()
 bool UBBoardPaletteManager::eventFilter(QObject* watched, QEvent* event)
 {
     if ((watched == mLeftPalette || watched == mRightPalette)
-            && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
+            && (event->type() == QEvent::Resize || event->type() == QEvent::Show || event->type() == QEvent::Hide
+                || event->type() == QEvent::Move))
     {
         QTimer::singleShot(0, this, &UBBoardPaletteManager::updateDockTabOffsets);
     }
@@ -629,6 +630,10 @@ void UBBoardPaletteManager::updateDockTabOffsets()
 
     const bool boardMode = mLeftPalette->parentWidget() == mContainer;
     const bool atTop = UBSettings::settings()->appToolBarPositionedAtTop->get().toBool();
+
+    // an open dock palette pushes the cluster of its side towards the centre
+    mLeftCluster->setEdgeInset(boardMode && mLeftPalette->isVisible() ? mLeftPalette->geometry().right() + 1 : 0);
+    mRightCluster->setEdgeInset(boardMode && mRightPalette->isVisible() ? mContainer->width() - mRightPalette->geometry().left() : 0);
 
     for (UBDockPalette* dock : {static_cast<UBDockPalette*>(mLeftPalette), static_cast<UBDockPalette*>(mRightPalette)})
     {

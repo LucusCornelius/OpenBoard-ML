@@ -547,9 +547,13 @@ void UBFloatingPalette::updateBackdrop()
             if (overlap.isEmpty())
                 continue;
 
+            // other glass panels only paint their body and shadow, not the window background
+            const QWidget::RenderFlags flags = qobject_cast<UBFloatingPalette*>(sibling)
+                    ? QWidget::RenderFlags(QWidget::DrawChildren)
+                    : (QWidget::DrawWindowBackground | QWidget::DrawChildren);
+
             const QRect source = overlap.translated(-sibling->pos());
-            sibling->render(&painter, overlap.topLeft() - geometryInParent.topLeft(), QRegion(source),
-                            QWidget::DrawWindowBackground | QWidget::DrawChildren);
+            sibling->render(&painter, overlap.topLeft() - geometryInParent.topLeft(), QRegion(source), flags);
             ++rendered;
         }
     }

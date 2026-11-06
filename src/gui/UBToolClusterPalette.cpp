@@ -40,6 +40,7 @@ UBToolClusterPalette::UBToolClusterPalette(Qt::Corner anchor, QWidget* parent)
     , mLayout(nullptr)
     , mTextUnderIcon(false)
     , mRepositionPending(false)
+    , mEdgeInset(0)
 {
     setObjectName("toolCluster");
     setProperty("glassLabels", false);
@@ -145,6 +146,16 @@ QList<QRect> UBToolClusterPalette::clusterBodies(QWidget* parent)
 }
 
 
+void UBToolClusterPalette::setEdgeInset(int inset)
+{
+    if (inset != mEdgeInset)
+    {
+        mEdgeInset = qMax(0, inset);
+        reposition();
+    }
+}
+
+
 void UBToolClusterPalette::setTextUnderIcon(bool textUnderIcon)
 {
     mTextUnderIcon = textUnderIcon;
@@ -217,7 +228,7 @@ void UBToolClusterPalette::reposition()
     const bool atTop = UBSettings::settings()->appToolBarPositionedAtTop->get().toBool();
     const bool left = (mAnchor == Qt::TopLeftCorner || mAnchor == Qt::BottomLeftCorner);
 
-    int x = left ? edgeGap - b : parent->width() - width() - edgeGap + b;
+    int x = left ? mEdgeInset + edgeGap - b : parent->width() - mEdgeInset - width() - edgeGap + b;
     int y = atTop ? UBGlassEffect::topInset(parent) + edgeGap - b : parent->height() - height() - edgeGap + b;
 
     x = qBound(-b, x, qMax(-b, parent->width() - width() + b));
@@ -236,9 +247,18 @@ bool UBToolClusterPalette::event(QEvent* event)
 {
     switch (event->type())
     {
-        case QEvent::Resize:
         case QEvent::Show:
         case QEvent::ParentChange:
+            // the native window chrome publishes the height of its title bar on the window (UBGlassEffect)
+            if (window() != this)
+            {
+                window()->removeEventFilter(this);
+                window()->installEventFilter(this);
+            }
+            scheduleReposition();
+            break;
+
+        case QEvent::Resize:
             scheduleReposition();
             break;
 
@@ -254,6 +274,12 @@ bool UBToolClusterPalette::eventFilter(QObject* watched, QEvent* event)
 {
     if (watched == parentWidget() && event->type() == QEvent::Resize)
         reposition();
+
+    if (watched == window() && event->type() == QEvent::DynamicPropertyChange
+            && static_cast<QDynamicPropertyChangeEvent*>(event)->propertyName() == "ubGlassTitleBarHeight")
+    {
+        scheduleReposition();
+    }
 
     return UBFloatingPalette::eventFilter(watched, event);
 }

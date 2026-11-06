@@ -115,14 +115,39 @@ void UBPenPanel::reposition()
         x = (parent->width() - width()) / 2;
         y = atTop ? UBGlassEffect::topInset(parent) + gap - b : parent->height() - height() - gap + b;
 
-        const QRect body = QRect(x, y, width(), height()).adjusted(b, b, -b, -b);
-        bool collides = false;
+        auto collides = [&clusters, gap, b, this](int px, int py) {
+            const QRect body = QRect(px, py, width(), height()).adjusted(b, b, -b, -b);
 
-        for (const QRect& cluster : clusters)
-            collides = collides || cluster.adjusted(-gap, 0, gap, 0).intersects(body);
+            for (const QRect& cluster : clusters)
+            {
+                if (cluster.adjusted(-gap, 0, gap, 0).intersects(body))
+                    return true;
+            }
 
-        if (collides)
+            return false;
+        };
+
+        if (collides(x, y))
         {
+            // centred in the free space between the clusters, if it fits there
+            int freeLeft = 0;
+            int freeRight = parent->width();
+
+            for (const QRect& cluster : clusters)
+            {
+                if (cluster.center().x() < parent->width() / 2)
+                    freeLeft = qMax(freeLeft, cluster.right() + 1);
+                else
+                    freeRight = qMin(freeRight, cluster.left());
+            }
+
+            x = (freeLeft + freeRight - width()) / 2;
+        }
+
+        if (collides(x, y))
+        {
+            x = (parent->width() - width()) / 2;
+
             if (atTop)
             {
                 int bottom = 0;

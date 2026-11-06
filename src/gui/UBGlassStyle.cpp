@@ -523,14 +523,14 @@ void UBGlassStyle::paintGlass(QPainter* painter, const QRectF& body, qreal radiu
     {
         // a dark grey rather than black: over black content the glass still reads as a surface
         const QColor base = hasBackdrop ? QColor(46, 46, 52) : QColor(30, 30, 34);
-        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.34 : 0.52));
-        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.40 : 0.62));
+        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.34 : 0.62));
+        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.40 : 0.70));
     }
     else
     {
         const QColor base = hasBackdrop ? QColor(255, 255, 255) : QColor(250, 250, 252);
-        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.38 : 0.62));
-        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.28 : 0.54));
+        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.38 : 0.72));
+        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.28 : 0.64));
     }
 
     painter->fillPath(path, tint);
