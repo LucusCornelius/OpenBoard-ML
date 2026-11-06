@@ -1059,23 +1059,23 @@ Do you wish to override the security check and continue ?   </source>
         <location filename="../forms/mainWindow.ui" line="14"/>
         <location filename="../forms/mainWindow.ui" line="727"/>
         <location filename="../forms/mainWindow.ui" line="730"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="411"/>
-        <source>Quit OpenBoard</source>
+        <source>Quit OpenBoard-ML</source>
         <translation>Open-Sankoreを終了</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1852"/>
-        <source>Hide OpenBoard</source>
-        <translation>OpenBoardを隠す</translation>
+        <source>Hide OpenBoard-ML</source>
+        <translation>OpenBoard-MLを隠す</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1855"/>
-        <source>Hide OpenBoard Application</source>
-        <translation>OpenBoardを隠す</translation>
+        <source>Hide OpenBoard-ML Application</source>
+        <translation>OpenBoard-MLを隠す</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1871"/>
@@ -1604,7 +1604,7 @@ Do you wish to override the security check and continue ?   </source>
     </message>
     <message>
         <location filename="../../src/desktop/UBDesktopPalette.cpp" line="55"/>
-        <source>Show OpenBoard</source>
+        <source>Show OpenBoard-ML</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2182,7 +2182,7 @@ Providing a new name will create a new document.</source>
     <message>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="313"/>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="327"/>
-        <source>The original PDF imported in OpenBoard seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
+        <source>The original PDF imported in OpenBoard-ML seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard-ML. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2770,7 +2770,7 @@ Do you want to ignore these errors for this host?</source>
     </message>
     <message>
         <location filename="../../src/core/UBPersistenceManager.cpp" line="1419"/>
-        <source>OpenBoard has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
+        <source>OpenBoard-ML has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2891,7 +2891,7 @@ Do you want to ignore these errors for this host?</source>
     </message>
     <message>
         <location filename="../../src/podcast/UBPodcastController.cpp" line="371"/>
-        <source>OpenBoard Cast</source>
+        <source>OpenBoard-ML Cast</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -3576,8 +3576,8 @@ Do you want to reload the page ?</source>
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="72"/>
-        <source>OpenBoard</source>
-        <translation type="unfinished">OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation type="unfinished">OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="129"/>
@@ -3679,7 +3679,7 @@ p, li { white-space: pre-wrap; }
     <name>documents</name>
     <message>
         <location filename="../forms/documents.ui" line="26"/>
-        <source>OpenBoard Documents</source>
+        <source>OpenBoard-ML Documents</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

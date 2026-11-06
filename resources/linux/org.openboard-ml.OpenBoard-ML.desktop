@@ -1,0 +1,11 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=OpenBoard-ML
+Comment=OpenBoard-ML, an interactive white board application
+Exec=openboard-ml %f
+Icon=org.openboard-ml.OpenBoard-ML
+StartupNotify=true
+Terminal=false
+Type=Application
+MimeType=application/ubz
+Categories=Education;

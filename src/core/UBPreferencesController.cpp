@@ -96,6 +96,10 @@ UBPreferencesController::UBPreferencesController(QWidget *parent)
     mPreferencesWindow = new UBPreferencesDialog(this,parent, Qt::Dialog);
     mPreferencesUI = new Ui::preferencesDialog();  // deleted in destructor
     mPreferencesUI->setupUi(mPreferencesWindow);
+#ifdef Q_OS_OSX
+    // Windows and Linux append the application display name to window titles themselves
+    mPreferencesWindow->setWindowTitle(QGuiApplication::applicationDisplayName() + " - " + mPreferencesWindow->windowTitle());
+#endif
     adjustScreensPreferences();
 
     connect(UBApplication::displayManager, &UBDisplayManager::availableScreenCountChanged, this, &UBPreferencesController::adjustScreensPreferences);
@@ -281,7 +285,7 @@ void UBPreferencesController::wire()
 
     // main tab
     mPreferencesUI->mainTabWidget->setCurrentWidget(mPreferencesUI->displayTab);
-    mPreferencesUI->versionLabel->setText(tr("version: ") + UBApplication::applicationVersion());
+    mPreferencesUI->versionLabel->setText(QGuiApplication::applicationDisplayName() + " " + UBApplication::applicationVersion());
 
     connect(mPreferencesUI->closeButton, SIGNAL(released()), this, SLOT(close()));
     connect(mPreferencesUI->defaultSettingsButton, SIGNAL(released()), this, SLOT(defaultSettings()));

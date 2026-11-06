@@ -266,8 +266,8 @@ Deseja substituir a verificação de segurança e continuar?</translation>
         <location filename="../forms/mainWindow.ui" line="14"/>
         <location filename="../forms/mainWindow.ui" line="727"/>
         <location filename="../forms/mainWindow.ui" line="730"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="43"/>
@@ -408,8 +408,8 @@ Deseja substituir a verificação de segurança e continuar?</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="411"/>
-        <source>Quit OpenBoard</source>
-        <translation>Fechar OpenBoard</translation>
+        <source>Quit OpenBoard-ML</source>
+        <translation>Fechar OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="429"/>
@@ -1174,13 +1174,13 @@ Deseja substituir a verificação de segurança e continuar?</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1852"/>
-        <source>Hide OpenBoard</source>
-        <translation>Ocultar o OpenBoard</translation>
+        <source>Hide OpenBoard-ML</source>
+        <translation>Ocultar o OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1855"/>
-        <source>Hide OpenBoard Application</source>
-        <translation>Ocultar a Aplicação OpenBoard</translation>
+        <source>Hide OpenBoard-ML Application</source>
+        <translation>Ocultar a Aplicação OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1858"/>
@@ -1720,8 +1720,8 @@ Deseja substituir a verificação de segurança e continuar?</translation>
     <name>UBDesktopPalette</name>
     <message>
         <location filename="../../src/desktop/UBDesktopPalette.cpp" line="55"/>
-        <source>Show OpenBoard</source>
-        <translation>Mostrar OpenBoard</translation>
+        <source>Show OpenBoard-ML</source>
+        <translation>Mostrar OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../../src/desktop/UBDesktopPalette.cpp" line="69"/>
@@ -2360,8 +2360,8 @@ Um outro nome permitirá que você mantenha o documento antigo.</translation>
     <message>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="313"/>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="327"/>
-        <source>The original PDF imported in OpenBoard seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
-        <translation>O PDF original importado no OpenBoard parece não ser válido e não pôde ser mesclado com suas anotações. Repare-o e então importe-o novamente no OpenBoard. A exportação atual será feita com imagens detalhadas (pesadas) das páginas do PDF original, para evitar falha completa na exportação.</translation>
+        <source>The original PDF imported in OpenBoard-ML seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard-ML. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
+        <translation>O PDF original importado no OpenBoard-ML parece não ser válido e não pôde ser mesclado com suas anotações. Repare-o e então importe-o novamente no OpenBoard-ML. A exportação atual será feita com imagens detalhadas (pesadas) das páginas do PDF original, para evitar falha completa na exportação.</translation>
     </message>
 </context>
 <context>
@@ -2965,7 +2965,7 @@ Quer ignorar estes erros deste servidor?</translation>
     </message>
     <message>
         <location filename="../../src/core/UBPersistenceManager.cpp" line="1419"/>
-        <source>OpenBoard has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
+        <source>OpenBoard-ML has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
         <translation>Acesso ao repositório &apos;%1&apos; foi perdido. Infelizmente, deverá encerrar a aplicação para evitar a corrupção de dados. As últimas alterações também serão perdidas.</translation>
     </message>
     <message>
@@ -3026,8 +3026,8 @@ Quer ignorar estes erros deste servidor?</translation>
     <name>UBPodcastController</name>
     <message>
         <location filename="../../src/podcast/UBPodcastController.cpp" line="371"/>
-        <source>OpenBoard Cast</source>
-        <translation>OpenBoard Cast</translation>
+        <source>OpenBoard-ML Cast</source>
+        <translation>OpenBoard-ML Cast</translation>
     </message>
     <message>
         <location filename="../../src/podcast/UBPodcastController.cpp" line="399"/>
@@ -3882,8 +3882,8 @@ Você quer recarregar a página?</translation>
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="72"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="79"/>
@@ -4004,8 +4004,8 @@ p, li { white-space: pre-wrap; }
     <name>documents</name>
     <message>
         <location filename="../forms/documents.ui" line="26"/>
-        <source>OpenBoard Documents</source>
-        <translation>Documentos OpenBoard</translation>
+        <source>OpenBoard-ML Documents</source>
+        <translation>Documentos OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/documents.ui" line="90"/>

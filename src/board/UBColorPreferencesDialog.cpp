@@ -193,7 +193,7 @@ UBColorPreferencesDialog::UBColorPreferencesDialog(QWidget* parent,
     hintIcon->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
 
     QLabel* hintLabel = new QLabel(
-        tr("When you switch between light and dark background in OpenBoard, each color is replaced by its counterpart so your annotations stay readable."),
+        tr("When you switch between light and dark background in OpenBoard-ML, each color is replaced by its counterpart so your annotations stay readable."),
         hintWidget);
     hintLabel->setObjectName(QStringLiteral("colorPreferencesHintText"));
     hintLabel->setWordWrap(true);

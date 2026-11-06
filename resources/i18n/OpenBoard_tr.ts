@@ -1066,23 +1066,23 @@ Güvenlik denetimini geçersiz kılmak ve devam etmek istiyor musunuz?   </trans
         <location filename="../forms/mainWindow.ui" line="14"/>
         <location filename="../forms/mainWindow.ui" line="727"/>
         <location filename="../forms/mainWindow.ui" line="730"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="411"/>
-        <source>Quit OpenBoard</source>
-        <translation>OpenBoardʼdan Çık</translation>
+        <source>Quit OpenBoard-ML</source>
+        <translation>OpenBoard-MLʼdan Çık</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1852"/>
-        <source>Hide OpenBoard</source>
-        <translation>OpenBoardʼu Gizle</translation>
+        <source>Hide OpenBoard-ML</source>
+        <translation>OpenBoard-MLʼu Gizle</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1855"/>
-        <source>Hide OpenBoard Application</source>
-        <translation>OpenBoard Uygulamasını Gizle</translation>
+        <source>Hide OpenBoard-ML Application</source>
+        <translation>OpenBoard-ML Uygulamasını Gizle</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1871"/>
@@ -1614,8 +1614,8 @@ Güvenlik denetimini geçersiz kılmak ve devam etmek istiyor musunuz?   </trans
     </message>
     <message>
         <location filename="../../src/desktop/UBDesktopPalette.cpp" line="55"/>
-        <source>Show OpenBoard</source>
-        <translation>OpenBoardʼu Göster</translation>
+        <source>Show OpenBoard-ML</source>
+        <translation>OpenBoard-MLʼu Göster</translation>
     </message>
 </context>
 <context>
@@ -2211,8 +2211,8 @@ Yeni bir ad sağlamak yeni belge oluşturur.</translation>
     <message>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="313"/>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="327"/>
-        <source>The original PDF imported in OpenBoard seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
-        <translation>OpenBoard&apos;a içe aktarılan özgün PDF geçerli görünmüyor ve açıklamalarınızla birleştirilemedi. Lütfen belgeyi onarın ve ardından OpenBoard&apos;da yeniden içe aktarın. Geçerli dışa aktarma, tamamen dışa aktarma hatasını önlemek için özgün PDF&apos;nin sayfalarının ayrıntılı (ağır) resimleriyle yapılacak.</translation>
+        <source>The original PDF imported in OpenBoard-ML seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard-ML. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
+        <translation>OpenBoard-ML&apos;a içe aktarılan özgün PDF geçerli görünmüyor ve açıklamalarınızla birleştirilemedi. Lütfen belgeyi onarın ve ardından OpenBoard-ML&apos;da yeniden içe aktarın. Geçerli dışa aktarma, tamamen dışa aktarma hatasını önlemek için özgün PDF&apos;nin sayfalarının ayrıntılı (ağır) resimleriyle yapılacak.</translation>
     </message>
 </context>
 <context>
@@ -2818,8 +2818,8 @@ Bu ana bilgisayar için yukarıdaki hatalar yok sayılsın mı?</translation>
     </message>
     <message>
         <location filename="../../src/core/UBPersistenceManager.cpp" line="1419"/>
-        <source>OpenBoard has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
-        <translation>OpenBoard, &apos;%1&apos; belge deposuna erişimini kaybetti. Ne yazık ki, veri bozulmasını önlemek için uygulamanın kapatılması gerekiyor. Son değişiklikler de kaybolabilir.</translation>
+        <source>OpenBoard-ML has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
+        <translation>OpenBoard-ML, &apos;%1&apos; belge deposuna erişimini kaybetti. Ne yazık ki, veri bozulmasını önlemek için uygulamanın kapatılması gerekiyor. Son değişiklikler de kaybolabilir.</translation>
     </message>
     <message>
         <location filename="../../src/core/UBPersistenceManager.cpp" line="1172"/>
@@ -2942,8 +2942,8 @@ Bu ana bilgisayar için yukarıdaki hatalar yok sayılsın mı?</translation>
     </message>
     <message>
         <location filename="../../src/podcast/UBPodcastController.cpp" line="371"/>
-        <source>OpenBoard Cast</source>
-        <translation>OpenBoard Yayını</translation>
+        <source>OpenBoard-ML Cast</source>
+        <translation>OpenBoard-ML Yayını</translation>
     </message>
 </context>
 <context>
@@ -3649,8 +3649,8 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="72"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="156"/>
@@ -3743,8 +3743,8 @@ p, li { white-space: pre-wrap; }
     <name>documents</name>
     <message>
         <location filename="../forms/documents.ui" line="26"/>
-        <source>OpenBoard Documents</source>
-        <translation>OpenBoard Belgeleri</translation>
+        <source>OpenBoard-ML Documents</source>
+        <translation>OpenBoard-ML Belgeleri</translation>
     </message>
     <message>
         <location filename="../forms/documents.ui" line="90"/>

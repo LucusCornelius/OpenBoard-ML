@@ -1,4 +1,4 @@
-target_sources(openboard PRIVATE
+target_sources(${PROJECT_NAME} PRIVATE
     UBBackgroundLoader.cpp
     UBBackgroundLoader.h
     UBBase32.cpp
@@ -22,7 +22,7 @@ target_sources(openboard PRIVATE
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
-    target_sources(openboard PRIVATE
+    target_sources(${PROJECT_NAME} PRIVATE
         UBDesktopPortal.cpp
         UBDesktopPortal.h
         UBPipewireSink.cpp

@@ -1,4 +1,4 @@
-TARGET = "OpenBoard"
+TARGET = "OpenBoard-ML"
 TEMPLATE = app
 
 CONFIG += c++20   # poppler >= 24.05 headers need C++20 (CMake build already uses C++20)
@@ -261,7 +261,7 @@ macx {
    UB_STARTUP_HINTS.path = "$$RESOURCES_DIR"
    UB_MACX_ICNS.files = $$files(resources/macx/*.icns)
    UB_MACX_ICNS.path = "$$RESOURCES_DIR"
-   UB_MACX_EXTRAS.files = "resources/macx/Save PDF to OpenBoard.workflow"
+   UB_MACX_EXTRAS.files = "resources/macx/Save PDF to OpenBoard-ML.workflow"
    UB_MACX_EXTRAS.path = "$$RESOURCES_DIR"
    UB_I18N.path = $$DESTDIR/i18n # not used
 

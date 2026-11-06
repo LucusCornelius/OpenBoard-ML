@@ -53,7 +53,7 @@ UBDesktopPalette::UBDesktopPalette(QWidget *parent, UBRightPalette* _rightPalett
 {
     QList<QAction*> actions;
 
-    mActionUniboard = new QAction(UBGlassStyle::icon("board"), tr("Show OpenBoard"), this);
+    mActionUniboard = new QAction(UBGlassStyle::icon("board"), tr("Show OpenBoard-ML"), this);
     connect(mActionUniboard, SIGNAL(triggered()), this, SIGNAL(uniboardClick()));
     actions << mActionUniboard;
 

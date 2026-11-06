@@ -64,23 +64,31 @@ void UBPlatformUtils::init()
 
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
 
-    NSString *currentPath      = [[NSBundle mainBundle] pathForResource:@"Save PDF to OpenBoard" ofType:@"workflow"];
-    NSString *installedPath    = [[[@"~/Library/PDF Services" stringByExpandingTildeInPath] stringByAppendingPathComponent:@"Save PDF to OpenBoard"] stringByAppendingPathExtension:@"workflow"];
+    NSString *pdfServicesPath  = [@"~/Library/PDF Services" stringByExpandingTildeInPath];
+    NSString *currentPath      = [[NSBundle mainBundle] pathForResource:@"Save PDF to OpenBoard-ML" ofType:@"workflow"];
+    NSString *installedPath    = [[pdfServicesPath stringByAppendingPathComponent:@"Save PDF to OpenBoard-ML"] stringByAppendingPathExtension:@"workflow"];
     NSString *currentVersion   = bundleShortVersion([NSBundle bundleWithPath:currentPath]);
     NSString *installedVersion = bundleShortVersion([NSBundle bundleWithPath:installedPath]);
+    NSFileManager *fileManager = [NSFileManager defaultManager];
 
-    if (![installedVersion isEqualToString:currentVersion])
+    if (currentPath && ![installedVersion isEqualToString:currentVersion])
     {
-        NSFileManager *fileManager = [NSFileManager defaultManager];
         [fileManager removeFileAtPath:installedPath handler:nil];
-        // removing the old version of the script named Save PDF to Uniboard
-        [fileManager removeFileAtPath:[[[@"~/Library/PDF Services" stringByExpandingTildeInPath] stringByAppendingPathComponent:@"Save PDF to OpenBoard"] stringByAppendingPathExtension:@"workflow"] handler:nil];
         [fileManager createDirectoryAtPath:[installedPath stringByDeletingLastPathComponent] attributes:nil];
         BOOL copyOK = [fileManager copyPath:currentPath toPath:installedPath handler:nil];
         if (!copyOK)
         {
-            qWarning("Could not install the 'Save PDF to OpenBoard workflow");
+            qWarning("Could not install the 'Save PDF to OpenBoard-ML' workflow");
         }
+    }
+
+    // Before the fork had its own name it installed "Save PDF to OpenBoard", which opens the
+    // upstream bundle id. Remove it only when no upstream OpenBoard is installed to handle it.
+    NSString *legacyPath = [[pdfServicesPath stringByAppendingPathComponent:@"Save PDF to OpenBoard"] stringByAppendingPathExtension:@"workflow"];
+    if ([fileManager fileExistsAtPath:legacyPath]
+        && ![[NSWorkspace sharedWorkspace] URLForApplicationWithBundleIdentifier:@"org.oe-f.OpenBoard"])
+    {
+        [fileManager removeFileAtPath:legacyPath handler:nil];
     }
 
     [pool drain];

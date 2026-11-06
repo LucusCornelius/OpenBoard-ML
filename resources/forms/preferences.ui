@@ -685,7 +685,7 @@
               <item row="0" column="0" colspan="2">
                <widget class="QCheckBox" name="useMultiScreenCheckBox">
                 <property name="toolTip">
-                 <string>Off: OpenBoard is a normal window on one screen. On: the board is also shown full screen on the other screen or projector.</string>
+                 <string>Off: OpenBoard-ML is a normal window on one screen. On: the board is also shown full screen on the other screen or projector.</string>
                 </property>
                 <property name="text">
                  <string>Show the board on a second screen or projector</string>

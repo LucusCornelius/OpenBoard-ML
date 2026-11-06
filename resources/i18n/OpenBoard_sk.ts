@@ -395,8 +395,8 @@ Do you wish to override the security check and continue ?   </source>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1855"/>
-        <source>Hide OpenBoard Application</source>
-        <translation>Schovať aplikáciu OpenBoard</translation>
+        <source>Hide OpenBoard-ML Application</source>
+        <translation>Schovať aplikáciu OpenBoard-ML</translation>
     </message>
     <message>
         <source>Import an External Page</source>
@@ -411,8 +411,8 @@ Do you wish to override the security check and continue ?   </source>
         <location filename="../forms/mainWindow.ui" line="14"/>
         <location filename="../forms/mainWindow.ui" line="727"/>
         <location filename="../forms/mainWindow.ui" line="730"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1405"/>
@@ -583,8 +583,8 @@ Do you wish to override the security check and continue ?   </source>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="411"/>
-        <source>Quit OpenBoard</source>
-        <translation>Skončiť OpenBoard</translation>
+        <source>Quit OpenBoard-ML</source>
+        <translation>Skončiť OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1087"/>
@@ -658,8 +658,8 @@ Do you wish to override the security check and continue ?   </source>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1852"/>
-        <source>Hide OpenBoard</source>
-        <translation>Schovať OpenBoard</translation>
+        <source>Hide OpenBoard-ML</source>
+        <translation>Schovať OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1381"/>
@@ -1611,8 +1611,8 @@ Do you wish to override the security check and continue ?   </source>
     </message>
     <message>
         <location filename="../../src/desktop/UBDesktopPalette.cpp" line="55"/>
-        <source>Show OpenBoard</source>
-        <translation>Zobraziť OpenBoard</translation>
+        <source>Show OpenBoard-ML</source>
+        <translation>Zobraziť OpenBoard-ML</translation>
     </message>
 </context>
 <context>
@@ -2199,7 +2199,7 @@ Providing a new name will create a new document.</source>
     <message>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="313"/>
         <location filename="../../src/adaptors/UBExportFullPDF.cpp" line="327"/>
-        <source>The original PDF imported in OpenBoard seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
+        <source>The original PDF imported in OpenBoard-ML seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard-ML. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -2806,7 +2806,7 @@ Chcete ignorovať tieto chyby na tomto serveri?</translation>
     </message>
     <message>
         <location filename="../../src/core/UBPersistenceManager.cpp" line="1419"/>
-        <source>OpenBoard has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
+        <source>OpenBoard-ML has lost access to the document repository &apos;%1&apos;. Unfortunately the application must shut down to avoid data corruption. Latest changes may be lost as well.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2928,9 +2928,9 @@ Chcete ignorovať tieto chyby na tomto serveri?</translation>
     </message>
     <message>
         <location filename="../../src/podcast/UBPodcastController.cpp" line="371"/>
-        <source>OpenBoard Cast</source>
+        <source>OpenBoard-ML Cast</source>
         <translatorcomment>Názov súboru podcastu</translatorcomment>
-        <translation>Film OpenBoardu</translation>
+        <translation>Film OpenBoard-MLu</translation>
     </message>
 </context>
 <context>
@@ -3628,8 +3628,8 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="72"/>
-        <source>OpenBoard</source>
-        <translation>OpenBoard</translation>
+        <source>OpenBoard-ML</source>
+        <translation>OpenBoard-ML</translation>
     </message>
     <message>
         <location filename="../forms/youTubePublishingDialog.ui" line="156"/>
@@ -3722,8 +3722,8 @@ p, li { white-space: pre-wrap; }
     <name>documents</name>
     <message>
         <location filename="../forms/documents.ui" line="26"/>
-        <source>OpenBoard Documents</source>
-        <translation>Dokumenty OpenBoardu</translation>
+        <source>OpenBoard-ML Documents</source>
+        <translation>Dokumenty OpenBoard-MLu</translation>
     </message>
     <message>
         <location filename="../forms/documents.ui" line="90"/>

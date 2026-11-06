@@ -375,7 +375,7 @@ void UBPodcastController::start()
             }
             else
             {
-                videoFileName = mPodcastRecordingPath + "/" + tr("OpenBoard Cast") + "." + mVideoEncoder->videoFileExtension();
+                videoFileName = mPodcastRecordingPath + "/" + tr("OpenBoard-ML Cast") + "." + mVideoEncoder->videoFileExtension();
             }
 
             videoFileName = UBFileSystemUtils::nextAvailableFileName(videoFileName, " ");
