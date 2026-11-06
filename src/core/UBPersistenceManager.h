@@ -134,6 +134,8 @@ class UBPersistenceManager : public QObject
 
         void createDocumentProxiesStructure(bool interactive = false);
         void createDocumentProxiesStructure(const QFileInfoList &contentInfoList, bool interactive = false);
+        // non modal progress window for long loads, on the main window's screen (or none)
+        static QProgressDialog* showLoadingProgress(int documentCount);
         static std::shared_ptr<UBDocumentProxy> createDocumentProxyStructure(const QFileInfo &contentInfo);
         QDialog::DialogCode processInteractiveReplacementDialog(std::shared_ptr<UBDocumentProxy> pProxy, bool multipleFiles = false);
 
@@ -183,7 +185,6 @@ private:
         bool mHasPurgedDocuments;
         QString mDocumentRepositoryPath;
         QString mFoldersXmlStorageName;
-        QProgressDialog mProgress;
         QFutureWatcher<void> futureWatcher;
         UBPersistenceWorker* mWorker;
         QList<std::shared_ptr<UBGraphicsScene>> mScenesToSave;
