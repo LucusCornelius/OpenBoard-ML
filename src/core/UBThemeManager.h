@@ -114,6 +114,11 @@ private:
     void setupLightPalette();
 
     /**
+     * @brief Modern user interface style: Fluent neutrals and accent (see UBUiStyle)
+     */
+    void applyModernColors();
+
+    /**
      * @brief Load and concatenate all stylesheets
      */
     void loadStylesheets();

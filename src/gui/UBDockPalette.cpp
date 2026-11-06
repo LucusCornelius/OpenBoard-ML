@@ -33,6 +33,8 @@
 
 #include "UBDockPalette.h"
 #include "UBGlassStyle.h"
+#include "UBModernStyle.h"
+#include "UBUiStyle.h"
 
 #include "frameworks/UBPlatformUtils.h"
 
@@ -686,7 +688,10 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
             painter.setOpacity(0.8);
         }
 
-        UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
+        if (UBUiStyle::isGlass())
+            UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
+        else
+            UBModernStyle::paintPanel(&painter, tabRect, UBModernStyle::panelRadius, UBGlassStyle::isDark());
         painter.setOpacity(1.0);
 
         // Optional tab icon

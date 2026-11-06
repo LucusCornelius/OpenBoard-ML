@@ -58,6 +58,7 @@
 #include "document/UBDocumentProxy.h"
 
 #include "gui/UBMainWindow.h"
+#include "gui/UBUiStyle.h"
 #include "gui/UBResources.h"
 #include "gui/UBThumbnail.h"
 #include "gui/UBStartupHintsPalette.h"
@@ -145,7 +146,8 @@ UBApplication::UBApplication(const QString &id, int &argc, char **argv) : Single
     setWindowIcon(QIcon(":/images/OpenBoard.png"));
 #endif
 
-    setStyle("fusion");
+    // Qt widget style and font of the user interface style (glass or modern)
+    UBUiStyle::applyApplicationStyle();
 
     UBThemeManager::instance()->applyUserThemePreference();
     

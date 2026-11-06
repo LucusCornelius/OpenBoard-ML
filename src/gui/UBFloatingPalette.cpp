@@ -36,6 +36,8 @@
 #include "UBFloatingPalette.h"
 #include "UBGlassStyle.h"
 #include "UBGlassEffect.h"
+#include "UBModernStyle.h"
+#include "UBUiStyle.h"
 
 #include "frameworks/UBPlatformUtils.h"
 
@@ -403,6 +405,12 @@ QRectF UBFloatingPalette::glassRect()
 
 void UBFloatingPalette::paintGlassBackground(QPainter& painter)
 {
+    if (UBUiStyle::isModern())
+    {
+        paintModernBackground(painter);
+        return;
+    }
+
     // a native glass view of the platform is behind the panel: controls only
     if (hasNativeGlass())
         return;
@@ -434,6 +442,24 @@ void UBFloatingPalette::paintGlassBackground(QPainter& painter)
 }
 
 
+void UBFloatingPalette::paintModernBackground(QPainter& painter)
+{
+    // a solid card in the colours of the theme: no backdrop, the corners are always 8 px
+    const QRectF body = glassRect();
+    const qreal r = UBModernStyle::panelRadius;
+    const qreal dpr = devicePixelRatio();
+
+    if (mShadow.isNull() || mShadow.size() != size() * dpr || mShadowOnDark != mOnDark)
+    {
+        mShadow = UBModernStyle::shadowImage(size(), body, r, dpr, mOnDark);
+        mShadowOnDark = mOnDark;
+    }
+
+    painter.drawImage(QPointF(0, 0), mShadow);
+    UBModernStyle::paintPanel(&painter, body, r, mOnDark);
+}
+
+
 void UBFloatingPalette::setGlassBackdropEnabled(bool enabled)
 {
     mGlassBackdropEnabled = enabled;
@@ -456,7 +482,8 @@ bool UBFloatingPalette::hasNativeGlass() const
 bool UBFloatingPalette::backdropActive() const
 {
     // with native glass the backdrop is still captured: its luminance selects the glyph colours
-    return mGlassBackdropEnabled && parentWidget() && !isWindow();
+    // the modern style has no backdrop: the material follows the theme
+    return UBUiStyle::isGlass() && mGlassBackdropEnabled && parentWidget() && !isWindow();
 }
 
 
@@ -599,7 +626,8 @@ bool UBFloatingPalette::event(QEvent *event)
 
         case QEvent::Show:
             publishGlassGeometry();
-            UBGlassEffect::applyToPanel(this);
+            if (UBUiStyle::isGlass())
+                UBGlassEffect::applyToPanel(this);
             // capture the backdrop before the first paint
             updateBackdrop();
             break;

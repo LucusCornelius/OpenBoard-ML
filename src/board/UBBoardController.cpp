@@ -39,6 +39,7 @@
 #include "board/UBColorPreferencesDialog.h"
 #include "core/UBColorPalette.h"
 #include "gui/UBColorPickerPopup.h"
+#include "gui/UBUiStyle.h"
 #include "board/UBDrawingController.h"
 #include "board/UBFeaturesController.h"
 #include "board/UBShapeToolController.h"
@@ -407,7 +408,8 @@ void UBBoardController::setupToolbar()
 
     // glass look: monochrome theme tinted icons, native window chrome on macOS
     UBGlassStyle::applyIcons(mMainWindow);
-    UBGlassEffect::applyToWindow(mMainWindow);
+    if (UBUiStyle::isGlass())
+        UBGlassEffect::applyToWindow(mMainWindow);
 
     // The pen options live in the floating glass pen panel at the top centre of the board.
     // The actions are unchanged, so shortcuts and drawing controller signals keep working.
