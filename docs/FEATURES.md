@@ -160,7 +160,21 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
   native glass panels on macOS follow the theme.
 * The app runs in a normal resizable window by default (`App/RunInWindow=true`); window
   geometry is remembered. **Full screen**: Ctrl+Shift+F (OpenBoard menu), or the green
-  zoom button on macOS.
+  zoom button on macOS. Connecting or disconnecting a screen does not move the window
+  (it is only brought back when its screen is gone) and does not re-centre the board.
+* **Show on Second Screen** (OpenBoard menu; also Preferences → Display → *Show the board on
+  a second screen or projector*; `App/UseMultiscreenMode`, **off by default**): additionally
+  shows the board full screen on another screen or projector, switched on and off at once.
+  The projection always goes to a screen the window is not on: the control role follows
+  the screen the window is on (also when the window is moved to another screen), the
+  screen list in the preferences gives the order of the other screens. Disabled with one
+  screen.
+* **Desktop** (right cluster): a transparent annotation overlay over the screen the window
+  is on, with a flat glass tool palette (monochrome glyphs), flat pen / marker / eraser
+  palettes (long press) and the flat "Add to" palette after a capture. Every panel on the
+  overlay is part of its shape, so it is visible and clickable; the rest of the screen
+  stays usable with the selector. The board button at the top of the palette returns to
+  the window and the mode the desktop was opened from.
 * The software update check has been removed. Startup hints are off by default and are
   never shown when their files are missing.
 
