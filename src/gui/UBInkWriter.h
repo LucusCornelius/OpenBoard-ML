@@ -22,7 +22,7 @@
 
 #include <QObject>
 #include <QPointer>
-#include <QPolygonF>
+#include <QPainterPath>
 
 #include "domain/UBMathInkLayout.h"
 
@@ -30,8 +30,8 @@ class QWidget;
 class UBInkGhost;
 
 /**
- * Writes laid out maths (see UBMathInkLayout) on the board as real pen strokes:
- * current pen colour and width, one strokes group and one undo step per formula.
+ * Writes typeset maths (see UBMathInkLayout) on the board as filled ink: the glyph
+ * outlines in the current pen colour, one strokes group and one undo step per formula.
  *
  * Placement: beginPlacement() waits for the next press on the board, showing a grey
  * preview of the formula that follows the pointer. The formula is centred on the
@@ -45,11 +45,19 @@ class UBInkWriter : public QObject
         explicit UBInkWriter(QObject* parent = nullptr);
         virtual ~UBInkWriter();
 
-        /** Size of one em on the board, in scene units (from Board/MathInkSizeCm and the grid size). */
-        static qreal emSizeInScene();
+        /** Default, smallest and largest font size of the maths, in points (see docs/MATHS.md). */
+        static constexpr int defaultFontSize = 28;
+        static constexpr int minimumFontSize = 12;
+        static constexpr int maximumFontSize = 96;
 
-        /** The formula as handwriting (smoothed and jittered strokes), in em units. */
-        static QList<QPolygonF> inkStrokes(const UBMathInkLayout::Formula& formula);
+        /** The font size of the maths in points (Board/MathFontSize). */
+        static int fontSize();
+
+        /**
+         * Size of one em on the board, in scene units: the font size in points, with the
+         * centimetre of the page grid (1 pt = 1/72 inch = 2.54/72 cm).
+         */
+        static qreal emSizeInScene();
 
         /** Write the formula on the active scene, centred on the scene position. */
         static bool write(const UBMathInkLayout::Formula& formula, const QPointF& scenePos);
@@ -76,7 +84,7 @@ class UBInkWriter : public QObject
         bool mSwallowRelease{false};
         bool mFilterInstalled{false};
         UBMathInkLayout::Formula mFormula;
-        QList<QPolygonF> mInk;
+        QPainterPath mInk;
         QRectF mInkBounds;
         QPointer<QWidget> mViewport;
         QPointer<UBInkGhost> mGhost;

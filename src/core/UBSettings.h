@@ -390,8 +390,8 @@ class UBSettings : public QObject
         UBSetting* boardShowMathPalette;
         UBSetting* boardMathPalettePosition;
         UBSetting* boardMathPaletteTab;
-        UBSetting* boardMathInkSizeCm;
-        UBSetting* boardMathInkJitter;
+        UBSetting* boardMathFontSize;
+        UBSetting* boardMathDisplayStyle;
 
         QMap<DocumentSizeRatio::Enum, QSize> documentSizes;
 

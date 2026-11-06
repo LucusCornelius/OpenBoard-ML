@@ -29,7 +29,8 @@ HEADERS += src/domain/UBGraphicsScene.h \
     src/domain/UBGraphicsItemZLevelUndoCommand.h \
     src/domain/UBGraphicsShapeItem.h \
     src/domain/UBGraphicsShapeItemDelegate.h \
-    src/domain/UBMathInkLayout.h
+    src/domain/UBMathInkLayout.h \
+    src/domain/UBMathFont.h
 
 SOURCES += src/domain/UBGraphicsScene.cpp \
     src/domain/UBWebEngineView.cpp \
@@ -62,4 +63,5 @@ SOURCES += src/domain/UBGraphicsScene.cpp \
     src/domain/UBGraphicsItemZLevelUndoCommand.cpp \
     src/domain/UBGraphicsShapeItem.cpp \
     src/domain/UBGraphicsShapeItemDelegate.cpp \
-    src/domain/UBMathInkLayout.cpp
+    src/domain/UBMathInkLayout.cpp \
+    src/domain/UBMathFont.cpp

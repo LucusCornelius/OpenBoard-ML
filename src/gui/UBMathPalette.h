@@ -34,9 +34,9 @@ class QToolButton;
 class UBInkWriter;
 
 /**
- * Floating palette that writes maths notation on the board as handwriting:
+ * Floating palette that writes typeset maths notation on the board:
  * tapping a symbol (root, integral, sum, limit, fraction, Greek letter, ...) and then
- * the board draws it there with pen strokes in the current pen colour and width.
+ * the board writes it there as ink in the current pen colour (Latin Modern Math, TeX rules).
  * The "ink text" field writes a whole formula typed with a simple syntax
  * (see UBMathInkLayout), e.g. f(x) = x^2 + 1/(x-1).
  */
@@ -71,7 +71,8 @@ class UBMathPalette : public UBFloatingPalette
     private slots:
         void templateButtonClicked();
         void inkTextEntered();
-        void sizeChanged(int halfCentimetres);
+        void sizeChanged(int index);
+        void displayStyleToggled(bool display);
         void pageSelected(int index);
         void placementStarted();
         void placementFinished(bool written);
@@ -91,6 +92,8 @@ class UBMathPalette : public UBFloatingPalette
 
         static QList<MathPage> buildPages();
         QToolButton* createTemplateButton(const MathTemplate& tmpl, QWidget* parent);
+        void updateTemplateButton(int index);
+        static bool displayStyle();
         void placeInsideParent();
         void updatePageSize();
         void showHint(const QString& text = QString());
@@ -103,6 +106,8 @@ class UBMathPalette : public UBFloatingPalette
         QLabel* mHint{nullptr};
         UBInkWriter* mWriter{nullptr};
         QList<UBMathInkLayout::Formula> mFormulas;
+        QList<QToolButton*> mTemplateButtons;
+        QStringList mTemplateSources;
         QPointer<QToolButton> mActiveButton;
         QPoint mPreferredPos;
         bool mHasPreferredPos{false};

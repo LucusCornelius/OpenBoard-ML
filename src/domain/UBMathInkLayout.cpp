@@ -19,423 +19,971 @@
 
 #include "UBMathInkLayout.h"
 
+#include <algorithm>
+#include <vector>
+
 #include <QCoreApplication>
-#include <QDebug>
-#include <QFile>
 #include <QHash>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QLineF>
 #include <QTransform>
-#include <QtMath>
+
+#include "domain/UBMathFont.h"
 
 #include "core/memcheck.h"
 
 namespace
 {
-    // -------------------------------------------------------------------- glyph library
-
-    struct GlyphDef
+    const UBMathFont& mathFont()
     {
-        qreal advance{0};
-        QList<QPolygonF> strokes;
-        QRectF bounds;
-    };
-
-    struct Library
-    {
-        bool loaded{false};
-        qreal axis{0.23};
-        QHash<QChar, GlyphDef> glyphs;
-    };
-
-    Library loadLibrary()
-    {
-        Library lib;
-        QFile file(":/math/inkGlyphs.json");
-
-        if (!file.open(QIODevice::ReadOnly))
-        {
-            qWarning() << "UBMathInkLayout: cannot open the glyph library" << file.fileName();
-            return lib;
-        }
-
-        const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
-        const QJsonObject metrics = root.value("metrics").toObject();
-        lib.axis = metrics.value("axis").toDouble(0.23);
-
-        const QJsonObject glyphs = root.value("glyphs").toObject();
-
-        for (auto it = glyphs.constBegin(); it != glyphs.constEnd(); ++it)
-        {
-            const QString key = it.key();
-
-            if (key.size() != 1)
-            {
-                continue;
-            }
-
-            const QJsonObject glyph = it.value().toObject();
-            GlyphDef def;
-            def.advance = glyph.value("w").toDouble();
-
-            for (const QJsonValue& strokeValue : glyph.value("s").toArray())
-            {
-                const QJsonArray coordinates = strokeValue.toArray();
-                QPolygonF stroke;
-
-                for (int i = 0; i + 1 < coordinates.size(); i += 2)
-                {
-                    stroke << QPointF(coordinates.at(i).toDouble(), coordinates.at(i + 1).toDouble());
-                }
-
-                if (stroke.size() >= 2)
-                {
-                    def.strokes << stroke;
-                    def.bounds = def.bounds.isNull() ? stroke.boundingRect() : def.bounds.united(stroke.boundingRect());
-                }
-            }
-
-            lib.glyphs.insert(key.at(0), def);
-        }
-
-        lib.loaded = !lib.glyphs.isEmpty();
-        return lib;
+        return UBMathFont::font();
     }
 
-    const Library& library()
+    const UBMathFont::Constants& constants()
     {
-        static const Library lib = loadLibrary();
-        return lib;
+        return UBMathFont::font().constants();
+    }
+
+    // -------------------------------------------------------------------- atoms and styles
+
+    /** The TeX atom classes, they decide the spacing (The TeXbook, chapter 17 and 18). */
+    enum class Atom
+    {
+        Ord, Op, Bin, Rel, Open, Close, Punct, Inner
+    };
+
+    /**
+     * Space between two atoms (The TeXbook, p. 170): 0 none, 1 thin (3 mu), 2 medium (4 mu),
+     * 3 thick (5 mu); negative values only in display and text style, not in scripts.
+     * 1 mu = 1/18 em of the current style.
+     */
+    const int sSpacing[8][8] = {
+        //  Ord  Op  Bin  Rel Open Close Punct Inner
+        {   0,   1,  -2,  -3,  0,   0,    0,   -1 },  // Ord
+        {   1,   1,   0,  -3,  0,   0,    0,   -1 },  // Op
+        {  -2,  -2,   0,   0, -2,   0,    0,   -2 },  // Bin
+        {  -3,  -3,   0,   0, -3,   0,    0,   -3 },  // Rel
+        {   0,   0,   0,   0,  0,   0,    0,    0 },  // Open
+        {   0,   1,  -2,  -3,  0,   0,    0,   -1 },  // Close
+        {  -1,  -1,   0,  -1, -1,  -1,   -1,   -1 },  // Punct
+        {  -1,   1,  -2,  -3, -1,   0,   -1,   -1 }   // Inner
+    };
+
+    /** \nulldelimiterspace of plain TeX: 1.2 pt at 10 pt, on both sides of a fraction. */
+    const qreal sNullDelimiterSpace = 0.12;
+
+    /** \delimiterfactor 901 and \delimitershortfall 5 pt of plain TeX (rule 19). */
+    const qreal sDelimiterFactor = 0.901;
+    const qreal sDelimiterShortfall = 0.5;
+
+    /** TeX styles: display, text, script, scriptscript, each normal or cramped. */
+    struct Style
+    {
+        int level{0};
+        bool cramped{false};
+
+        qreal size() const
+        {
+            return level <= 1 ? 1.0 : (level == 2 ? constants().scriptScale : constants().scriptScriptScale);
+        }
+
+        int scriptLevel() const { return qMax(0, level - 1); }
+        bool isDisplay() const { return level == 0; }
+        bool isScript() const { return level >= 2; }
+        Style superscript() const { return Style{level <= 1 ? 2 : 3, cramped}; }
+        Style subscript() const { return Style{level <= 1 ? 2 : 3, true}; }
+        Style numerator() const { return Style{level == 0 ? 1 : (level == 1 ? 2 : 3), cramped}; }
+        Style denominator() const { return Style{numerator().level, true}; }
+        Style crampedStyle() const { return Style{level, true}; }
+    };
+
+    qreal spaceBetween(Atom left, Atom right, const Style& style)
+    {
+        const int code = sSpacing[int(left)][int(right)];
+
+        if (code == 0 || (code < 0 && style.isScript()))
+        {
+            return 0;
+        }
+
+        return (2 + qAbs(code)) / 18.0 * style.size();
     }
 
     // -------------------------------------------------------------------- boxes
 
-    const qreal sPlaceholderWidth = 0.6;
-    const qreal sScriptScale = 0.62;
-    const qreal sOperatorPadding = 0.08;
-
-    /** A laid out piece of a formula. Coordinates in em, y axis down, origin at the left end of the baseline. */
+    /** A laid out piece of a formula. Units em, y axis down, origin at the left end of the baseline. */
     struct Box
     {
         qreal width{0};
         qreal ascent{0};
         qreal descent{0};
-        QList<UBMathInkLayout::Glyph> glyphs;
+        qreal italic{0};
+        qreal size{1};
+        quint32 glyph{0};
+        bool character{false};
+        bool largeOperator{false};
+        QList<QPainterPath> shapes;
         QList<QRectF> placeholders;
 
-        qreal height() const { return ascent + descent; }
-
-        /** Place another box with its baseline origin at (x, y), scaled. */
-        void place(const Box& other, qreal x, qreal y, qreal scale = 1.0)
+        /** Place another box with its baseline origin at (x, y). The result is a composite box. */
+        void place(const Box& other, qreal x, qreal y)
         {
-            QTransform transform;
-            transform.translate(x, y);
-            transform.scale(scale, scale);
+            const QTransform transform = QTransform::fromTranslate(x, y);
 
-            for (const UBMathInkLayout::Glyph& glyph : other.glyphs)
+            for (const QPainterPath& shape : other.shapes)
             {
-                UBMathInkLayout::Glyph copy;
-
-                for (const QPolygonF& stroke : glyph.strokes)
-                {
-                    copy.strokes << transform.map(stroke);
-                }
-
-                copy.box = transform.mapRect(glyph.box);
-                glyphs << copy;
+                shapes << transform.map(shape);
             }
 
             for (const QRectF& rect : other.placeholders)
             {
-                placeholders << transform.mapRect(rect);
+                placeholders << rect.translated(x, y);
             }
 
-            width = qMax(width, x + other.width * scale);
-            ascent = qMax(ascent, other.ascent * scale - y);
-            descent = qMax(descent, other.descent * scale + y);
+            width = qMax(width, x + other.width);
+            ascent = qMax(ascent, other.ascent - y);
+            descent = qMax(descent, other.descent + y);
+            character = false;
+            largeOperator = false;
         }
 
-        /** Append another box on the right, on the same baseline. */
         void append(const Box& other, qreal gap = 0)
         {
             place(other, width + gap, 0);
         }
 
-        /** Add a structural stroke (fraction bar, vinculum, arrow) as its own symbol. */
-        void addStrokes(const QList<QPolygonF>& strokes)
+        /** A rule (fraction bar, vinculum). */
+        void addRule(const QRectF& rect)
         {
-            UBMathInkLayout::Glyph glyph;
-            glyph.strokes = strokes;
-
-            for (const QPolygonF& stroke : strokes)
-            {
-                glyph.box = glyph.box.isNull() ? stroke.boundingRect() : glyph.box.united(stroke.boundingRect());
-            }
-
-            glyphs << glyph;
-            ascent = qMax(ascent, -glyph.box.top());
-            descent = qMax(descent, glyph.box.bottom());
-            width = qMax(width, glyph.box.right());
+            QPainterPath path;
+            path.setFillRule(Qt::WindingFill);
+            path.addRect(rect);
+            shapes << path;
+            ascent = qMax(ascent, -rect.top());
+            descent = qMax(descent, rect.bottom());
+            width = qMax(width, rect.right());
         }
     };
 
-    Box glyphBox(QChar c, const QTransform& extra = QTransform())
+    /** A single glyph at the size of the style (script style alternates if the font has them). */
+    Box glyphBox(quint32 glyph, const Style& style, bool scriptAlternate = true)
     {
+        const qreal s = style.size();
+        const quint32 g = scriptAlternate ? mathFont().scriptGlyph(glyph, style.scriptLevel()) : glyph;
+        const QPainterPath outline = mathFont().path(g);
+
         Box box;
-        const auto it = library().glyphs.constFind(c);
+        box.width = mathFont().advance(g) * s;
+        box.italic = mathFont().italicCorrection(g) * s;
+        box.size = s;
+        box.glyph = g;
+        box.character = true;
 
-        if (it == library().glyphs.constEnd())
+        if (!outline.isEmpty())
         {
-            return box;
+            const QRectF ink = outline.boundingRect();
+            box.shapes << QTransform::fromScale(s, s).map(outline);
+            box.ascent = -ink.top() * s;
+            box.descent = ink.bottom() * s;
         }
 
-        UBMathInkLayout::Glyph glyph;
-
-        for (const QPolygonF& stroke : it->strokes)
-        {
-            glyph.strokes << extra.map(stroke);
-        }
-
-        glyph.box = extra.mapRect(it->bounds);
-        box.glyphs << glyph;
-        box.width = it->advance;
-        box.ascent = qMax(0., -glyph.box.top());
-        box.descent = qMax(0., glyph.box.bottom());
         return box;
     }
 
-    Box textBox(const QString& text)
+    /** Centre a box vertically on the maths axis (delimiters, big operators). */
+    Box centredOnAxis(const Box& box, const Style& style)
+    {
+        const qreal axis = constants().axisHeight * style.size();
+        Box result;
+        result.place(box, 0, -axis - (box.descent - box.ascent) / 2);
+        result.italic = box.italic;
+        result.largeOperator = box.largeOperator;
+        return result;
+    }
+
+    /** A glyph built from the parts of a glyph assembly (OpenType MATH), at least `target` high or wide. */
+    Box assemblyBox(const QList<UBMathFont::Part>& parts, qreal target, const Style& style, bool vertical)
+    {
+        const qreal s = style.size();
+        const qreal minOverlap = mathFont().minConnectorOverlap();
+        QList<UBMathFont::Part> list;
+
+        for (int repeats = 0; repeats < 64; ++repeats)
+        {
+            list.clear();
+
+            for (const UBMathFont::Part& part : parts)
+            {
+                for (int i = 0; i < (part.extender ? repeats : 1); ++i)
+                {
+                    list << part;
+                }
+            }
+
+            qreal full = 0;
+
+            for (const UBMathFont::Part& part : list)
+            {
+                full += part.fullAdvance;
+            }
+
+            if (list.size() > 0 && (full - (list.size() - 1) * minOverlap) * s >= target)
+            {
+                break;
+            }
+        }
+
+        if (list.isEmpty())
+        {
+            return Box();
+        }
+
+        // the largest possible overlap of each connection, then shrink them evenly to reach the target
+        QList<qreal> maxOverlaps;
+        qreal full = list.first().fullAdvance;
+        qreal shrinkable = 0;
+
+        for (int i = 1; i < list.size(); ++i)
+        {
+            const qreal overlap = qMax(minOverlap, qMin(list.at(i - 1).endConnector, list.at(i).startConnector));
+            maxOverlaps << overlap;
+            full += list.at(i).fullAdvance - overlap;
+            shrinkable += overlap - minOverlap;
+        }
+
+        const qreal needed = target / s - full;
+        const qreal t = shrinkable > 0 ? qBound(0.0, needed / shrinkable, 1.0) : 0;
+
+        Box box;
+        qreal offset = 0;
+
+        for (int i = 0; i < list.size(); ++i)
+        {
+            if (i > 0)
+            {
+                const qreal overlap = maxOverlaps.at(i - 1) - t * (maxOverlaps.at(i - 1) - minOverlap);
+                offset += list.at(i - 1).fullAdvance - overlap;
+            }
+
+            const Box part = glyphBox(list.at(i).glyph, style, false);
+
+            if (vertical)
+            {
+                // stacked bottom to top, each glyph with its ink bottom at the offset
+                const QRectF ink = mathFont().inkBounds(list.at(i).glyph);
+                box.place(part, 0, -offset * s - ink.bottom() * s);
+            }
+            else
+            {
+                // left to right, each glyph with its origin at the offset
+                box.place(part, offset * s, 0);
+            }
+        }
+
+        // one shape: the overlapping parts are filled as one, without seams
+        QPainterPath joined;
+        joined.setFillRule(Qt::WindingFill);
+
+        for (const QPainterPath& shape : box.shapes)
+        {
+            joined.addPath(shape);
+        }
+
+        box.shapes = {joined};
+        return box;
+    }
+
+    /** The smallest variant of a glyph that is at least `target` high (or wide), else an assembly. */
+    Box stretchedGlyph(quint32 glyph, qreal target, const Style& style, bool vertical = true)
+    {
+        const qreal s = style.size();
+        const QList<UBMathFont::Variant> variants = mathFont().variants(glyph, vertical);
+
+        for (const UBMathFont::Variant& variant : variants)
+        {
+            if (variant.size * s >= target)
+            {
+                return glyphBox(variant.glyph, style, variant.glyph == glyph);
+            }
+        }
+
+        const QList<UBMathFont::Part> parts = mathFont().assembly(glyph, vertical);
+
+        if (!parts.isEmpty())
+        {
+            return assemblyBox(parts, target, style, vertical);
+        }
+
+        return glyphBox(variants.isEmpty() ? glyph : variants.last().glyph, style, false);
+    }
+
+    /** A delimiter for content of the given extent, centred on the axis (TeX rule 19). */
+    Box delimiterBox(char32_t c, qreal ascent, qreal descent, const Style& style)
+    {
+        const quint32 glyph = mathFont().glyph(c);
+
+        if (!glyph)
+        {
+            return Box();
+        }
+
+        const qreal axis = constants().axisHeight * style.size();
+        const qreal delta = qMax(ascent - axis, descent + axis);
+        const qreal target = qMax(2 * delta * sDelimiterFactor, 2 * delta - sDelimiterShortfall * style.size());
+        return centredOnAxis(stretchedGlyph(glyph, target, style), style);
+    }
+
+    Box placeholderBox(const Style& style)
+    {
+        const qreal s = style.size();
+        Box box;
+        box.width = 0.6 * s;
+        box.ascent = 0.68 * s;
+        box.descent = 0.02 * s;
+        box.placeholders << QRectF(0.05 * s, -0.68 * s, 0.5 * s, 0.7 * s);
+        return box;
+    }
+
+    /** A fraction (TeX rule 15, OpenType fraction constants). */
+    Box fractionBox(const Box& numerator, const Box& denominator, const Style& style)
+    {
+        const UBMathFont::Constants& k = constants();
+        const qreal s = style.size();
+        const qreal axis = k.axisHeight * s;
+        const qreal rule = k.fractionRuleThickness * s;
+        qreal shiftUp = (style.isDisplay() ? k.fractionNumeratorDisplayStyleShiftUp : k.fractionNumeratorShiftUp) * s;
+        qreal shiftDown = (style.isDisplay() ? k.fractionDenominatorDisplayStyleShiftDown : k.fractionDenominatorShiftDown) * s;
+        const qreal numeratorGap = (style.isDisplay() ? k.fractionNumDisplayStyleGapMin : k.fractionNumeratorGapMin) * s;
+        const qreal denominatorGap = (style.isDisplay() ? k.fractionDenomDisplayStyleGapMin : k.fractionDenominatorGapMin) * s;
+
+        shiftUp = qMax(shiftUp, axis + rule / 2 + numeratorGap + numerator.descent);
+        shiftDown = qMax(shiftDown, denominatorGap + rule / 2 - axis + denominator.ascent);
+
+        const qreal width = qMax(numerator.width, denominator.width);
+        const qreal pad = sNullDelimiterSpace;
+
+        Box box;
+        box.place(numerator, pad + (width - numerator.width) / 2, -shiftUp);
+        box.place(denominator, pad + (width - denominator.width) / 2, shiftDown);
+        box.addRule(QRectF(pad, -axis - rule / 2, width, rule));
+        box.width = width + 2 * pad;
+        return box;
+    }
+
+    /** A square root (TeX rule 11, OpenType radical constants). */
+    Box radicalBox(const Box& content, const Style& style)
+    {
+        const UBMathFont::Constants& k = constants();
+        const qreal s = style.size();
+        const qreal rule = k.radicalRuleThickness * s;
+        qreal gap = (style.isDisplay() ? k.radicalDisplayStyleVerticalGap : k.radicalVerticalGap) * s;
+        const qreal target = content.ascent + content.descent + gap + rule;
+
+        const Box radical = stretchedGlyph(mathFont().glyph(0x221A), target, style);
+        const qreal height = radical.ascent + radical.descent;
+
+        if (height > target)
+        {
+            // TeX: the clearance gets half of the excess
+            gap += (height - target) / 2;
+        }
+
+        const qreal ruleTop = content.ascent + gap + rule;
+
+        // the sign and its vinculum are one shape: the rule overlaps the end of the sign and
+        // runs in the direction of the outline of the sign, so that the overlap stays filled
+        const qreal x = radical.width;
+        Box sign;
+        sign.place(radical, 0, radical.ascent - ruleTop);
+        QPainterPath joined;
+        joined.setFillRule(Qt::WindingFill);
+        qreal orientation = 0;
+
+        for (const QPainterPath& shape : sign.shapes)
+        {
+            joined.addPath(shape);
+
+            for (const QPolygonF& contour : shape.toSubpathPolygons())
+            {
+                qreal area = 0;
+
+                for (int i = 0; i < contour.size(); ++i)
+                {
+                    const QPointF& p = contour.at(i);
+                    const QPointF& q = contour.at((i + 1) % contour.size());
+                    area += p.x() * q.y() - q.x() * p.y();
+                }
+
+                if (qAbs(area) > qAbs(orientation))
+                {
+                    orientation = area;
+                }
+            }
+        }
+
+        const QRectF bar(x - rule / 4, -ruleTop, content.width + rule / 4, rule);
+        QPolygonF barOutline({bar.topLeft(), bar.topRight(), bar.bottomRight(), bar.bottomLeft()});
+
+        if (orientation < 0)
+        {
+            std::reverse(barOutline.begin(), barOutline.end());
+        }
+
+        joined.addPolygon(barOutline);
+        joined.closeSubpath();
+        sign.shapes = {joined};
+        sign.ascent = qMax(sign.ascent, ruleTop);
+        sign.width = qMax(sign.width, bar.right());
+
+        Box box;
+        box.place(sign, 0, 0);
+        box.place(content, x, 0);
+        box.ascent = qMax(box.ascent, ruleTop + k.radicalExtraAscender * s);
+        return box;
+    }
+
+    /** An accent over a box (TeX rule 12), used for the vector arrow. */
+    Box accentBox(const Box& base, char32_t accent, const Style& style)
+    {
+        const quint32 glyph = mathFont().glyph(accent);
+
+        if (!glyph)
+        {
+            return base;
+        }
+
+        const qreal s = style.size();
+        const Box mark = stretchedGlyph(glyph, base.width * 0.9, style, false);
+        const qreal delta = qMin(base.ascent, constants().accentBaseHeight * s);
+        const qreal shiftUp = base.ascent - delta;
+
+        qreal baseAttachment = base.width / 2;
+
+        if (base.character && mathFont().topAccentAttachment(base.glyph) >= 0)
+        {
+            baseAttachment = mathFont().topAccentAttachment(base.glyph) * base.size;
+        }
+
+        QRectF markInk;
+
+        for (const QPainterPath& shape : mark.shapes)
+        {
+            markInk = markInk.united(shape.boundingRect());
+        }
+
+        qreal markAttachment = markInk.center().x();
+
+        if (mathFont().topAccentAttachment(mark.glyph) >= 0 && mark.character)
+        {
+            markAttachment = mathFont().topAccentAttachment(mark.glyph) * mark.size;
+        }
+
+        Box box;
+        box.place(base, 0, 0);
+        box.place(mark, baseAttachment - markAttachment, -shiftUp);
+        box.width = base.width;
+        return box;
+    }
+
+    /** Superscript and subscript (TeX rule 18, OpenType script constants). */
+    Box scriptsBox(const Box& base, const Box* superscript, const Box* subscript, const Style& style)
+    {
+        const UBMathFont::Constants& k = constants();
+        const qreal s = style.size();
+        // TeX rule 18a: a character base uses the standard shifts only, any other base (also a
+        // big operator, which became a box centred on the axis) drops the scripts from its edges
+        qreal shiftUp = base.character ? 0 : base.ascent - k.superscriptBaselineDropMax * s;
+        qreal shiftDown = base.character ? 0 : base.descent + k.subscriptBaselineDropMin * s;
+
+        // big operators include the italic correction in their advance
+        const qreal italic = base.character || base.largeOperator ? base.italic : 0;
+        const qreal superscriptX = base.largeOperator ? base.width : base.width + italic;
+        const qreal subscriptX = base.largeOperator ? base.width - italic : base.width;
+
+        if (superscript)
+        {
+            shiftUp = qMax(shiftUp, (style.cramped ? k.superscriptShiftUpCramped : k.superscriptShiftUp) * s);
+            shiftUp = qMax(shiftUp, superscript->descent + k.superscriptBottomMin * s);
+        }
+
+        if (subscript)
+        {
+            shiftDown = qMax(shiftDown, k.subscriptShiftDown * s);
+
+            if (!superscript)
+            {
+                shiftDown = qMax(shiftDown, subscript->ascent - k.subscriptTopMax * s);
+            }
+        }
+
+        if (superscript && subscript)
+        {
+            const qreal gap = (shiftUp - superscript->descent) - (subscript->ascent - shiftDown);
+
+            if (gap < k.subSuperscriptGapMin * s)
+            {
+                shiftDown += k.subSuperscriptGapMin * s - gap;
+                const qreal psi = k.superscriptBottomMaxWithSubscript * s - (shiftUp - superscript->descent);
+
+                if (psi > 0)
+                {
+                    shiftUp += psi;
+                    shiftDown -= psi;
+                }
+            }
+        }
+
+        Box box;
+        box.place(base, 0, 0);
+        qreal right = base.width;
+
+        if (superscript)
+        {
+            box.place(*superscript, superscriptX, -shiftUp);
+            right = qMax(right, superscriptX + superscript->width);
+        }
+
+        if (subscript)
+        {
+            box.place(*subscript, subscriptX, shiftDown);
+            right = qMax(right, subscriptX + subscript->width);
+        }
+
+        box.width = right + k.spaceAfterScript * s;
+        return box;
+    }
+
+    /** Limits above and below a big operator or lim in display style (TeX rule 13a). */
+    Box limitsBox(const Box& base, const Box* upper, const Box* lower, const Style& style)
+    {
+        const UBMathFont::Constants& k = constants();
+        const qreal s = style.size();
+        const qreal italic = base.italic;
+        qreal width = base.width;
+
+        if (upper)
+        {
+            width = qMax(width, upper->width);
+        }
+
+        if (lower)
+        {
+            width = qMax(width, lower->width);
+        }
+
+        Box box;
+        box.place(base, (width - base.width) / 2, 0);
+
+        if (upper)
+        {
+            const qreal rise = qMax(k.upperLimitBaselineRiseMin * s, k.upperLimitGapMin * s + upper->descent);
+            box.place(*upper, (width - upper->width + italic) / 2, -base.ascent - rise);
+        }
+
+        if (lower)
+        {
+            const qreal drop = qMax(k.lowerLimitBaselineDropMin * s, k.lowerLimitGapMin * s + lower->ascent);
+            box.place(*lower, (width - lower->width - italic) / 2, base.descent + drop);
+        }
+
+        box.width = width;
+        return box;
+    }
+
+    // -------------------------------------------------------------------- characters
+
+    /** Variables and lower case Greek are italic (Unicode mathematical italic letters). */
+    char32_t mathItalic(char32_t c)
+    {
+        char32_t italic = c;
+
+        if (c >= 'a' && c <= 'z')
+        {
+            italic = c == 'h' ? 0x210E : 0x1D44E + (c - 'a');
+        }
+        else if (c >= 'A' && c <= 'Z')
+        {
+            italic = 0x1D434 + (c - 'A');
+        }
+        else if (c >= 0x3B1 && c <= 0x3C9)
+        {
+            italic = 0x1D6FC + (c - 0x3B1);
+        }
+        else
+        {
+            static const QHash<char32_t, char32_t> variants = {
+                {0x3F5, 0x1D716}, {0x3D1, 0x1D717}, {0x3F0, 0x1D718},
+                {0x3D5, 0x1D719}, {0x3F1, 0x1D71A}, {0x3D6, 0x1D71B}
+            };
+            italic = variants.value(c, c);
+        }
+
+        return mathFont().glyph(italic) ? italic : c;
+    }
+
+    Atom atomOf(char32_t c)
+    {
+        static const QHash<char32_t, Atom> atoms = []() {
+            QHash<char32_t, Atom> t;
+
+            for (char32_t b : {U'+', U'−', U'±', U'∓', U'×', U'÷', U'·', U'⋅',
+                               U'∪', U'∩', U'∘', U'∗', U'⊕', U'⊗', U'∧', U'∨', U'∖'})
+            {
+                t.insert(b, Atom::Bin);
+            }
+
+            for (char32_t r : {U'=', U'<', U'>', U':', U'≠', U'≈', U'≡', U'≤', U'≥', U'→',
+                               U'←', U'↔', U'⇒', U'⇐', U'⇔', U'↦', U'∈', U'∉',
+                               U'∋', U'⊂', U'⊃', U'⊆', U'⊇', U'∼', U'≃', U'≅',
+                               U'∝', U'⊥', U'∥', U'≪', U'≫'})
+            {
+                t.insert(r, Atom::Rel);
+            }
+
+            for (char32_t o : {U'(', U'[', U'{', U'⟨', U'⌊', U'⌈'})
+            {
+                t.insert(o, Atom::Open);
+            }
+
+            for (char32_t o : {U')', U']', U'}', U'⟩', U'⌋', U'⌉', U'!'})
+            {
+                t.insert(o, Atom::Close);
+            }
+
+            t.insert(',', Atom::Punct);
+            t.insert(';', Atom::Punct);
+
+            for (char32_t o : {U'∑', U'∏', U'∫', U'∬', U'∭', U'∮', U'⋃', U'⋂'})
+            {
+                t.insert(o, Atom::Op);
+            }
+
+            return t;
+        }();
+
+        return atoms.value(c, Atom::Ord);
+    }
+
+    bool isBigOperator(char32_t c)
+    {
+        return c == 0x2211 || c == 0x220F || c == 0x222B || c == 0x222C || c == 0x222D || c == 0x222E;
+    }
+
+    /** Sums and products take their limits above and below in display style, integrals at the side. */
+    bool takesLimits(char32_t c)
+    {
+        return c == 0x2211 || c == 0x220F;
+    }
+
+    // -------------------------------------------------------------------- formula tree
+
+    enum class Kind
+    {
+        Glyph,          // one character
+        Word,           // function name, upright
+        Differential,   // d followed by a variable
+        Row,            // a sequence
+        Fenced,         // a sequence between delimiters that grow with it
+        Fraction,
+        Scripts,        // base with superscript and/or subscript
+        BigOperator,
+        Limit,          // lim, max, min
+        Radical,
+        Vector,
+        Placeholder
+    };
+
+    struct Node
+    {
+        Kind kind{Kind::Row};
+        char32_t character{0};
+        char32_t close{0};
+        QString text;
+        bool transparentAtoms{false};
+        qreal quadsBefore{0};
+        std::vector<Node> items;
+        std::vector<Node> superscript;
+        std::vector<Node> subscript;
+    };
+
+    Node glyphNode(char32_t c)
+    {
+        Node node;
+        node.kind = Kind::Glyph;
+        node.character = c;
+        return node;
+    }
+
+    Node rowNode(std::vector<Node> items = {})
+    {
+        Node node;
+        node.kind = Kind::Row;
+        node.items = std::move(items);
+        return node;
+    }
+
+    struct Laid
+    {
+        Box box;
+        Atom left{Atom::Ord};
+        Atom right{Atom::Ord};
+        bool differential{false};
+    };
+
+    Box layoutRow(const std::vector<Node>& items, const Style& style);
+    Laid layoutNode(const Node& node, const Style& style);
+
+    Box wordBox(const QString& text, const Style& style)
     {
         Box box;
 
         for (const QChar c : text)
         {
-            box.append(glyphBox(c));
+            box.append(glyphBox(mathFont().glyph(c.unicode()), style));
         }
 
         return box;
     }
 
-    Box placeholderBox()
+    Box bigOperatorBox(char32_t c, const Style& style)
     {
-        Box box;
-        box.width = sPlaceholderWidth;
-        box.ascent = 0.6;
-        box.descent = 0.04;
-        box.placeholders << QRectF(0.05, -0.6, sPlaceholderWidth - 0.1, 0.64);
-        return box;
-    }
+        const quint32 glyph = mathFont().glyph(c);
+        Box op;
 
-    Box spaceBox(qreal width)
-    {
-        Box box;
-        box.width = width;
-        return box;
-    }
-
-    /** A fence ( ) [ ] | { } stretched vertically to enclose content of the given extent. */
-    Box fenceBox(QChar c, qreal ascent, qreal descent)
-    {
-        const auto it = library().glyphs.constFind(c);
-
-        if (it == library().glyphs.constEnd())
+        if (style.isDisplay())
         {
-            return Box();
-        }
-
-        const qreal top = -(ascent + 0.06);
-        const qreal bottom = descent + 0.06;
-        const QRectF bounds = it->bounds;
-        QTransform transform;
-
-        if (top < bounds.top() || bottom > bounds.bottom())
-        {
-            const qreal newTop = qMin(top, bounds.top());
-            const qreal newBottom = qMax(bottom, bounds.bottom());
-            const qreal sy = (newBottom - newTop) / bounds.height();
-            transform.translate(0, newTop);
-            transform.scale(1.0, sy);
-            transform.translate(0, -bounds.top());
-        }
-
-        return glyphBox(c, transform);
-    }
-
-    Box fractionBox(const Box& numerator, const Box& denominator)
-    {
-        const qreal scale = 0.9;
-        const qreal axis = library().axis;
-        const qreal gap = 0.1;
-        const qreal side = 0.05;
-        const qreal barWidth = qMax(numerator.width, denominator.width) * scale + 0.12;
-
-        Box box;
-        box.place(numerator, side + (barWidth - numerator.width * scale) / 2,
-                  -axis - gap - numerator.descent * scale, scale);
-        box.place(denominator, side + (barWidth - denominator.width * scale) / 2,
-                  -axis + gap + denominator.ascent * scale, scale);
-        box.addStrokes({QPolygonF({QPointF(side, -axis), QPointF(side + barWidth, -axis)})});
-        box.width = barWidth + 2 * side;
-        return box;
-    }
-
-    Box sqrtBox(const Box& content)
-    {
-        const qreal top = qMax(content.ascent, 0.42) + 0.1;
-        const qreal bottom = qMax(content.descent, 0.0);
-        const qreal height = top + bottom;
-        const qreal tickY = bottom - qMin(height * 0.42, 0.3);
-
-        QPolygonF radical;
-        radical << QPointF(0.02, tickY)
-                << QPointF(0.09, tickY - 0.05)
-                << QPointF(0.19, bottom);
-        const qreal riseX = 0.19 + qMax(0.14, 0.24 * height);
-        radical << QPointF(riseX, -top);
-
-        const qreal contentX = riseX + 0.05;
-        radical << QPointF(contentX + content.width + 0.05, -top);
-
-        Box box;
-        box.place(content, contentX, 0);
-        box.addStrokes({radical});
-        box.width = contentX + content.width + 0.1;
-        return box;
-    }
-
-    Box vectorBox(const Box& content)
-    {
-        const qreal y = -(qMax(content.ascent, 0.42) + 0.1);
-        const qreal start = 0.02;
-        const qreal end = qMax(content.width, 0.32) - 0.02;
-        const qreal head = 0.07;
-
-        Box box;
-        box.place(content, 0, 0);
-        box.addStrokes({QPolygonF({QPointF(start, y), QPointF(end, y)}),
-                        QPolygonF({QPointF(end - head, y - head * 0.7), QPointF(end, y), QPointF(end - head, y + head * 0.7)})});
-        box.width = qMax(content.width, 0.32);
-        return box;
-    }
-
-    Box scriptsBox(const Box& base, const Box* superscript, const Box* subscript)
-    {
-        Box box = base;
-        const qreal x = base.width - 0.01;
-
-        if (superscript)
-        {
-            const qreal shift = qMax(0.3, base.ascent * 0.72);
-            box.place(*superscript, x, -shift, sScriptScale);
-        }
-
-        if (subscript)
-        {
-            const qreal shift = qMax(0.13, base.descent * 0.5);
-            box.place(*subscript, x, shift, sScriptScale);
-        }
-
-        box.width += 0.03;
-        return box;
-    }
-
-    enum class BigOpKind
-    {
-        Integral,
-        Sum
-    };
-
-    /** A big operator (integral, sum, product) with optional bounds. */
-    Box bigOperatorBox(QChar op, BigOpKind kind, const Box* lower, const Box* upper)
-    {
-        const qreal axis = library().axis;
-        const qreal scale = kind == BigOpKind::Integral ? 1.3 : 1.15;
-        const Box symbol = glyphBox(op);
-
-        if (symbol.glyphs.isEmpty())
-        {
-            return Box();
-        }
-
-        // centre the symbol on the maths axis
-        const QRectF bounds = symbol.glyphs.first().box;
-        const qreal dy = -axis - bounds.center().y() * scale;
-
-        Box opBox;
-        opBox.place(symbol, 0, dy, scale);
-        const qreal opTop = -opBox.ascent;
-        const qreal opBottom = opBox.descent;
-        const qreal opWidth = opBox.width;
-
-        Box box;
-
-        if (kind == BigOpKind::Integral)
-        {
-            box.place(opBox, 0, 0);
-
-            if (upper)
-            {
-                box.place(*upper, opWidth * 0.95, opTop + upper->ascent * sScriptScale, sScriptScale);
-            }
-
-            if (lower)
-            {
-                box.place(*lower, opWidth * 0.55, opBottom + 0.06, sScriptScale);
-            }
+            op = stretchedGlyph(glyph, constants().displayOperatorMinHeight, style);
         }
         else
         {
-            qreal width = opWidth;
-
-            if (upper)
-            {
-                width = qMax(width, upper->width * sScriptScale);
-            }
-
-            if (lower)
-            {
-                width = qMax(width, lower->width * sScriptScale);
-            }
-
-            box.place(opBox, (width - opWidth) / 2, 0);
-
-            if (upper)
-            {
-                box.place(*upper, (width - upper->width * sScriptScale) / 2,
-                          opTop - 0.06 - upper->descent * sScriptScale, sScriptScale);
-            }
-
-            if (lower)
-            {
-                box.place(*lower, (width - lower->width * sScriptScale) / 2,
-                          opBottom + 0.06 + lower->ascent * sScriptScale, sScriptScale);
-            }
+            op = glyphBox(glyph, style);
         }
 
-        box.width += 0.06;
+        Box box = centredOnAxis(op, style);
+        box.italic = op.italic;
+        box.largeOperator = true;
         return box;
     }
 
-    Box limitBox(const Box& below)
+    Laid layoutNode(const Node& node, const Style& style)
     {
-        Box box = textBox("lim");
-        const qreal width = qMax(box.width, below.width * sScriptScale);
-        Box result;
-        result.place(box, (width - box.width) / 2, 0);
-        result.place(below, (width - below.width * sScriptScale) / 2,
-                     0.08 + below.ascent * sScriptScale, sScriptScale);
-        result.width = width + 0.08;
-        return result;
+        Laid laid;
+
+        switch (node.kind)
+        {
+        case Kind::Glyph:
+            laid.box = glyphBox(mathFont().glyph(node.character), style);
+            laid.left = laid.right = atomOf(node.character);
+            break;
+
+        case Kind::Word:
+            laid.box = wordBox(node.text, style);
+            laid.left = laid.right = Atom::Op;
+            break;
+
+        case Kind::Differential:
+        {
+            laid.box = wordBox(node.text.left(1), style);
+            laid.box.append(glyphBox(mathFont().glyph(mathItalic(node.text.at(1).unicode())), style));
+            laid.differential = true;
+            break;
+        }
+
+        case Kind::Row:
+        {
+            laid.box = layoutRow(node.items, style);
+
+            if (node.transparentAtoms && !node.items.empty())
+            {
+                laid.left = layoutNode(node.items.front(), style).left;
+                laid.right = layoutNode(node.items.back(), style).right;
+            }
+
+            break;
+        }
+
+        case Kind::Fenced:
+        {
+            const Box inner = layoutRow(node.items, style);
+            laid.box = delimiterBox(node.character, inner.ascent, inner.descent, style);
+            laid.box.append(inner);
+
+            if (node.close)
+            {
+                laid.box.append(delimiterBox(node.close, inner.ascent, inner.descent, style));
+            }
+
+            laid.left = Atom::Open;
+            laid.right = node.close ? Atom::Close : Atom::Ord;
+            break;
+        }
+
+        case Kind::Fraction:
+            if (style.isScript() && node.items.at(0).items.size() == 1 && node.items.at(1).items.size() == 1
+                    && node.items.at(0).items.front().kind == Kind::Glyph && node.items.at(1).items.front().kind == Kind::Glyph)
+            {
+                // a simple fraction in a script is written with a solidus, as a^{1/n}
+                laid.box = layoutRow({node.items.at(0).items.front(), glyphNode('/'), node.items.at(1).items.front()}, style);
+                break;
+            }
+
+            laid.box = fractionBox(layoutRow(node.items.at(0).items, style.numerator()),
+                                   layoutRow(node.items.at(1).items, style.denominator()), style);
+            laid.left = laid.right = Atom::Inner;
+            break;
+
+        case Kind::Scripts:
+        {
+            const Node& baseNode = node.items.front();
+            const Laid base = layoutNode(baseNode, style);
+            Box superscript;
+            Box subscript;
+            const bool hasSuperscript = !node.superscript.empty();
+            const bool hasSubscript = !node.subscript.empty();
+
+            if (hasSuperscript)
+            {
+                superscript = layoutRow(node.superscript.front().items, style.superscript());
+            }
+
+            if (hasSubscript)
+            {
+                subscript = layoutRow(node.subscript.front().items, style.subscript());
+            }
+
+            const bool limits = style.isDisplay()
+                    && (baseNode.kind == Kind::Limit || (baseNode.kind == Kind::BigOperator && takesLimits(baseNode.character)));
+
+            if (limits)
+            {
+                laid.box = limitsBox(base.box, hasSuperscript ? &superscript : nullptr, hasSubscript ? &subscript : nullptr, style);
+            }
+            else
+            {
+                laid.box = scriptsBox(base.box, hasSuperscript ? &superscript : nullptr, hasSubscript ? &subscript : nullptr, style);
+            }
+
+            laid.left = base.left;
+            laid.right = base.right;
+            break;
+        }
+
+        case Kind::BigOperator:
+            laid.box = bigOperatorBox(node.character, style);
+            laid.left = laid.right = Atom::Op;
+            break;
+
+        case Kind::Limit:
+            laid.box = wordBox(node.text, style);
+            laid.left = laid.right = Atom::Op;
+            break;
+
+        case Kind::Radical:
+            laid.box = radicalBox(layoutRow(node.items.front().items, style.crampedStyle()), style);
+            break;
+
+        case Kind::Vector:
+        {
+            const Node& operand = node.items.front();
+            Box base;
+
+            if (operand.items.size() == 1 && operand.items.front().kind == Kind::Glyph)
+            {
+                // a single letter: the accent is attached to the glyph itself
+                base = layoutNode(operand.items.front(), style.crampedStyle()).box;
+            }
+            else
+            {
+                base = layoutRow(operand.items, style.crampedStyle());
+            }
+
+            laid.box = accentBox(base, 0x20D7, style);
+            break;
+        }
+
+        case Kind::Placeholder:
+            laid.box = placeholderBox(style);
+            break;
+        }
+
+        return laid;
+    }
+
+    Box layoutRow(const std::vector<Node>& items, const Style& style)
+    {
+        std::vector<Laid> laid;
+        laid.reserve(items.size());
+
+        for (const Node& item : items)
+        {
+            laid.push_back(layoutNode(item, style));
+        }
+
+        // a binary operator without a left operand is an ordinary symbol (TeX rules 5 and 6)
+        for (size_t i = 0; i < laid.size(); ++i)
+        {
+            Laid& current = laid[i];
+
+            if (current.left == Atom::Bin)
+            {
+                const Atom previous = i == 0 ? Atom::Op : laid[i - 1].right;
+
+                if (previous == Atom::Bin || previous == Atom::Op || previous == Atom::Rel
+                        || previous == Atom::Open || previous == Atom::Punct)
+                {
+                    current.left = current.right = Atom::Ord;
+                }
+            }
+
+            if (i > 0 && laid[i - 1].right == Atom::Bin
+                    && (current.left == Atom::Rel || current.left == Atom::Close || current.left == Atom::Punct))
+            {
+                laid[i - 1].left = laid[i - 1].right = Atom::Ord;
+            }
+        }
+
+        if (!laid.empty() && laid.back().right == Atom::Bin)
+        {
+            laid.back().left = laid.back().right = Atom::Ord;
+        }
+
+        Box row;
+
+        for (size_t i = 0; i < laid.size(); ++i)
+        {
+            Box box = laid[i].box;
+
+            // TeX rule 17: a character keeps its italic correction
+            if (box.character && !box.largeOperator)
+            {
+                box.width += box.italic;
+            }
+
+            qreal gap = items[i].quadsBefore * style.size();
+
+            if (i > 0)
+            {
+                const qreal atomSpace = spaceBetween(laid[i - 1].right, laid[i].left, style);
+                gap += atomSpace;
+
+                // a thin space before the d of dx, as \,dx in TeX
+                if (laid[i].differential && atomSpace == 0 && !style.isScript()
+                        && (laid[i - 1].right == Atom::Ord || laid[i - 1].right == Atom::Close || laid[i - 1].right == Atom::Inner))
+                {
+                    gap += 3 / 18.0 * style.size();
+                }
+            }
+
+            row.append(box, gap);
+        }
+
+        return row;
     }
 
     // -------------------------------------------------------------------- vocabulary
 
     enum class WordKind
     {
-        Function,   // written as letters, followed by a small space
-        Symbol,     // a single glyph
+        Function,
+        Symbol,
         BigOperator,
         Limit,
         SquareRoot,
@@ -445,7 +993,7 @@ namespace
     struct Word
     {
         WordKind kind;
-        QString glyphs;
+        QString text;
     };
 
     const QHash<QString, Word>& words()
@@ -455,7 +1003,7 @@ namespace
 
             const QStringList functions = {
                 "sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan",
-                "sinh", "cosh", "tanh", "ln", "log", "exp", "max", "min", "det", "mod", "gcd", "lcm"
+                "sinh", "cosh", "tanh", "ln", "log", "exp", "det", "mod", "gcd", "lcm", "arg", "dim"
             };
 
             for (const QString& f : functions)
@@ -465,17 +1013,19 @@ namespace
 
             const QList<QPair<QString, QString>> symbols = {
                 {"alpha", "α"}, {"beta", "β"}, {"gamma", "γ"}, {"delta", "δ"}, {"epsilon", "ε"},
-                {"zeta", "ζ"}, {"eta", "η"}, {"theta", "θ"}, {"kappa", "κ"}, {"lambda", "λ"},
-                {"mu", "μ"}, {"nu", "ν"}, {"xi", "ξ"}, {"pi", "π"}, {"rho", "ρ"}, {"sigma", "σ"},
-                {"tau", "τ"}, {"phi", "φ"}, {"chi", "χ"}, {"psi", "ψ"}, {"omega", "ω"},
+                {"varepsilon", "ε"}, {"zeta", "ζ"}, {"eta", "η"}, {"theta", "θ"}, {"vartheta", "ϑ"},
+                {"iota", "ι"}, {"kappa", "κ"}, {"lambda", "λ"}, {"mu", "μ"}, {"nu", "ν"}, {"xi", "ξ"},
+                {"pi", "π"}, {"rho", "ρ"}, {"sigma", "σ"}, {"tau", "τ"}, {"upsilon", "υ"}, {"phi", "φ"},
+                {"varphi", "φ"}, {"chi", "χ"}, {"psi", "ψ"}, {"omega", "ω"},
                 {"Gamma", "Γ"}, {"Delta", "Δ"}, {"Theta", "Θ"}, {"Lambda", "Λ"}, {"Xi", "Ξ"},
                 {"Pi", "Π"}, {"Sigma", "Σ"}, {"Phi", "Φ"}, {"Psi", "Ψ"}, {"Omega", "Ω"},
                 {"inf", "∞"}, {"infty", "∞"}, {"infinity", "∞"}, {"partial", "∂"}, {"nabla", "∇"},
-                {"pm", "±"}, {"times", "×"}, {"div", "÷"}, {"cdot", "·"}, {"le", "≤"}, {"leq", "≤"},
+                {"pm", "±"}, {"mp", "∓"}, {"times", "×"}, {"div", "÷"}, {"cdot", "⋅"}, {"le", "≤"}, {"leq", "≤"},
                 {"ge", "≥"}, {"geq", "≥"}, {"ne", "≠"}, {"neq", "≠"}, {"approx", "≈"}, {"equiv", "≡"},
-                {"in", "∈"}, {"notin", "∉"}, {"subset", "⊂"}, {"supset", "⊃"}, {"cup", "∪"},
-                {"cap", "∩"}, {"empty", "∅"}, {"emptyset", "∅"}, {"forall", "∀"}, {"exists", "∃"},
-                {"deg", "°"}, {"perp", "⊥"}, {"parallel", "∥"}, {"angle", "∠"},
+                {"in", "∈"}, {"notin", "∉"}, {"subset", "⊂"}, {"supset", "⊃"}, {"subseteq", "⊆"},
+                {"supseteq", "⊇"}, {"cup", "∪"}, {"cap", "∩"}, {"empty", "∅"}, {"emptyset", "∅"},
+                {"forall", "∀"}, {"exists", "∃"}, {"deg", "°"}, {"perp", "⊥"}, {"parallel", "∥"},
+                {"angle", "∠"}, {"to", "→"}, {"circ", "∘"},
                 {"NN", "ℕ"}, {"ZZ", "ℤ"}, {"QQ", "ℚ"}, {"RR", "ℝ"}, {"CC", "ℂ"}
             };
 
@@ -490,7 +1040,9 @@ namespace
             t.insert("sum", {WordKind::BigOperator, "∑"});
             t.insert("prod", {WordKind::BigOperator, "∏"});
             t.insert("lim", {WordKind::Limit, "lim"});
-            t.insert("sqrt", {WordKind::SquareRoot, "√"});
+            t.insert("max", {WordKind::Limit, "max"});
+            t.insert("min", {WordKind::Limit, "min"});
+            t.insert("sqrt", {WordKind::SquareRoot, QString()});
             t.insert("vec", {WordKind::Vector, QString()});
             return t;
         }();
@@ -498,20 +1050,13 @@ namespace
         return table;
     }
 
-    /** Relations and binary operators get some room on both sides. */
-    bool isSpacedOperator(QChar c)
-    {
-        static const QString operators = QStringLiteral("+−±×÷·=≠≈≡<>≤≥→←⇒⇔∈∉⊂⊃∪∩~");
-        return operators.contains(c);
-    }
-
     /** Multi-character ASCII operators, longest first. */
-    const QList<QPair<QString, QChar>>& asciiOperators()
+    const QList<QPair<QString, char32_t>>& asciiOperators()
     {
-        static const QList<QPair<QString, QChar>> table = {
-            {"<=>", QChar(0x21D4)}, {"->", QChar(0x2192)}, {"=>", QChar(0x21D2)},
-            {"<=", QChar(0x2264)}, {">=", QChar(0x2265)}, {"!=", QChar(0x2260)}, {"~~", QChar(0x2248)},
-            {"+-", QChar(0x00B1)}, {"//", QChar('/')}, {"*", QChar(0x00B7)}, {"-", QChar(0x2212)}
+        static const QList<QPair<QString, char32_t>> table = {
+            {"<=>", 0x21D4}, {"->", 0x2192}, {"<-", 0x2190}, {"=>", 0x21D2},
+            {"<=", 0x2264}, {">=", 0x2265}, {"!=", 0x2260}, {"~~", 0x2248},
+            {"+-", 0x00B1}, {"//", '/'}, {"*", 0x22C5}, {"-", 0x2212}, {"~", 0x223C}
         };
         return table;
     }
@@ -545,15 +1090,21 @@ namespace
             {
             }
 
-            Box parse(QString* error)
+            Node parse(QString* error)
             {
-                Box box = parseSequence(QChar());
+                Node row = parseSequence(QChar());
 
                 while (mError.isEmpty() && mPos < mSource.size())
                 {
                     // stray closing bracket: write it and continue
-                    box.append(glyphBox(mSource.at(mPos++)));
-                    box.append(parseSequence(QChar()));
+                    Node bracket;
+
+                    if (glyphItem(mSource.at(mPos++).unicode(), bracket))
+                    {
+                        row.items.push_back(bracket);
+                        Node rest = parseSequence(QChar());
+                        row.items.insert(row.items.end(), rest.items.begin(), rest.items.end());
+                    }
                 }
 
                 if (error)
@@ -561,22 +1112,20 @@ namespace
                     *error = mError;
                 }
 
-                return mError.isEmpty() ? box : Box();
+                return row;
             }
 
         private:
-            /** An item: its box, and for a parenthesised group the box without the parentheses. */
-            struct Item
+            /** A parenthesised group used as an operand loses its parentheses: (x+1)/2. */
+            static Node operand(const Node& item)
             {
-                Box box;
-                Box inner;
-                bool group{false};
-                bool bigOperator{false};
-                bool limit{false};
-                QChar op;
+                if (item.kind == Kind::Fenced && item.close && (item.character == '(' || item.character == '['))
+                {
+                    return rowNode(item.items);
+                }
 
-                const Box& operand() const { return group ? inner : box; }
-            };
+                return item.kind == Kind::Row ? item : rowNode({item});
+            }
 
             void skipSpaces()
             {
@@ -598,10 +1147,9 @@ namespace
                 return QStringView(mSource).mid(mPos).startsWith(text);
             }
 
-            Box parseSequence(QChar close)
+            Node parseSequence(QChar close)
             {
-                Box box;
-                bool previousWasOperator = true;
+                Node row = rowNode();
 
                 while (mError.isEmpty())
                 {
@@ -618,106 +1166,92 @@ namespace
                         break;
                     }
 
-                    // a space typed between two operands is kept as a small gap
-                    const bool spaceBefore = mPos > 0 && mSource.at(mPos - 1).isSpace();
+                    // spaces are ignored as in TeX, but two or more typed spaces are a \quad
+                    int spaces = 0;
 
-                    Item item;
+                    while (mPos - spaces - 1 >= 0 && mSource.at(mPos - spaces - 1) == ' ')
+                    {
+                        ++spaces;
+                    }
+
+                    Node item;
 
                     if (!parseItem(item))
                     {
                         break;
                     }
 
-                    const bool isOperator = !item.op.isNull() && (isSpacedOperator(item.op) || item.op == ',' || item.op == ';');
-
-                    if (spaceBefore && box.width > 0 && !isOperator && !previousWasOperator)
+                    if (spaces >= 2 && !row.items.empty())
                     {
-                        box.width += 0.16;
+                        item.quadsBefore = 1;
                     }
-
-                    previousWasOperator = isOperator;
 
                     // fractions bind tighter than anything else in a sequence
                     while (mError.isEmpty() && peek() == '/' && !lookingAt("//"))
                     {
                         ++mPos;
-                        Item denominator;
+                        Node denominator;
 
                         if (!parseItem(denominator))
                         {
-                            denominator.box = placeholderBox();
+                            denominator.kind = Kind::Placeholder;
                         }
 
-                        Item fraction;
-                        fraction.box = fractionBox(item.operand(), denominator.operand());
+                        Node fraction;
+                        fraction.kind = Kind::Fraction;
+                        fraction.items = {operand(item), operand(denominator)};
                         item = fraction;
                     }
 
-                    if (!item.op.isNull() && isSpacedOperator(item.op))
-                    {
-                        box.append(item.box, box.width > 0 ? sOperatorPadding : 0);
-                        box.width += sOperatorPadding;
-                    }
-                    else if (item.op == ',' || item.op == ';')
-                    {
-                        box.append(item.box);
-                        box.width += 0.1;
-                    }
-                    else
-                    {
-                        box.append(item.box);
-                    }
+                    row.items.push_back(item);
                 }
 
-                return box;
+                return row;
             }
 
-            /** Parse one primary with its postfix scripts. Returns false at the end of the input. */
-            bool parseItem(Item& item)
+            /** Parse one primary with its primes and scripts. Returns false at the end of the input. */
+            bool parseItem(Node& item)
             {
                 if (!parsePrimary(item))
                 {
                     return false;
                 }
 
-                const Box* lower = nullptr;
-                const Box* upper = nullptr;
-                Box lowerBox;
-                Box upperBox;
+                int primes = 0;
+                bool hasSuperscript = false;
+                bool hasSubscript = false;
+                Node superscript = rowNode();
+                Node subscript = rowNode();
 
                 while (mError.isEmpty())
                 {
-                    const QChar c = peek();
+                    const QChar c = mPos < mSource.size() ? mSource.at(mPos) : QChar();
 
-                    if (c == '\'' && !item.bigOperator && !item.limit)
+                    if ((c == '\'' || c == QChar(0x2032)) && item.kind != Kind::BigOperator && item.kind != Kind::Limit)
                     {
                         ++mPos;
-                        Box prime = glyphBox('\'');
-                        item.box.place(prime, item.box.width - 0.04, 0);
-                        item.group = false;
+                        ++primes;
                     }
-                    else if (c == '^' || c == '_')
+                    else if (peek() == '^' || peek() == '_')
                     {
-                        ++mPos;
-                        Box script = parseScriptOperand();
+                        const QChar op = mSource.at(mPos++);
+                        Node script = parseScriptOperand();
 
-                        if (c == '^')
+                        if (op == '^')
                         {
-                            upperBox = script;
-                            upper = &upperBox;
+                            superscript = script;
+                            hasSuperscript = true;
                         }
                         else
                         {
-                            lowerBox = script;
-                            lower = &lowerBox;
+                            subscript = script;
+                            hasSubscript = true;
                         }
                     }
-                    else if (!superscriptDigit(c).isNull())
+                    else if (!superscriptDigit(peek()).isNull())
                     {
-                        ++mPos;
-                        upperBox = upper ? upperBox : Box();
-                        upperBox.append(glyphBox(superscriptDigit(c)));
-                        upper = &upperBox;
+                        superscript.items.push_back(glyphNode(superscriptDigit(mSource.at(mPos++)).unicode()));
+                        hasSuperscript = true;
                     }
                     else
                     {
@@ -725,60 +1259,68 @@ namespace
                     }
                 }
 
-                if (item.bigOperator)
+                if (primes > 0)
                 {
-                    item.box = bigOperatorBox(item.op, item.op == QChar(0x2211) || item.op == QChar(0x220F)
-                                              ? BigOpKind::Sum : BigOpKind::Integral, lower, upper);
-                    item.group = false;
-                    item.op = QChar();
+                    // f' is f^{\prime}, TeX style
+                    std::vector<Node> marks(primes, glyphNode(0x2032));
+                    superscript.items.insert(superscript.items.begin(), marks.begin(), marks.end());
+                    hasSuperscript = true;
                 }
-                else if (item.limit)
-                {
-                    item.box = limitBox(lower ? *lower : Box());
 
-                    if (upper)
+                if (hasSuperscript || hasSubscript)
+                {
+                    Node scripts;
+                    scripts.kind = Kind::Scripts;
+                    scripts.items = {item};
+
+                    if (hasSuperscript)
                     {
-                        item.box = scriptsBox(item.box, upper, nullptr);
+                        scripts.superscript = {superscript};
                     }
 
-                    item.group = false;
-                }
-                else if (lower || upper)
-                {
-                    item.box = scriptsBox(item.box, upper, lower);
-                    item.group = false;
-                    item.op = QChar();
+                    if (hasSubscript)
+                    {
+                        scripts.subscript = {subscript};
+                    }
+
+                    item = scripts;
                 }
 
                 return true;
             }
 
             /** The operand of ^ or _: one primary (a group loses its parentheses), with an optional sign. */
-            Box parseScriptOperand()
+            Node parseScriptOperand()
             {
-                Box sign;
+                Node result = rowNode();
                 const QChar c = peek();
 
                 if (c == '-' || c == '+' || c == QChar(0x2212))
                 {
                     ++mPos;
-                    sign = glyphBox(c == '+' ? QChar('+') : QChar(0x2212));
+                    result.items.push_back(glyphNode(c == '+' ? '+' : 0x2212));
                 }
 
-                Item operand;
+                Node primary;
 
-                if (!parsePrimary(operand))
+                if (!parsePrimary(primary))
                 {
-                    operand.box = sign.glyphs.isEmpty() ? placeholderBox() : Box();
+                    if (result.items.empty())
+                    {
+                        Node placeholder;
+                        placeholder.kind = Kind::Placeholder;
+                        result.items.push_back(placeholder);
+                    }
+
+                    return result;
                 }
 
-                // allow a prime inside the script, e.g. f^'
-                Box result = sign;
-                result.append(operand.operand());
+                const Node inner = operand(primary);
+                result.items.insert(result.items.end(), inner.items.begin(), inner.items.end());
                 return result;
             }
 
-            bool parsePrimary(Item& item)
+            bool parsePrimary(Node& item)
             {
                 const QChar c = peek();
 
@@ -792,9 +1334,7 @@ namespace
                 {
                     const QChar close = c == '(' ? ')' : (c == '[' ? ']' : '}');
                     ++mPos;
-                    item.inner = parseSequence(close);
-                    item.group = true;
-
+                    const Node inner = parseSequence(close);
                     bool closed = false;
 
                     if (peek() == close)
@@ -805,20 +1345,15 @@ namespace
 
                     if (c == '{')
                     {
-                        item.box = item.inner;
+                        item = inner;
                     }
                     else
                     {
-                        const qreal ascent = qMax(item.inner.ascent, 0.42);
-                        const qreal descent = item.inner.descent;
-                        item.box = fenceBox(c, ascent, descent);
-                        item.box.append(item.inner, 0.02);
-
                         // an opening bracket without its closing one is written alone
-                        if (closed)
-                        {
-                            item.box.append(fenceBox(close, ascent, descent), 0.02);
-                        }
+                        item.kind = Kind::Fenced;
+                        item.character = c.unicode();
+                        item.close = closed ? close.unicode() : 0;
+                        item.items = inner.items;
                     }
 
                     return true;
@@ -827,7 +1362,7 @@ namespace
                 // escaped characters: literal braces and other specials
                 if (c == '\\' && mPos + 1 < mSource.size())
                 {
-                    const QChar escaped = mSource.at(mPos + 1);
+                    const char32_t escaped = mSource.at(mPos + 1).unicode();
                     mPos += 2;
                     return glyphItem(escaped, item);
                 }
@@ -835,11 +1370,10 @@ namespace
                 if (c == '#' || c == QChar(0x25A1))
                 {
                     ++mPos;
-                    item.box = placeholderBox();
+                    item.kind = Kind::Placeholder;
                     return true;
                 }
 
-                // ASCII letters: words or single letters
                 if (isAsciiLetter(c))
                 {
                     return wordItem(item);
@@ -854,20 +1388,51 @@ namespace
                     }
                 }
 
-                ++mPos;
-                return glyphItem(c, item);
+                // characters typed directly
+                char32_t code = c.unicode();
+                int length = 1;
+
+                if (c.isHighSurrogate() && mPos + 1 < mSource.size() && mSource.at(mPos + 1).isLowSurrogate())
+                {
+                    code = QChar::surrogateToUcs4(c, mSource.at(mPos + 1));
+                    length = 2;
+                }
+
+                mPos += length;
+
+                if (code == 0x221A)
+                {
+                    return radicalItem(item);
+                }
+
+                if (isBigOperator(code))
+                {
+                    item.kind = Kind::BigOperator;
+                    item.character = code;
+                    return true;
+                }
+
+                return glyphItem(code, item);
             }
 
-            bool glyphItem(QChar c, Item& item)
+            bool glyphItem(char32_t c, Node& item)
             {
-                if (!library().glyphs.contains(c))
+                // the middle dot of the keyboard is the multiplication dot of maths
+                if (c == 0x00B7)
                 {
-                    mError = QCoreApplication::translate("UBMathInkLayout", "Cannot write the character \"%1\".").arg(c);
+                    c = 0x22C5;
+                }
+
+                const char32_t styled = mathItalic(c);
+
+                if (!mathFont().glyph(styled))
+                {
+                    mError = QCoreApplication::translate("UBMathInkLayout", "Cannot write the character \"%1\".")
+                            .arg(QString::fromUcs4(&c, 1));
                     return false;
                 }
 
-                item.box = glyphBox(c);
-                item.op = c;
+                item = glyphNode(styled);
                 return true;
             }
 
@@ -875,21 +1440,53 @@ namespace
              * A function name or a letter directly followed by a parenthesised group, like f(x)
              * or sin(x), is a single item: f(x)/2 is the fraction of f(x) and 2.
              */
-            bool attachArguments(Item& item)
+            bool attachArguments(Node& item)
             {
+                // f'(x): the primes belong to the function
+                int end = mPos;
+
+                while (end < mSource.size() && (mSource.at(end) == '\'' || mSource.at(end) == QChar(0x2032)))
+                {
+                    ++end;
+                }
+
+                if (end > mPos && end < mSource.size() && mSource.at(end) == '(')
+                {
+                    Node scripts;
+                    scripts.kind = Kind::Scripts;
+                    scripts.items = {item};
+                    scripts.superscript = {rowNode(std::vector<Node>(end - mPos, glyphNode(0x2032)))};
+                    item = scripts;
+                    mPos = end;
+                }
+
                 if (mPos < mSource.size() && mSource.at(mPos) == '(')
                 {
-                    Item arguments;
+                    Node arguments;
 
                     if (parsePrimary(arguments))
                     {
-                        item.box.append(arguments.box);
-                        item.op = QChar();
-                        item.group = false;
+                        Node row = rowNode({item, arguments});
+                        row.transparentAtoms = true;
+                        item = row;
                     }
                 }
 
                 return mError.isEmpty();
+            }
+
+            bool radicalItem(Node& item)
+            {
+                Node content;
+
+                if (!parsePrimary(content))
+                {
+                    content.kind = Kind::Placeholder;
+                }
+
+                item.kind = Kind::Radical;
+                item.items = {operand(content)};
+                return true;
             }
 
             static bool isAsciiLetter(QChar c)
@@ -897,7 +1494,7 @@ namespace
                 return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
             }
 
-            bool wordItem(Item& item)
+            bool wordItem(Node& item)
             {
                 int end = mPos;
 
@@ -929,16 +1526,28 @@ namespace
 
                 if (word.isEmpty() && atWordStart && run.size() == 2 && run.at(0) == 'd')
                 {
-                    // a differential (dx, dt, ...) is one item, so that d/dx and dy/dx are fractions of differentials
+                    // a differential (dx, dt, ...) is one item with an upright d (ISO 80000-2),
+                    // so that d/dx and dy/dx are fractions of differentials
                     mPos += 2;
-                    item.box = textBox(run);
+                    item.kind = Kind::Differential;
+                    item.text = run;
                     return true;
                 }
 
                 if (word.isEmpty())
                 {
                     ++mPos;
-                    return glyphItem(run.at(0), item) && attachArguments(item);
+
+                    if (run.size() == 1 && run.at(0) == 'd' && peek() == '/')
+                    {
+                        // the operator d in d/dx is upright as well
+                        item.kind = Kind::Word;
+                        item.text = run;
+                        item = rowNode({item});
+                        return true;
+                    }
+
+                    return glyphItem(run.at(0).unicode(), item) && attachArguments(item);
                 }
 
                 mPos += word.size();
@@ -947,33 +1556,37 @@ namespace
                 switch (w.kind)
                 {
                 case WordKind::Function:
-                    item.box = textBox(w.glyphs);
-                    item.box.width += 0.04;
+                    item.kind = Kind::Word;
+                    item.text = w.text;
                     return attachArguments(item);
 
                 case WordKind::Symbol:
-                    return glyphItem(w.glyphs.at(0), item);
+                    return glyphItem(w.text.toUcs4().value(0), item);
 
                 case WordKind::BigOperator:
-                    item.bigOperator = true;
-                    item.op = w.glyphs.at(0);
+                    item.kind = Kind::BigOperator;
+                    item.character = w.text.toUcs4().value(0);
                     return true;
 
                 case WordKind::Limit:
-                    item.limit = true;
+                    item.kind = Kind::Limit;
+                    item.text = w.text;
                     return true;
 
                 case WordKind::SquareRoot:
+                    return radicalItem(item);
+
                 case WordKind::Vector:
                 {
-                    Item operand;
+                    Node content;
 
-                    if (!parsePrimary(operand))
+                    if (!parsePrimary(content))
                     {
-                        operand.box = placeholderBox();
+                        content.kind = Kind::Placeholder;
                     }
 
-                    item.box = w.kind == WordKind::SquareRoot ? sqrtBox(operand.operand()) : vectorBox(operand.operand());
+                    item.kind = Kind::Vector;
+                    item.items = {operand(content)};
                     return true;
                 }
                 }
@@ -985,114 +1598,6 @@ namespace
             int mPos{0};
             QString mError;
     };
-
-    // -------------------------------------------------------------------- handwriting
-
-    /** Small deterministic pseudo random generator (xorshift). */
-    class Random
-    {
-        public:
-            explicit Random(quint32 seed) : mState(seed ? seed : 0x9E3779B9u) {}
-
-            /** Uniform in [-1, 1]. */
-            qreal next()
-            {
-                mState ^= mState << 13;
-                mState ^= mState >> 17;
-                mState ^= mState << 5;
-                return (mState / qreal(0xFFFFFFFFu)) * 2.0 - 1.0;
-            }
-
-        private:
-            quint32 mState;
-    };
-
-    /** Split a polyline at sharp corners, so that every piece is smooth. */
-    QList<QPolygonF> splitAtCorners(const QPolygonF& stroke, qreal maxTurnDegrees)
-    {
-        QList<QPolygonF> pieces;
-        QPolygonF current;
-
-        for (int i = 0; i < stroke.size(); ++i)
-        {
-            const QPointF& p = stroke.at(i);
-
-            if (!current.isEmpty() && QLineF(current.last(), p).length() < 1e-6)
-            {
-                continue;
-            }
-
-            current << p;
-
-            if (i > 0 && i + 1 < stroke.size())
-            {
-                const QLineF in(stroke.at(i - 1), p);
-                const QLineF out(p, stroke.at(i + 1));
-
-                if (in.length() > 1e-6 && out.length() > 1e-6)
-                {
-                    qreal turn = qAbs(in.angleTo(out));
-                    turn = qMin(turn, 360.0 - turn);
-
-                    if (turn > maxTurnDegrees)
-                    {
-                        pieces << current;
-                        current = QPolygonF({p});
-                    }
-                }
-            }
-        }
-
-        if (current.size() >= 2)
-        {
-            pieces << current;
-        }
-        else if (current.size() == 1 && pieces.isEmpty())
-        {
-            pieces << QPolygonF({current.first(), current.first() + QPointF(0.005, 0)});
-        }
-
-        return pieces;
-    }
-
-    /** Resample a polyline with points at most `step` apart (the original points are kept). */
-    QPolygonF subdivide(const QPolygonF& stroke, qreal step)
-    {
-        QPolygonF result;
-
-        for (int i = 0; i + 1 < stroke.size(); ++i)
-        {
-            const QPointF a = stroke.at(i);
-            const QPointF b = stroke.at(i + 1);
-            const int n = qMax(1, qCeil(QLineF(a, b).length() / step));
-
-            for (int k = 0; k < n; ++k)
-            {
-                result << a + (b - a) * (qreal(k) / n);
-            }
-        }
-
-        result << stroke.last();
-        return result;
-    }
-
-    /** Light Laplacian smoothing, the end points stay in place. */
-    QPolygonF smooth(QPolygonF stroke, int passes)
-    {
-        for (int pass = 0; pass < passes; ++pass)
-        {
-            QPolygonF next = stroke;
-
-            for (int i = 1; i + 1 < stroke.size(); ++i)
-            {
-                next[i] = stroke.at(i - 1) * 0.25 + stroke.at(i) * 0.5 + stroke.at(i + 1) * 0.25;
-            }
-
-            stroke = next;
-        }
-
-        return stroke;
-    }
 }
 
 // ------------------------------------------------------------------------ UBMathInkLayout
@@ -1101,12 +1606,9 @@ QRectF UBMathInkLayout::Formula::bounds() const
 {
     QRectF rect;
 
-    for (const Glyph& glyph : glyphs)
+    for (const QPainterPath& shape : shapes)
     {
-        for (const QPolygonF& stroke : glyph.strokes)
-        {
-            rect = rect.isNull() ? stroke.boundingRect() : rect.united(stroke.boundingRect());
-        }
+        rect = rect.isNull() ? shape.boundingRect() : rect.united(shape.boundingRect());
     }
 
     for (const QRectF& placeholder : placeholders)
@@ -1117,17 +1619,25 @@ QRectF UBMathInkLayout::Formula::bounds() const
     return rect;
 }
 
+QPainterPath UBMathInkLayout::Formula::path() const
+{
+    QPainterPath all;
+    all.setFillRule(Qt::WindingFill);
+
+    for (const QPainterPath& shape : shapes)
+    {
+        all.addPath(shape);
+    }
+
+    return all;
+}
+
 bool UBMathInkLayout::isAvailable()
 {
-    return library().loaded;
+    return UBMathFont::font().isValid();
 }
 
-bool UBMathInkLayout::hasGlyph(QChar c)
-{
-    return library().glyphs.contains(c);
-}
-
-UBMathInkLayout::Formula UBMathInkLayout::layout(const QString& source, QString* error)
+UBMathInkLayout::Formula UBMathInkLayout::layout(const QString& source, QString* error, bool displayStyle)
 {
     Formula formula;
     formula.source = source;
@@ -1136,7 +1646,7 @@ UBMathInkLayout::Formula UBMathInkLayout::layout(const QString& source, QString*
     {
         if (error)
         {
-            *error = QCoreApplication::translate("UBMathInkLayout", "The handwriting glyphs could not be loaded.");
+            *error = QCoreApplication::translate("UBMathInkLayout", "The maths font could not be loaded.");
         }
 
         return formula;
@@ -1144,7 +1654,7 @@ UBMathInkLayout::Formula UBMathInkLayout::layout(const QString& source, QString*
 
     Parser parser(source);
     QString parseError;
-    const Box box = parser.parse(&parseError);
+    const Node root = parser.parse(&parseError);
 
     if (error)
     {
@@ -1156,68 +1666,14 @@ UBMathInkLayout::Formula UBMathInkLayout::layout(const QString& source, QString*
         return formula;
     }
 
-    formula.glyphs = box.glyphs;
+    const Box box = layoutRow(root.items, Style{displayStyle ? 0 : 1, false});
+    formula.shapes = box.shapes;
     formula.placeholders = box.placeholders;
 
-    if (formula.glyphs.isEmpty() && formula.placeholders.isEmpty() && error && error->isEmpty())
+    if (formula.shapes.isEmpty() && formula.placeholders.isEmpty() && error && error->isEmpty())
     {
         *error = QCoreApplication::translate("UBMathInkLayout", "Nothing to write.");
     }
 
     return formula;
-}
-
-QList<QPolygonF> UBMathInkLayout::humanize(const Formula& formula, qreal jitter)
-{
-    QList<QPolygonF> result;
-    jitter = qBound(0.0, jitter, 3.0);
-
-    const qreal slant = qMin(0.06 * jitter, 0.15);
-    const quint32 formulaSeed = qHash(formula.source) ^ 0x5bd1e995u;
-    Random formulaRandom(formulaSeed);
-    const qreal wavePhase = formulaRandom.next() * M_PI;
-
-    for (int g = 0; g < formula.glyphs.size(); ++g)
-    {
-        const Glyph& glyph = formula.glyphs.at(g);
-        Random random(formulaSeed ^ (quint32(g + 1) * 2654435761u));
-
-        // per symbol: slightly different angle, size and position, baseline wobble
-        const QPointF center = glyph.box.center();
-        const qreal angle = jitter * 1.6 * random.next();
-        const qreal scale = 1.0 + jitter * 0.03 * random.next();
-        const QPointF offset(jitter * 0.008 * random.next(),
-                             jitter * (0.01 * random.next() + 0.012 * qSin(center.x() * 2.3 + wavePhase)));
-
-        QTransform transform;
-        transform.translate(center.x() + offset.x(), center.y() + offset.y());
-        transform.rotate(angle);
-        transform.scale(scale, scale);
-        transform.translate(-center.x(), -center.y());
-
-        // trembling hand: a smooth displacement field, so that touching strokes stay connected
-        const qreal tremble = jitter * 0.0045;
-        const qreal f1 = 8.0 + 3.0 * random.next();
-        const qreal f2 = 9.0 + 3.0 * random.next();
-        const qreal p1 = random.next() * M_PI;
-        const qreal p2 = random.next() * M_PI;
-
-        for (const QPolygonF& stroke : glyph.strokes)
-        {
-            for (const QPolygonF& piece : splitAtCorners(transform.map(stroke), 40.0))
-            {
-                QPolygonF points = subdivide(piece, 0.012);
-
-                for (QPointF& p : points)
-                {
-                    p += QPointF(tremble * qSin(p.y() * f1 + p1), tremble * qSin(p.x() * f2 + p2));
-                    p.setX(p.x() - slant * p.y());
-                }
-
-                result << smooth(points, 2);
-            }
-        }
-    }
-
-    return result;
 }

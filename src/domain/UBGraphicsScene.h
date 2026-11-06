@@ -355,12 +355,13 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         QRectF annotationsBoundingRect() const;
 
         /**
-         * Add ready-made pen strokes (e.g. handwritten maths) as one strokes group, using the
-         * pen tool's polygon pipeline, with a single undo step. Every polyline becomes a stroke
-         * of constant width. Returns nullptr if nothing was added (e.g. while drawing).
+         * Add ready-made filled ink shapes (e.g. the glyphs of typeset maths) as one stroke in one
+         * strokes group, with a single undo step. They behave like pen strokes: pen colours for
+         * light and dark backgrounds, eraser, selection, saving. Returns nullptr if nothing was
+         * added (e.g. while drawing).
          */
-        UBGraphicsStrokesGroup* addInkStrokes(const QList<QPolygonF>& strokes, qreal width,
-                                              const QColor& colorOnLightBackground, const QColor& colorOnDarkBackground);
+        UBGraphicsStrokesGroup* addInkShapes(const QList<QPolygonF>& shapes,
+                                             const QColor& colorOnLightBackground, const QColor& colorOnDarkBackground);
 
 public slots:
         void updateSelectionFrame();
