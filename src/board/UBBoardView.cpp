@@ -1028,91 +1028,6 @@ void UBBoardView::setBoxing(const QMargins& margins)
     mMargins = margins;
 }
 
-// work around for handling tablet events on MAC OS with Qt 4.8.0 and above
-#if defined(Q_OS_OSX)
-bool UBBoardView::directTabletEvent(QEvent *event)
-{
-    QTabletEvent *tEvent = static_cast<QTabletEvent *>(event);
-#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-    const QPointingDevice *device = dynamic_cast<const QPointingDevice*>(tEvent->device());
-    tEvent = new QTabletEvent(tEvent->type()
-                              , device
-                              , mapFromGlobal(tEvent->pos())
-                              , tEvent->globalPos()
-                              , tEvent->pressure()
-                              , tEvent->xTilt()
-                              , tEvent->yTilt()
-                              , tEvent->tangentialPressure()
-                              , tEvent->rotation()
-                              , tEvent->z()
-                              , tEvent->modifiers()
-                              , tEvent->button()
-                              , tEvent->buttons());
-#else
-    tEvent = new QTabletEvent(tEvent->type()
-                              , mapFromGlobal(tEvent->pos())
-                              , tEvent->globalPos()
-                              , tEvent->device()
-                              , tEvent->pointerType()
-                              , tEvent->pressure()
-                              , tEvent->xTilt()
-                              , tEvent->yTilt()
-                              , tEvent->tangentialPressure()
-                              , tEvent->rotation()
-                              , tEvent->z()
-                              , tEvent->modifiers()
-                              , tEvent->uniqueId());
-#endif
-
-    if (geometry().contains(tEvent->pos()))
-    {
-        if (NULL == widgetForTabletEvent(this->parentWidget(), tEvent->pos()))
-        {
-            tabletEvent(tEvent);
-            return true;
-        }
-    }
-    return false;
-}
-
-QWidget *UBBoardView::widgetForTabletEvent(QWidget *w, const QPoint &pos)
-{
-    Q_ASSERT(w);
-
-    // it should work that, but it doesn't. So we check if it is control view.
-    //UBBoardView *board = qobject_cast<UBBoardView *>(w);
-    UBBoardView *board = UBApplication::boardController->controlView();
-
-    QWidget *childAtPos = NULL;
-
-    QList<QObject *> childs = w->children();
-    foreach(QObject *child, childs)
-    {
-        QWidget *childWidget = qobject_cast<QWidget *>(child);
-        if (childWidget)
-        {
-            if (childWidget->isVisible() && childWidget->geometry().contains(pos))
-            {
-                QWidget *lastChild = widgetForTabletEvent(childWidget, pos);
-
-                if (board && board->viewport() == lastChild)
-                    continue;
-
-                if (NULL != lastChild)
-                    childAtPos = lastChild;
-                else
-                    childAtPos = childWidget;
-
-                break;
-            }
-            else
-                childAtPos = NULL;
-        }
-    }
-    return childAtPos;
-}
-#endif
-
 void UBBoardView::longPressEvent()
 {
     UBDrawingController *drawingController = UBDrawingController::drawingController();
@@ -1246,7 +1161,8 @@ void UBBoardView::mousePressEvent (QMouseEvent *event)
                     connect(&mLongPressTimer, SIGNAL(timeout()), this, SLOT(longPressEvent()));
                     mLongPressTimer.start();
                 }
-                scene()->inputDevicePress(mapToScene(UBGeometryUtils::pointConstrainedInRect(event->pos(), rect())), 1., event->modifiers());
+                // keep the sub-pixel position (Retina screens, tablets in mouse mode)
+                scene()->inputDevicePress(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), 1., event->modifiers());
             }
             event->accept ();
         }
@@ -1407,7 +1323,13 @@ void UBBoardView::mouseMoveEvent (QMouseEvent *event)
 
     default:
         if (!mTabletStylusIsPressed && scene()) {
-            scene()->inputDeviceMove(mapToScene(UBGeometryUtils::pointConstrainedInRect(event->pos(), rect())) , mMouseButtonIsPressed, event->modifiers());
+            // keep the sub-pixel position (Retina screens, tablets in mouse mode)
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+            const QPointF eventPosition = event->position();
+#else
+            const QPointF eventPosition = event->localPos();
+#endif
+            scene()->inputDeviceMove(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), mMouseButtonIsPressed, event->modifiers());
         }
         event->accept ();
     }
