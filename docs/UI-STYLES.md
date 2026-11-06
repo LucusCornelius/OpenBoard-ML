@@ -61,3 +61,39 @@ the current theme.
     `windows11` widget style is used for dialogs and preferences (Fusion
     otherwise);
   * font: Segoe UI Variable when installed (Windows 11), else Segoe UI.
+
+## Document mode
+
+The documents explorer (Documents button) uses the same flat language in both
+styles. All colours and radii come from `UBGlassStyle::documentModeColors(dark)`
+(glass on macOS, Fluent values for the modern style); the stylesheet block is
+`UBGlassStyle::documentModeStyleSheet(dark)`, appended by both
+`UBGlassStyle::styleSheet` and `UBModernStyle::styleSheet`.
+
+* Layout: the document toolbar and the page grid share one flat content
+  background (light `#F0F0F3`, dark graphite `#161618`; modern: Fluent window
+  neutrals). The document tree sits in a floating sidebar card (white / `#242427`,
+  12 px corners and a hairline; modern: card surface, 8 px). The splitter is an
+  8 px transparent gap.
+* Tree (`UBDocumentTreeView::drawRow` / `drawBranches`, `UBDocumentTreeItemDelegate`):
+  28 px rows, one rounded pill per row: hover = subtle fill, selection = solid
+  accent pill with white text (glass) or a tinted fill with a short accent
+  indicator (modern), grey while the tree has no focus. Chevrons instead of
+  branch lines, no horizontal scrolling (the name is elided, the date sits right
+  aligned in local time). Monochrome glyphs from `resources/images/glass/`:
+  `myDocuments`, `folder`, `erase` (Trash) in the accent colour, `document`,
+  `favorite`, `documentCurrent` (the document open on the board, accent).
+* Drag and drop: the folder (or, for pages, the document) receiving the drop is
+  shown as an accent outlined pill; no line between rows.
+* Rename: the inline field has an accent outline; a name that already exists
+  gets a red outline (`QLineEdit[invalid="true"]`).
+* Controls: sort box, sort direction button and search field are flat rounded
+  fills (8 px, modern 4 px); the search field has a search glyph.
+* Pages (`UBThumbnail`, also in the board's page list): flat cards with 6 px
+  corners, a hairline and a soft shadow; the selection is a 3 px accent ring
+  with a small gap; the page number uses the secondary text colour, the accent
+  when selected. Drop position between pages: a flat accent bar.
+* Zoom: thin capsule slider with zoom out / zoom in glyph buttons at the
+  bottom right. Empty state: a glyph and "No document selected" when no
+  document is selected. Messages (copying, importing) appear as a glass capsule
+  at the bottom centre of the page grid.

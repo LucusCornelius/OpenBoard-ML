@@ -150,6 +150,11 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
     material (`OPENBOARD_NATIVE_PANEL_GLASS=0` = painted); `OPENBOARD_NO_NATIVE_GLASS=1`
     disables all native chrome (normal title bar, painted glass); `OPENBOARD_THEME=light|dark|auto`
     overrides the theme without touching the saved setting.
+* **Document mode** (documents explorer) in the same flat style, light and dark: floating
+  sidebar card with the tree (rounded selection pill, chevrons, monochrome folder/document
+  glyphs, dates in local time), flat sort/search controls, pages as rounded cards with a
+  hairline, soft shadow and accent selection ring, zoom slider with glyph buttons, empty
+  state and message capsule. Details in [UI-STYLES.md](UI-STYLES.md#document-mode).
 * Backgrounds palette: compact rounded page swatches (60 x 46) with the ruling and an accent
   ring for the current background, also used in the preferences.
 * Monochrome SF Symbols like icons (`resources/images/glass/`, tinted per material) also for
