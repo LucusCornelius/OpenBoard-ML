@@ -19,24 +19,38 @@
  * along with OpenBoard. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// macOS native glass for the main window chrome.
+// macOS native "Liquid Glass" for OpenBoard.
 //
-// Everything here is optional decoration: the Qt painted glass (UBGlassStyle,
-// UBFloatingPalette) is always drawn, so the application looks right even if
-// nothing below has an effect. The deployment target stays macOS 12; newer API
-// is guarded with @available.
+// Window chrome (all macOS versions >= 12): transparent title bar, hidden
+// title, no title bar separator and a full size content view, so that the
+// board extends edge to edge under the title bar like Freeform. The floating
+// tool clusters stay below the traffic lights using topInset().
+//
+// Panels (macOS 26+, opt-in): an NSGlassEffectView is placed behind a
+// floating palette. The palette becomes a native child view and paints only
+// its controls; the glass view is a sibling below it in the same superview.
+// Everything is optional decoration: when anything is missing or fails, the
+// Qt painted glass (UBGlassStyle, UBFloatingPalette) stays on.
+//
+// Every macOS 26 symbol is inside "#if defined(__MAC_26_0)" (SDK 26 or newer)
+// and "if (@available(macOS 26.0, *))", plus a NSClassFromString check, so
+// this file builds with any SDK >= 12 and runs on macOS 12 and later.
 //
 // Environment switches (for testing on the Mac):
-//   OPENBOARD_NO_NATIVE_GLASS=1   disable all of this (plain title bar)
-//   OPENBOARD_NO_VIBRANCY=1       keep the transparent title bar, no vibrancy view
+//   OPENBOARD_NO_NATIVE_GLASS=1     disable all of this (normal title bar, painted glass only)
+//   OPENBOARD_NATIVE_PANEL_GLASS=1  use NSGlassEffectView behind the floating panels (macOS 26+)
 
 #include "UBGlassEffect.h"
 
 #include <QtGlobal>
+#include <QDebug>
 #include <QEvent>
 #include <QMainWindow>
-#include <QStyle>
+#include <QPointer>
+#include <QRect>
+#include <QTimer>
 #include <QToolBar>
+#include <QVariant>
 #include <QWidget>
 
 #include "core/UBThemeManager.h"
@@ -45,16 +59,14 @@
 
 namespace
 {
-    NSString* const vibrancyIdentifier = @"ch.openboard.glass.toolbarVibrancy";
-
     bool nativeGlassDisabled()
     {
         return qEnvironmentVariableIntValue("OPENBOARD_NO_NATIVE_GLASS") != 0;
     }
 
-    bool vibrancyDisabled()
+    bool nativePanelGlassRequested()
     {
-        return nativeGlassDisabled() || qEnvironmentVariableIntValue("OPENBOARD_NO_VIBRANCY") != 0;
+        return !nativeGlassDisabled() && qEnvironmentVariableIntValue("OPENBOARD_NATIVE_PANEL_GLASS") != 0;
     }
 
     NSWindow* nativeWindow(QWidget* widget)
@@ -72,36 +84,6 @@ namespace
         return view ? [view window] : nil;
     }
 
-    NSVisualEffectView* findVibrancyView(NSView* frameView)
-    {
-        for (NSView* subview in [frameView subviews])
-        {
-            if ([subview isKindOfClass:[NSVisualEffectView class]]
-                    && [[subview identifier] isEqualToString:vibrancyIdentifier])
-            {
-                return (NSVisualEffectView*)subview;
-            }
-        }
-
-        return nil;
-    }
-
-    void repolish(QWidget* top)
-    {
-        QList<QWidget*> widgets;
-        widgets << top;
-
-        for (QToolBar* toolBar : top->findChildren<QToolBar*>())
-            widgets << toolBar;
-
-        for (QWidget* w : widgets)
-        {
-            w->style()->unpolish(w);
-            w->style()->polish(w);
-            w->update();
-        }
-    }
-
     void updateWindowChrome(QWidget* top)
     {
         NSWindow* window = nativeWindow(top);
@@ -112,10 +94,8 @@ namespace
 
         @try
         {
-            QToolBar* boardToolBar = mainWindow->findChild<QToolBar*>(QStringLiteral("boardToolBar"));
             const bool fullScreen = ([window styleMask] & NSWindowStyleMaskFullScreen) != 0;
-            const bool toolBarAtTop = boardToolBar && mainWindow->toolBarArea(boardToolBar) == Qt::TopToolBarArea;
-            const bool unified = toolBarAtTop && !fullScreen;
+            const bool unified = !fullScreen;
 
             // follow the light / dark theme of the application, not only the system appearance
             NSAppearance* appearance = [NSAppearance appearanceNamed:UBThemeManager::instance()->isDarkMode()
@@ -140,66 +120,27 @@ namespace
             if ([window titleVisibility] != titleVisibility)
                 [window setTitleVisibility:titleVisibility];
 
-            // the toolbars extend below the transparent title bar: keep their buttons below the traffic lights
+            if (@available(macOS 11.0, *))
+            {
+                if ([window titlebarSeparatorStyle] != NSTitlebarSeparatorStyleNone)
+                    [window setTitlebarSeparatorStyle:NSTitlebarSeparatorStyleNone];
+            }
+
+            // the content extends below the transparent title bar: controls at the top keep clear of it
             int titleBarHeight = 0;
 
             if (unified)
-            {
                 titleBarHeight = qMax(0, qRound(NSHeight([window frame]) - NSHeight([window contentLayoutRect])));
-            }
+
+            top->setProperty("ubGlassTitleBarHeight", titleBarHeight);
 
             for (QToolBar* toolBar : mainWindow->findChildren<QToolBar*>(QString(), Qt::FindDirectChildrenOnly))
             {
-                const int top = (mainWindow->toolBarArea(toolBar) == Qt::TopToolBarArea) ? titleBarHeight : 0;
-                const QMargins margins(0, top, 0, 0);
+                const int topMargin = (mainWindow->toolBarArea(toolBar) == Qt::TopToolBarArea) ? titleBarHeight : 0;
+                const QMargins margins(0, topMargin, 0, 0);
 
                 if (toolBar->contentsMargins() != margins)
                     toolBar->setContentsMargins(margins);
-            }
-
-            // vibrancy behind the title bar and the top toolbar
-            NSView* contentView = [window contentView];
-            NSView* frameView = [contentView superview];
-
-            if (!frameView)
-                return;
-
-            NSVisualEffectView* vibrancy = findVibrancyView(frameView);
-            const bool wantVibrancy = unified && !vibrancyDisabled() && top->property("ubGlassTranslucentWindow").toBool();
-
-            // the glass stylesheet makes the window and toolbar backgrounds transparent
-            // only while the vibrancy view is behind them
-            if (top->property("ubGlassVibrancy").toBool() != wantVibrancy)
-            {
-                top->setProperty("ubGlassVibrancy", wantVibrancy);
-                repolish(top);
-            }
-
-            if (wantVibrancy)
-            {
-                if (!vibrancy)
-                {
-                    vibrancy = [[NSVisualEffectView alloc] initWithFrame:NSZeroRect];
-                    [vibrancy setIdentifier:vibrancyIdentifier];
-                    [vibrancy setMaterial:NSVisualEffectMaterialSidebar];
-                    [vibrancy setBlendingMode:NSVisualEffectBlendingModeBehindWindow];
-                    [vibrancy setState:NSVisualEffectStateFollowsWindowActiveState];
-                    [vibrancy setAutoresizingMask:NSViewWidthSizable | NSViewMinYMargin];
-                    [frameView addSubview:vibrancy positioned:NSWindowBelow relativeTo:contentView];
-#if !__has_feature(objc_arc)
-                    [vibrancy release];
-#endif
-                }
-
-                const CGFloat height = titleBarHeight + (boardToolBar && boardToolBar->isVisible() ? boardToolBar->height() : 0);
-                const NSRect bounds = [frameView bounds];
-                const CGFloat y = [frameView isFlipped] ? 0 : NSHeight(bounds) - height;
-                [vibrancy setFrame:NSMakeRect(0, y, NSWidth(bounds), height)];
-                [vibrancy setHidden:NO];
-            }
-            else if (vibrancy)
-            {
-                [vibrancy setHidden:YES];
             }
         }
         @catch (NSException* exception)
@@ -209,8 +150,7 @@ namespace
     }
 
     /**
-     * Keeps the native chrome in sync with the window state (full screen,
-     * toolbar position and height).
+     * Keeps the native chrome in sync with the window state (full screen, theme).
      */
     class UBMacWindowGlassFilter : public QObject
     {
@@ -228,6 +168,7 @@ namespace
                     case QEvent::WindowStateChange:
                     case QEvent::Resize:
                     case QEvent::LayoutRequest:
+                    case QEvent::StyleChange:
                         if (watched->isWidgetType())
                             updateWindowChrome(static_cast<QWidget*>(watched));
                         break;
@@ -239,6 +180,134 @@ namespace
                 return false;
             }
     };
+
+#if defined(__MAC_26_0)
+    /**
+     * Owns the NSGlassEffectView behind one floating panel and keeps its frame,
+     * corner radius, visibility and z-order in sync with the panel.
+     */
+    class UBMacPanelGlass : public QObject
+    {
+        public:
+            /** glass is a NSGlassEffectView, only created on macOS 26 and later */
+            UBMacPanelGlass(QWidget* panel, NSView* glass)
+                : QObject(panel)
+                , mPanel(panel)
+                , mGlass(glass)
+            {
+#if !__has_feature(objc_arc)
+                [mGlass retain];
+#endif
+                panel->installEventFilter(this);
+                sync();
+            }
+
+            ~UBMacPanelGlass() override
+            {
+                @try
+                {
+                    [mGlass removeFromSuperview];
+                }
+                @catch (NSException* exception)
+                {
+                    qWarning("UBGlassEffect: removing the panel glass failed: %s", [[exception reason] UTF8String]);
+                }
+#if !__has_feature(objc_arc)
+                [mGlass release];
+#endif
+                mGlass = nil;
+            }
+
+            bool eventFilter(QObject* watched, QEvent* event) override
+            {
+                if (watched == mPanel)
+                {
+                    switch (event->type())
+                    {
+                        case QEvent::Move:
+                        case QEvent::Resize:
+                        case QEvent::Show:
+                        case QEvent::Hide:
+                        case QEvent::ZOrderChange:
+                        case QEvent::ParentChange:
+                        case QEvent::EnabledChange:
+                            sync();
+                            // the native view may only follow after the event: sync again
+                            QTimer::singleShot(0, this, [this]() { sync(); });
+                            break;
+
+                        default:
+                            break;
+                    }
+                }
+
+                return false;
+            }
+
+            void sync()
+            {
+                if (!mPanel || !mGlass)
+                    return;
+
+                @try
+                {
+                    NSView* view = reinterpret_cast<NSView*>(mPanel->internalWinId());
+                    NSView* superview = view ? [view superview] : nil;
+
+                    if (!superview)
+                    {
+                        [mGlass setHidden:YES];
+                        return;
+                    }
+
+                    // always directly below the view of the panel, in the same superview
+                    NSArray<NSView*>* subviews = [superview subviews];
+                    const NSUInteger viewIndex = [subviews indexOfObject:view];
+                    const NSUInteger glassIndex = [subviews indexOfObject:mGlass];
+
+                    if ([mGlass superview] != superview || glassIndex == NSNotFound
+                            || viewIndex == NSNotFound || glassIndex + 1 != viewIndex)
+                    {
+                        [mGlass removeFromSuperview];
+                        [superview addSubview:mGlass positioned:NSWindowBelow relativeTo:view];
+                    }
+
+                    // the glass covers the body of the panel, the margin around it holds no glass
+                    QRect body = mPanel->property("ubGlassBody").toRect();
+
+                    if (body.isEmpty())
+                        body = mPanel->rect();
+
+                    const NSRect bodyInView = NSMakeRect(body.x(), [view isFlipped] ? body.y() : mPanel->height() - body.bottom() - 1,
+                                                         body.width(), body.height());
+                    const NSRect frame = [view convertRect:bodyInView toView:superview];
+
+                    if (!NSEqualRects([mGlass frame], frame))
+                        [mGlass setFrame:frame];
+
+                    const CGFloat radius = qMax(0.0, mPanel->property("ubGlassRadius").toReal());
+
+                    if (@available(macOS 26.0, *))
+                    {
+                        NSGlassEffectView* glass = (NSGlassEffectView*)mGlass;
+
+                        if ([glass cornerRadius] != radius)
+                            [glass setCornerRadius:radius];
+                    }
+
+                    [mGlass setHidden:(mPanel->isVisible() ? NO : YES)];
+                }
+                @catch (NSException* exception)
+                {
+                    qWarning("UBGlassEffect: panel glass sync failed: %s", [[exception reason] UTF8String]);
+                }
+            }
+
+        private:
+            QPointer<QWidget> mPanel;
+            NSView* mGlass;
+    };
+#endif
 }
 
 
@@ -257,30 +326,97 @@ void UBGlassEffect::applyToWindow(QWidget* widget)
 
     top->setProperty("ubGlassWindow", true);
 
-    // Vibrancy needs a non opaque Qt window. This can only be requested before
-    // the native window is created; the central widget stays opaque.
-    if (!vibrancyDisabled() && !top->testAttribute(Qt::WA_WState_Created) && qobject_cast<QMainWindow*>(top))
-    {
-        top->setAttribute(Qt::WA_TranslucentBackground);
-        top->setProperty("ubGlassTranslucentWindow", true);
-
-        if (QWidget* central = static_cast<QMainWindow*>(top)->centralWidget())
-            central->setAutoFillBackground(true);
-    }
-
+    // the window stays opaque: the board is drawn edge to edge below the transparent title bar
     top->installEventFilter(new UBMacWindowGlassFilter(top));
     updateWindowChrome(top);
 }
 
 
+int UBGlassEffect::topInset(QWidget* widget)
+{
+    if (!widget || nativeGlassDisabled())
+        return 0;
+
+    QWidget* top = widget->window();
+    const int titleBarHeight = top->property("ubGlassTitleBarHeight").toInt();
+
+    if (titleBarHeight <= 0 || top == widget)
+        return qMax(0, titleBarHeight);
+
+    const int y = widget->mapTo(top, QPoint(0, 0)).y();
+
+    return qMax(0, titleBarHeight - y);
+}
+
+
 void UBGlassEffect::applyToPanel(QWidget* panel)
 {
-    // Floating panels are non native child widgets painted into the window's
-    // single Qt layer, together with the board below them. A native
-    // NSGlassEffectView (macOS 26) or NSVisualEffectView can only be placed
-    // above that layer (hiding the panel's buttons) or below it (hidden by the
-    // board), so panels keep the Qt painted glass with the real blurred
-    // backdrop of the board (UBFloatingPalette). The native material is used
-    // for the window chrome only.
-    Q_UNUSED(panel);
+    // Native panel glass is opt-in: Qt paints all widgets of a window, native
+    // child views included, into one shared backing store. The layer of the
+    // native panel view may therefore show the board pixels behind the panel,
+    // hiding the glass view below it. Enable it with OPENBOARD_NATIVE_PANEL_GLASS=1
+    // to try; the painted glass is the default.
+    if (!panel || panel->isWindow() || !nativePanelGlassRequested())
+        return;
+
+    if (panel->property("ubNativeGlass").toBool() || panel->property("ubNativeGlassFailed").toBool())
+        return;
+
+#if defined(__MAC_26_0)
+    if (@available(macOS 26.0, *))
+    {
+        if (!NSClassFromString(@"NSGlassEffectView"))
+        {
+            panel->setProperty("ubNativeGlassFailed", true);
+            return;
+        }
+
+        @try
+        {
+            // a native child view (without making the ancestors native), with a transparent background
+            panel->setAttribute(Qt::WA_DontCreateNativeAncestors);
+            panel->setAttribute(Qt::WA_TranslucentBackground);
+            panel->setAttribute(Qt::WA_NoSystemBackground);
+            panel->setAttribute(Qt::WA_NativeWindow);
+
+            NSView* view = reinterpret_cast<NSView*>(panel->winId());
+
+            if (!view || ![view superview])
+            {
+                qWarning("UBGlassEffect: no native view for panel %s, keeping the painted glass",
+                         qPrintable(panel->objectName()));
+                panel->setProperty("ubNativeGlassFailed", true);
+                return;
+            }
+
+            NSGlassEffectView* glass = [[NSGlassEffectView alloc] initWithFrame:[view frame]];
+
+            if (!glass)
+            {
+                panel->setProperty("ubNativeGlassFailed", true);
+                return;
+            }
+
+            [glass setStyle:NSGlassEffectViewStyleRegular];
+            [glass setTintColor:nil];
+
+            [[view superview] addSubview:glass positioned:NSWindowBelow relativeTo:view];
+
+            // the panel paints its controls only, the glass view below draws the material
+            panel->setProperty("ubNativeGlass", true);
+            new UBMacPanelGlass(panel, glass);
+
+#if !__has_feature(objc_arc)
+            [glass release];
+#endif
+            panel->update();
+        }
+        @catch (NSException* exception)
+        {
+            qWarning("UBGlassEffect: native panel glass failed: %s", [[exception reason] UTF8String]);
+            panel->setProperty("ubNativeGlass", false);
+            panel->setProperty("ubNativeGlassFailed", true);
+        }
+    }
+#endif
 }
