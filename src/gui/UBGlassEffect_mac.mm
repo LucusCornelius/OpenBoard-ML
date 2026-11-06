@@ -790,6 +790,12 @@ namespace
                         gpuVisible = true;
                 }
 
+                // a panel moved into a translucent window (the desktop annotation overlay takes the
+                // dock palettes and the "add to" palette) paints its glass itself, like the panels
+                // created there: no native material on top of the desktop
+                if (mPanel && mPanel->window()->testAttribute(Qt::WA_TranslucentBackground))
+                    gpuVisible = true;
+
                 if (gpuVisible != mSuspended)
                 {
                     mSuspended = gpuVisible;
@@ -1070,7 +1076,9 @@ namespace
                         [mHost setAppearance:appearance];
 
                     // wait for the first rendered image, an empty glass body would flash
-                    const bool visible = mPanel->isVisible() && mImageKey != 0 && !mSuspended;
+                    // (never in a translucent window, see suspended())
+                    const bool visible = mPanel->isVisible() && mImageKey != 0 && !mSuspended
+                            && !mPanel->window()->testAttribute(Qt::WA_TranslucentBackground);
                     [mHost setHidden:(visible ? NO : YES)];
                 }
                 @catch (NSException* exception)

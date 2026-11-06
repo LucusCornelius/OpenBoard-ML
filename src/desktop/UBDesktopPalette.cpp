@@ -53,7 +53,7 @@ UBDesktopPalette::UBDesktopPalette(QWidget *parent, UBRightPalette* _rightPalett
 {
     QList<QAction*> actions;
 
-    mActionUniboard = new QAction(QIcon(":/images/toolbar/board.png"), tr("Show OpenBoard"), this);
+    mActionUniboard = new QAction(UBGlassStyle::icon("board"), tr("Show OpenBoard"), this);
     connect(mActionUniboard, SIGNAL(triggered()), this, SIGNAL(uniboardClick()));
     actions << mActionUniboard;
 
@@ -67,32 +67,29 @@ UBDesktopPalette::UBDesktopPalette(QWidget *parent, UBRightPalette* _rightPalett
     if (UBPlatformUtils::hasVirtualKeyboard())
         actions << UBApplication::mainWindow->actionVirtualKeyboard;
 
-    mActionCustomSelect = new QAction(QIcon(":/images/toolbar/captureArea.png"), tr("Capture Part of the Screen"), this);
+    mActionCustomSelect = new QAction(UBGlassStyle::icon("captureArea"), tr("Capture Part of the Screen"), this);
     connect(mActionCustomSelect, SIGNAL(triggered()), this, SIGNAL(customClick()));
     actions << mActionCustomSelect;
 
-    mDisplaySelectAction = new QAction(QIcon(":/images/toolbar/captureScreen.png"), tr("Capture the Screen"), this);
+    mDisplaySelectAction = new QAction(UBGlassStyle::icon("capture"), tr("Capture the Screen"), this);
     connect(mDisplaySelectAction, SIGNAL(triggered()), this, SIGNAL(screenClick()));
     actions << mDisplaySelectAction;
 
-    QIcon showHideIcon;
-    showHideIcon.addPixmap(QPixmap(":/images/toolbar/eyeOpened.png"), QIcon::Normal , QIcon::On);
-    showHideIcon.addPixmap(QPixmap(":/images/toolbar/eyeClosed.png"), QIcon::Normal , QIcon::Off);
-    mShowHideAction = new QAction(showHideIcon, "", this);
+    // open / crossed eye, switched in updateShowHideState
+    mShowHideAction = new QAction(UBGlassStyle::icon("hide"), "", this);
     mShowHideAction->setCheckable(true);
 
     connect(mShowHideAction, SIGNAL(triggered(bool)), this, SLOT(showHideClick(bool)));
     actions << mShowHideAction;
 
     setActions(actions);
-    setButtonIconSize(QSize(42, 42));
+    // monochrome glyphs like the stylus palette of the board
+    setButtonIconSize(QSize(24, 24));
 
     adjustSizeAndPosition();
 
     //  This palette can be minimized
-    QIcon maximizeIcon;
-    maximizeIcon.addPixmap(QPixmap(":/images/toolbar/stylusTab.png"), QIcon::Normal, QIcon::On);
-    mMaximizeAction = new QAction(maximizeIcon, tr("Show the stylus palette"), this);
+    mMaximizeAction = new QAction(UBGlassStyle::icon("pen"), tr("Show the stylus palette"), this);
     connect(mMaximizeAction, SIGNAL(triggered()), this, SLOT(maximizeMe()));
     connect(this, SIGNAL(maximizeStart()), this, SLOT(maximizeMe()));
     connect(this, SIGNAL(minimizeStart(eMinimizedLocation)), this, SLOT(minimizeMe(eMinimizedLocation)));
@@ -139,6 +136,7 @@ void UBDesktopPalette::showHideClick(bool checked)
 void UBDesktopPalette::updateShowHideState(bool pShowEnabled)
 {
     mShowHideAction->setChecked(pShowEnabled);
+    mShowHideAction->setIcon(UBGlassStyle::icon(pShowEnabled ? "show" : "hide"));
 
     if (mShowHideAction->isChecked())
         mShowHideAction->setToolTip(tr("Show Board on Secondary Screen"));
@@ -210,31 +208,15 @@ void UBDesktopPalette::maximizeMe()
 
 void UBDesktopPalette::showEvent(QShowEvent *event)
 {
-    Q_UNUSED(event);
-    QIcon penIcon;
-    QIcon markerIcon;
-    QIcon eraserIcon;
-    penIcon.addFile(":images/stylusPalette/penArrow.svg", QSize(), QIcon::Normal, QIcon::Off);
-    penIcon.addFile(":images/stylusPalette/penOnArrow.svg", QSize(), QIcon::Normal, QIcon::On);
-    UBApplication::mainWindow->actionPen->setIcon(penIcon);
-    markerIcon.addFile(":images/stylusPalette/markerArrow.svg", QSize(), QIcon::Normal, QIcon::Off);
-    markerIcon.addFile(":images/stylusPalette/markerOnArrow.svg", QSize(), QIcon::Normal, QIcon::On);
-    UBApplication::mainWindow->actionMarker->setIcon(markerIcon);
-    eraserIcon.addFile(":images/stylusPalette/eraserArrow.svg", QSize(), QIcon::Normal, QIcon::Off);
-    eraserIcon.addFile(":images/stylusPalette/eraserOnArrow.svg", QSize(), QIcon::Normal, QIcon::On);
-    UBApplication::mainWindow->actionEraser->setIcon(eraserIcon);
-
+    // the pen, marker and eraser keep their monochrome glyphs: a long press (or a click
+    // on the lower right corner) opens their colour and width palette
+    UBActionPalette::showEvent(event);
     adjustPosition();
 }
 
 void UBDesktopPalette::hideEvent(QHideEvent *event)
 {
-    Q_UNUSED(event);
-
-    // back to the monochrome board icons
-    UBApplication::mainWindow->actionPen->setIcon(UBGlassStyle::icon("pen"));
-    UBApplication::mainWindow->actionMarker->setIcon(UBGlassStyle::icon("marker"));
-    UBApplication::mainWindow->actionEraser->setIcon(UBGlassStyle::icon("eraser"));
+    UBActionPalette::hideEvent(event);
 }
 
 QPoint UBDesktopPalette::buttonPos(QAction *action)

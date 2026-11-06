@@ -793,6 +793,11 @@ void UBGlassStyle::applyIcons(UBMainWindow* mainWindow)
         {mainWindow->actionWebCustomCapture, "captureArea"},
         {mainWindow->actionWebWindowCapture, "window"},
         {mainWindow->actionWebShowHideOnDisplay, "show"},
+        // "add to" palette after a capture (web and desktop mode)
+        {mainWindow->actionAddItemToCurrentPage, "add"},
+        {mainWindow->actionAddItemToNewPage, "newDocument"},
+        {mainWindow->actionAddItemToLibrary, "library"},
+        {mainWindow->actionEraseDesktopAnnotations, "erase"},
         // document mode
         {mainWindow->actionNewDocument, "newDocument"},
         {mainWindow->actionNewFolder, "newFolder"},

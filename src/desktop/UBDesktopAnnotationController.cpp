@@ -139,17 +139,28 @@ UBDesktopAnnotationController::UBDesktopAnnotationController(QObject *parent, UB
 
     connect(mTransparentDrawingView, SIGNAL(resized(QResizeEvent*)), this, SLOT(onTransparentWidgetResized()));
 
+    // the shape (mask) of the overlay follows every panel on it: panels shown, moved or
+    // reparented onto the overlay later (dock palettes, "add to" palette, pen palettes)
+    mTransparentDrawingView->installEventFilter(this);
+
+    for (QObject* child : mTransparentDrawingView->children())
+    {
+        child->installEventFilter(this);
+    }
+
 
     connect(UBDrawingController::drawingController(), SIGNAL(stylusToolChanged(int)), this, SLOT(stylusToolChanged(int)));
 
     // Add the desktop associated palettes
-    mDesktopPenPalette = new UBDesktopPenPalette(mTransparentDrawingView, rightPalette, "desktop");
+    // "glass" buttons: flat like the pen panel of the board (the old "desktop" names
+    // matched toolbar rules which gave them a bevelled look)
+    mDesktopPenPalette = new UBDesktopPenPalette(mTransparentDrawingView, rightPalette, "glass");
 
     connect(mDesktopPalette, SIGNAL(maximized()), mDesktopPenPalette, SLOT(onParentMaximized()));
     connect(mDesktopPalette, SIGNAL(minimizeStart(eMinimizedLocation)), mDesktopPenPalette, SLOT(onParentMinimized()));
 
-    mDesktopMarkerPalette = new UBDesktopMarkerPalette(mTransparentDrawingView, rightPalette, "desktop");
-    mDesktopEraserPalette = new UBDesktopEraserPalette(mTransparentDrawingView, rightPalette, "desktop");
+    mDesktopMarkerPalette = new UBDesktopMarkerPalette(mTransparentDrawingView, rightPalette, "glass");
+    mDesktopEraserPalette = new UBDesktopEraserPalette(mTransparentDrawingView, rightPalette, "glass");
 
     mDesktopPalette->setBackgroundBrush(QBrush(UBSettings::settings()->opaquePaletteColor));
 
@@ -334,7 +345,16 @@ void UBDesktopAnnotationController::showWindow()
     mDesktopPalette->setDisplaySelectButtonVisible(true);
 
     connect(UBApplication::applicationController, SIGNAL(desktopMode(bool))
-            , mDesktopPalette, SLOT(setDisplaySelectButtonVisible(bool)));
+            , mDesktopPalette, SLOT(setDisplaySelectButtonVisible(bool)), Qt::UniqueConnection);
+
+    // the overlay covers the screen the control window is on (UBDisplayManager::assignRoles),
+    // never another one
+    const QRect desktopRect = UBApplication::displayManager->screenGeometry(ScreenRole::Desktop);
+
+    if (desktopRect.isValid() && mTransparentDrawingView->geometry() != desktopRect)
+    {
+        mTransparentDrawingView->setGeometry(desktopRect);
+    }
 
     mDesktopPalette->show();
 
@@ -345,9 +365,8 @@ void UBDesktopAnnotationController::showWindow()
 
     if (!mWindowPositionInitialized)
     {
-        QRect desktopRect = UBApplication::displayManager->screenGeometry(ScreenRole::Desktop);
-
-        mDesktopPalette->move(5, desktopRect.top() + 150);
+        // the palette is a child of the overlay: local coordinates
+        mDesktopPalette->move(5, 150);
 
         mWindowPositionInitialized = true;
         mDesktopPalette->maximizeMe();
@@ -359,7 +378,14 @@ void UBDesktopAnnotationController::showWindow()
 
     UBDrawingController::drawingController()->setStylusTool(mDesktopStylusTool);
 
-#ifndef Q_OS_LINUX
+#if defined(Q_OS_MACOS)
+    // a frameless window covering exactly the screen of the control window; not maximized:
+    // the zoom of macOS would use the visible frame of whatever screen the window was on before
+    mTransparentDrawingView->setWindowState(Qt::WindowNoState);
+    mTransparentDrawingView->setGeometry(desktopRect);
+    mTransparentDrawingView->show();
+    mTransparentDrawingView->raise();
+#elif !defined(Q_OS_LINUX)
     UBPlatformUtils::showFullScreen(mTransparentDrawingView);
 #else
     // this is necessary to avoid hiding the panels on Unity and Cinnamon
@@ -455,7 +481,8 @@ void UBDesktopAnnotationController::hideWindow()
 
 void UBDesktopAnnotationController::goToUniboard()
 {
-    UBApplication::applicationController->showBoard();
+    // back to the window and the mode the desktop was opened from
+    UBApplication::applicationController->hideDesktop();
 }
 
 
@@ -876,6 +903,61 @@ void UBDesktopAnnotationController::onTransparentWidgetResized()
     UBApplication::boardController->paletteManager()->leftPalette()->resize(lW, rH);
 }
 
+bool UBDesktopAnnotationController::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == mTransparentDrawingView)
+    {
+        if (event->type() == QEvent::ChildAdded)
+        {
+            QObject* child = static_cast<QChildEvent*>(event)->child();
+
+            if (child && child->isWidgetType())
+            {
+                child->installEventFilter(this);
+                scheduleMaskRefresh();
+            }
+        }
+        else if (event->type() == QEvent::ChildRemoved)
+        {
+            scheduleMaskRefresh();
+        }
+    }
+    else if (watched->isWidgetType() && static_cast<QWidget*>(watched)->parentWidget() == mTransparentDrawingView)
+    {
+        switch (event->type())
+        {
+            case QEvent::Show:
+            case QEvent::Hide:
+            case QEvent::Move:
+            case QEvent::Resize:
+                scheduleMaskRefresh();
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    return QObject::eventFilter(watched, event);
+}
+
+
+void UBDesktopAnnotationController::scheduleMaskRefresh()
+{
+#ifdef UB_REQUIRES_MASK_UPDATE
+    if (mMaskRefreshPending || !mTransparentDrawingView || !mTransparentDrawingView->isVisible())
+        return;
+
+    mMaskRefreshPending = true;
+
+    QTimer::singleShot(0, this, [this]() {
+        mMaskRefreshPending = false;
+        refreshMask();
+    });
+#endif
+}
+
+
 void UBDesktopAnnotationController::updateMask(bool bTransparent)
 {
     if(bTransparent)
@@ -891,6 +973,22 @@ void UBDesktopAnnotationController::updateMask(bool bTransparent)
 
         p.setPen(Qt::red);
         p.setBrush(QBrush(Qt::red));
+
+        // every visible panel on the overlay: the desktop palette, its pen, marker and eraser
+        // palettes, the dock palettes and their tabs, the "add to" palette, the keyboard;
+        // a panel outside the mask would not be shown at all
+        for (QObject* child : mTransparentDrawingView->children())
+        {
+            QWidget* panel = qobject_cast<QWidget*>(child);
+
+            if (!panel || panel->isWindow() || !panel->isVisible() || panel == mTransparentDrawingView->viewport()
+                    || panel->objectName().startsWith("qt_scrollarea"))
+            {
+                continue;
+            }
+
+            p.drawRect(panel->geometry());
+        }
 
         // Here we draw the widget mask
         if(mDesktopPalette->isVisible())
@@ -993,16 +1091,11 @@ void UBDesktopAnnotationController::updateMask(bool bTransparent)
 void UBDesktopAnnotationController::refreshMask()
 {
     if (mTransparentDrawingScene && mTransparentDrawingView->isVisible()) {
-        if(mIsFullyTransparent
-                || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Selector
-                //Needed to work correctly when another actions on stylus are checked
-                || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Eraser
-                || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Pointer
-                || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Pen
-                || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Marker)
-        {
-            updateMask(true);
-        }
+        // the same rule as updateBackground: only with the selector (or while capturing) the
+        // desktop is used through the overlay, with the drawing tools the whole overlay
+        // takes the input
+        updateMask(mIsFullyTransparent
+                || UBDrawingController::drawingController()->stylusTool() == UBStylusTool::Selector);
     }
 }
 
