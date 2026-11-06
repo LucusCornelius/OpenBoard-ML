@@ -855,6 +855,35 @@ void UBGlassStyle::applyIcons(UBMainWindow* mainWindow)
         {mainWindow->actionHome, "home"},
         {mainWindow->actionWebBigger, "zoomIn"},
         {mainWindow->actionWebSmaller, "zoomOut"},
+        {mainWindow->actionCaptureWebContent, "webCapture"},
+        {mainWindow->actionWebCustomCapture, "captureArea"},
+        {mainWindow->actionWebWindowCapture, "window"},
+        {mainWindow->actionWebShowHideOnDisplay, "show"},
+        // document mode
+        {mainWindow->actionNewDocument, "newDocument"},
+        {mainWindow->actionNewFolder, "newFolder"},
+        {mainWindow->actionImport, "import"},
+        {mainWindow->actionExport, "export"},
+        {mainWindow->actionRename, "rename"},
+        {mainWindow->actionAddDocumentToFavorites, "favorite"},
+        {mainWindow->actionDuplicate, "duplicate"},
+        {mainWindow->actionDelete, "erase"},
+        {mainWindow->actionOpen, "open"},
+        {mainWindow->actionAddToWorkingDocument, "addToDocument"},
+        {mainWindow->actionDocumentAdd, "add"},
+        // OpenBoard menu
+        {mainWindow->actionCut, "cut"},
+        {mainWindow->actionCopy, "copy"},
+        {mainWindow->actionPaste, "paste"},
+        {mainWindow->actionHideApplication, "hide"},
+        {mainWindow->actionSleep, "sleep"},
+        {mainWindow->actionOpenTutorial, "help"},
+        {mainWindow->actionHintsAndTips, "hints"},
+        {mainWindow->actionPreferences, "preferences"},
+        {mainWindow->actionMultiScreen, "multiScreen"},
+        {mainWindow->actionToggleFullScreen, "fullScreen"},
+        {mainWindow->actionPodcast, "record"},
+        {mainWindow->actionQuit, "quit"},
     };
 
     for (const auto& entry : glassIcons)
@@ -1168,6 +1197,7 @@ QDialog#preferencesDialog QTabWidget::pane
 {
     min-width: 40px;
     min-height: 40px;
+    border-radius: 25px;
 }
 
 @P@[glassLabels="true"] QToolButton#clusterButton

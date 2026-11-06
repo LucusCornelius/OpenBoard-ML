@@ -435,6 +435,33 @@
         <file>images/glass/stop.svg</file>
         <file>images/glass/tools.svg</file>
         <file>images/glass/appearance.svg</file>
+        <file>images/glass/newDocument.svg</file>
+        <file>images/glass/newFolder.svg</file>
+        <file>images/glass/import.svg</file>
+        <file>images/glass/export.svg</file>
+        <file>images/glass/rename.svg</file>
+        <file>images/glass/favorite.svg</file>
+        <file>images/glass/duplicate.svg</file>
+        <file>images/glass/open.svg</file>
+        <file>images/glass/addToDocument.svg</file>
+        <file>images/glass/add.svg</file>
+        <file>images/glass/pageSize.svg</file>
+        <file>images/glass/cut.svg</file>
+        <file>images/glass/copy.svg</file>
+        <file>images/glass/paste.svg</file>
+        <file>images/glass/hide.svg</file>
+        <file>images/glass/show.svg</file>
+        <file>images/glass/sleep.svg</file>
+        <file>images/glass/help.svg</file>
+        <file>images/glass/hints.svg</file>
+        <file>images/glass/preferences.svg</file>
+        <file>images/glass/multiScreen.svg</file>
+        <file>images/glass/fullScreen.svg</file>
+        <file>images/glass/record.svg</file>
+        <file>images/glass/quit.svg</file>
+        <file>images/glass/window.svg</file>
+        <file>images/glass/captureArea.svg</file>
+        <file>images/glass/webCapture.svg</file>
     </qresource>
     <qresource prefix="/shortcutProfiles">
         <file alias="keyboard-default.json">etc/shortcutProfiles/keyboard-default.json</file>

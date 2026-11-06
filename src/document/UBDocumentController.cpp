@@ -50,6 +50,7 @@
 #include "board/UBBoardController.h"
 #include "board/UBBoardPaletteManager.h"
 
+#include "gui/UBGlassStyle.h"
 #include "gui/UBMessageWindow.h"
 #include "gui/UBMainWindow.h"
 #include "gui/UBDocumentToolsPalette.h"
@@ -3664,6 +3665,9 @@ void UBDocumentController::updateActions()
         }
         break;
     }
+
+    // one monochrome trash glyph for every kind of deletion, the text tells which one
+    mMainWindow->actionDelete->setIcon(UBGlassStyle::icon("erase"));
 
     mMainWindow->actionDocumentAdd->setEnabled((docSelected || pageSelected) && !trashSelected);
     mMainWindow->actionImport->setEnabled(!trashSelected);
