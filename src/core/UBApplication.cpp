@@ -109,8 +109,12 @@ UBApplication::UBApplication(const QString &id, int &argc, char **argv) : Single
 
     setOrganizationName("Open Education Foundation");
     setOrganizationDomain("oe-f.org");
+    // The application name stays "OpenBoard": UBSettings derives the user data directory, the
+    // config file names and the pictures/videos/audio folders from it, so the documents and
+    // settings of OpenBoard keep working. The fork shows its own name everywhere the user sees it.
     setApplicationName("OpenBoard");
-    setDesktopFileName("ch.openboard.OpenBoard");
+    setApplicationDisplayName("OpenBoard-ML");
+    setDesktopFileName("org.openboard-ml.OpenBoard-ML");
     // With Qt 6.9 on macOS 15 (at least), icons aren't shown in menus. This forces their display.
     QCoreApplication::setAttribute(Qt::AA_DontShowIconsInMenus, false);
 
@@ -405,7 +409,7 @@ int UBApplication::exec(const QString& pFileToImport)
     connect(mainWindow->actionCopy, SIGNAL(triggered()), applicationController, SLOT(actionCopy()));
     connect(mainWindow->actionPaste, SIGNAL(triggered()), applicationController, SLOT(actionPaste()));
 
-    // window title: "OpenBoard" plus the name of the current document
+    // window title: the application name plus the name of the current document
     connect(boardController, &UBBoardController::documentSet, this, &UBApplication::updateWindowTitle);
     connect(boardController, &UBBoardController::activeSceneChanged, this, &UBApplication::updateWindowTitle);
     connect(UBPersistenceManager::persistenceManager(), &UBPersistenceManager::documentMetadataChanged, this, &UBApplication::updateWindowTitle);
@@ -454,7 +458,7 @@ void UBApplication::toggleFullScreen(bool fullScreen)
 
 void UBApplication::updateWindowTitle()
 {
-    QString title = applicationName();
+    QString title = applicationDisplayName();
 
     if (boardController)
     {
@@ -462,7 +466,12 @@ void UBApplication::updateWindowTitle()
 
         if (document && !document->name().isEmpty())
         {
+#ifdef Q_OS_OSX
             title += " - " + document->name();
+#else
+            // Windows and Linux append the display name to titles that do not end with it
+            title = document->name() + " - " + title;
+#endif
         }
     }
 

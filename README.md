@@ -5,6 +5,12 @@ interactive whiteboard for schools, with a modern flat user interface and a set 
 teaching maths with a pen tablet. It is based on the upstream `dev` branch (1.8.0) and builds with the
 same tools; no new dependencies.
 
+OpenBoard-ML has its own name and version numbering (currently 1.0.0, independent of upstream) and can
+be installed next to OpenBoard. It keeps OpenBoard's data location and file format: documents and
+settings of an existing OpenBoard installation (for example `~/Library/Application Support/OpenBoard`
+on macOS) are used as they are, and `.ubz` files stay compatible both ways. Because the two share
+their documents, do not run OpenBoard and OpenBoard-ML at the same time.
+
 | macOS (Liquid Glass) | Windows and Linux (modern style) |
 |---|---|
 | ![macOS](docs/screenshots/macos-liquid-glass.png) | ![Modern style](docs/screenshots/modern-style.png) |
@@ -35,14 +41,14 @@ Ready-made builds are published on the [Releases](../../releases) page of this r
 
 ### macOS
 
-1. Download `OpenBoard.dmg` from the latest release (Apple Silicon; macOS 12 or newer, the glass
-   effects need macOS 26).
-2. Open the image and drag `OpenBoard` to `Applications`.
+1. Download `OpenBoard-ML-1.0.0-macOS-arm64.dmg` from the latest release (Apple Silicon; macOS 12 or
+   newer, the glass effects need macOS 26).
+2. Open the image and drag `OpenBoard-ML` to `Applications`.
 3. The app is not signed with an Apple developer certificate. The first time, right-click the app and
    choose **Open**, or run in Terminal:
 
    ```bash
-   xattr -dr com.apple.quarantine /Applications/OpenBoard.app
+   xattr -dr com.apple.quarantine /Applications/OpenBoard-ML.app
    ```
 
 ### Windows
@@ -74,13 +80,14 @@ git clone https://github.com/<your-user>/OpenBoard-ML.git
 cd OpenBoard-ML
 qmake OpenBoard.pro -spec macx-clang CONFIG+=release
 make -j8 release
-open build/macx/release/product/OpenBoard.app
+open build/macx/release/product/OpenBoard-ML.app
 ```
 
 `OpenBoard.pro` finds the libraries in `/opt/homebrew`, `/usr/local` or `/opt/local` on its own
 (override with `qmake OpenBoard.pro MAC_LIB_PREFIX=/some/prefix`). Qt from the Qt Online Installer
 works too: use its `qmake` and add the modules *Qt WebEngine*, *Qt Multimedia* and *Qt 5 Compatibility*.
-To make a distributable disk image: `macdeployqt build/macx/release/product/OpenBoard.app -dmg`.
+To make a distributable disk image: `macdeployqt build/macx/release/product/OpenBoard-ML.app -dmg`
+(creates `OpenBoard-ML.dmg` next to the app).
 
 ### Windows
 
@@ -94,6 +101,8 @@ cd OpenBoard-ML
 C:\Qt\6.9.3\msvc2022_64\bin\qmake.exe OpenBoard.pro CONFIG+=release
 nmake release
 ```
+
+The program is `build\win32\release\product\OpenBoard-ML.exe`.
 
 The modern style uses the Windows 11 Qt style when available and sets a dark title bar through
 `DwmSetWindowAttribute` (`-lDwmapi`). This fork has not been compiled on Windows yet; please open
@@ -111,8 +120,12 @@ cd OpenBoard-ML
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j8
 sudo cmake --install build      # rulings and device profiles are read from the install prefix
-openboard
+openboard-ml
 ```
+
+The CMake build installs the program `openboard-ml`, its data in `share/openboard-ml`, its system
+configuration in `etc/openboard-ml` and the desktop entry `org.openboard-ml.OpenBoard-ML.desktop`,
+next to (not over) an installed OpenBoard.
 
 Linux gets the same modern style as Windows. The Linux CMake build of this fork was last built
 in a container during development and should be re-checked on a real system.

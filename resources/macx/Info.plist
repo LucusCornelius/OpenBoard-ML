@@ -49,21 +49,25 @@
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
-	<string>OpenBoard</string>
+	<string>@EXECUTABLE@</string>
+	<key>CFBundleName</key>
+	<string>OpenBoard-ML</string>
+	<key>CFBundleDisplayName</key>
+	<string>OpenBoard-ML</string>
 	<key>CFBundleGetInfoString</key>
-	<string>OpenBoard @SHORT_VERSION@</string>
+	<string>OpenBoard-ML @FULL_VERSION@</string>
 	<key>CFBundleIconFile</key>
 	<string>OpenBoard.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>org.oe-f.OpenBoard</string>
+	<string>org.openboard-ml.OpenBoard-ML</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>5.0.0 (rDEVELOPMENT)</string>
+	<string>@FULL_VERSION@</string>
 	<key>CFBundleSignature</key>
 	<string>OpenB</string>
 	<key>CFBundleVersion</key>
-	<string>0</string>
+	<string>@FULL_VERSION@</string>
 	<key>SUPublicDSAKeyFile</key>
 	<string>sparkle_public_key.pem</string>
 	<key>NSMicrophoneUsageDescription</key>

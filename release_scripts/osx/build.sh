@@ -18,7 +18,9 @@ SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$SCRIPT_PATH/../.."
 
 
-APPLICATION_NAME="OpenBoard"
+APPLICATION_NAME="OpenBoard-ML"
+# name of the project file (OpenBoard.pro) and of the PackageMaker project (OpenBoard.packproj)
+PROJECT_NAME="OpenBoard"
 BASE_QT_DIR=/Users/dev/Qt/6.9.3/macos
 # Executables
 QMAKE=$BASE_QT_DIR/bin/qmake
@@ -91,18 +93,18 @@ done
 }
 
 
-trap "defaults write org.oe-f.OpenBoard.release Running -bool NO" EXIT
+trap "defaults write org.openboard-ml.OpenBoard-ML.release Running -bool NO" EXIT
 
-notify "Running OpenBoard release script (`date`)"
+notify "Running $APPLICATION_NAME release script (`date`)"
 
 cd $PROJECT_ROOT
 
-script_is_running=`defaults read org.oe-f.OpenBoard.release Running 2>/dev/null`
+script_is_running=`defaults read org.openboard-ml.OpenBoard-ML.release Running 2>/dev/null`
 if [[ $? -eq 0 ]] && [[ "$script_is_running" = "1" ]]; then
     trap EXIT
     abort "another release script already running"
 fi
-defaults write org.oe-f.OpenBoard.release Running -bool YES
+defaults write org.openboard-ml.OpenBoard-ML.release Running -bool YES
 
 # Check for executables
 checkExecutable "$QMAKE"
@@ -120,16 +122,16 @@ rm -rf "$BUILD_DIR"
 
 # application translations
 notify "Generating applications translatons"
-$LRELEASE "$APPLICATION_NAME.pro"
+$LRELEASE "$PROJECT_NAME.pro"
 
 # generate Makefiles
 notify "Generating Makefile ..."
 
 
 if [ "$1" == "1010" ]; then
-   QMAKE_CMD="$QMAKE \"DEFINES+=OS_NEWER_THAN_OR_EQUAL_TO_1010\" $APPLICATION_NAME.pro -spec macx-clang"
+   QMAKE_CMD="$QMAKE \"DEFINES+=OS_NEWER_THAN_OR_EQUAL_TO_1010\" $PROJECT_NAME.pro -spec macx-clang"
 else
-   QMAKE_CMD="$QMAKE $APPLICATION_NAME.pro -spec macx-clang"
+   QMAKE_CMD="$QMAKE $PROJECT_NAME.pro -spec macx-clang"
 fi
 $QMAKE_CMD
 
@@ -178,7 +180,7 @@ $STRIP -S "$APP/Contents/MacOS/$APPLICATION_NAME"
 notify "$APPLICATION_NAME is now built. You can now sign the application using the script 'codesign.sh'."
 notify "Usage : sudo ./codesign.sh \"Developer ID Application: ...\""
 notify "You can also ignore signing step if you don't intend to distribute this version"
-notify "If so, you can directly package OpenBoard using the script 'package.sh'"
+notify "If so, you can directly package $APPLICATION_NAME using the script 'package.sh'"
 notify "Usage : sudo ./package.sh"
 
 exit 0

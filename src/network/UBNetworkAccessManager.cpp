@@ -164,7 +164,7 @@ void UBNetworkAccessManager::sslErrors(QNetworkReply *reply, const QList<QSslErr
         QMessageBox messageBox;
         messageBox.setParent(mainWindow);
         messageBox.setWindowFlags(Qt::Dialog);
-        messageBox.setWindowTitle(QCoreApplication::applicationName());
+        messageBox.setWindowTitle(QGuiApplication::applicationDisplayName());
         messageBox.setText(tr("SSL Errors:\n\n%1\n\n%2\n\n"
                               "Do you want to ignore these errors for this host?").arg(reply->url().toString()).arg(errors));
         QPushButton* yesButton = messageBox.addButton(tr("Yes"),QMessageBox::YesRole);

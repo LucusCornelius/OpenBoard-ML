@@ -133,7 +133,7 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
 * **Freeform-style layout**: in board mode there is no toolbar strip. The board runs edge to
   edge and the controls float above it as pieces of glass (the "control layer"):
   * top-left cluster: Undo, Redo | Backgrounds, Maths | Pages, Previous, Next, Erase;
-  * top-right cluster: Web, Documents, Desktop | OpenBoard menu (Board while not on the board);
+  * top-right cluster: Web, Documents, Desktop | OpenBoard-ML menu (Board while not on the board);
   * pen panel capsule at the top centre, tool capsule at the bottom centre; Backgrounds and
     Maths palettes float. Groups are separated by thin hairlines; the active item is a solid
     accent capsule, hover/press show a light glass pill.
@@ -197,15 +197,15 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
   ring for the current background, also used in the preferences.
 * Monochrome SF Symbols like icons (`resources/images/glass/`, tinted per material) also for
   the pen, eraser and marker tools, the dock tabs, the document toolbar, the web tools
-  palette and the OpenBoard menu.
+  palette and the OpenBoard-ML menu.
 * Dark/light theme (`App/ThemeMode`: 0 system, 1 light, 2 dark) applies to menus, dialogs,
   dock palettes and the web/document toolbars; painted glass panels adapt to the content below,
   native glass panels on macOS follow the theme.
 * The app runs in a normal resizable window by default (`App/RunInWindow=true`); window
-  geometry is remembered. **Full screen**: Ctrl+Shift+F (OpenBoard menu), or the green
+  geometry is remembered. **Full screen**: Ctrl+Shift+F (OpenBoard-ML menu), or the green
   zoom button on macOS. Connecting or disconnecting a screen does not move the window
   (it is only brought back when its screen is gone) and does not re-centre the board.
-* **Show on Second Screen** (OpenBoard menu; also Preferences → Display → *Show the board on
+* **Show on Second Screen** (OpenBoard-ML menu; also Preferences → Display → *Show the board on
   a second screen or projector*; `App/UseMultiscreenMode`, **off by default**): additionally
   shows the board full screen on another screen or projector, switched on and off at once.
   The projection always goes to a screen the window is not on: the control role follows
@@ -254,7 +254,7 @@ QuaZip version. Override with `qmake OpenBoard.pro MAC_LIB_PREFIX=/some/prefix`.
 ```bash
 ~/Qt/6.9.3/macos/bin/qmake OpenBoard.pro -spec macx-clang CONFIG+=release
 make -j8 release
-~/Qt/6.9.3/macos/bin/macdeployqt build/macx/release/product/OpenBoard.app
+~/Qt/6.9.3/macos/bin/macdeployqt build/macx/release/product/OpenBoard-ML.app
 ```
 
 Add `CONFIG+=universal` to the qmake line for an x86_64 + arm64 build (needs universal

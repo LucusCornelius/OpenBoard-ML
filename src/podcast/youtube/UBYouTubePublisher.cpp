@@ -69,7 +69,7 @@ void UBYouTubePublisher::uploadVideo(const QString& videoFilePath)
     UBYouTubePublishingDialog pub(videoFilePath, UBApplication::mainWindow);
 
     pub.title->setText(QFileInfo(mVideoFilePath).completeBaseName());
-    pub.keywords->setText(qApp->applicationName());
+    pub.keywords->setText(QGuiApplication::applicationDisplayName());
 
     QString defaultEMail = UBSettings::settings()->youTubeUserEMail->get().toString();
     pub.email->setText(defaultEMail);

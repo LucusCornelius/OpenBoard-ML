@@ -27,7 +27,7 @@ RESOURCES_DIR="$PROJECT_ROOT/resources"
 MACX_RESOURCES_DIR="$RESOURCES_DIR/macx"
 INSTALL_DIR="$PROJECT_ROOT/install/mac"
 
-APPLICATION_NAME="OpenBoard"
+APPLICATION_NAME="OpenBoard-ML"
 APPLICATION_DOT_APP="$APPLICATION_NAME.app"
 APPLICATION_DIR="$PRODUCT_DIR/$APPLICATION_DOT_APP"
 APPLICATION_CONTENTS_DIR="$APPLICATION_DIR/Contents"
@@ -101,7 +101,7 @@ signOpenBoard
 
 signWebEngine
 
-notify "$APPLICATION_NAME is now signed. You can now package OpenBoard using the script 'package.sh'"
+notify "$APPLICATION_NAME is now signed. You can now package $APPLICATION_NAME using the script 'package.sh'"
 
 exit 0
 

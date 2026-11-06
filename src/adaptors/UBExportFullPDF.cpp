@@ -328,7 +328,7 @@ bool UBExportFullPDF::persistsDocument(std::shared_ptr<UBDocumentProxy> pDocumen
 
             QMessageBox errorBox;
             errorBox.setIcon(QMessageBox::Warning);
-            errorBox.setText(tr("The original PDF imported in OpenBoard seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure."));
+            errorBox.setText(tr("The original PDF imported in OpenBoard-ML seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard-ML. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure."));
             QApplication::restoreOverrideCursor();
             errorBox.exec();
             QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
@@ -342,7 +342,7 @@ bool UBExportFullPDF::persistsDocument(std::shared_ptr<UBDocumentProxy> pDocumen
 
             QMessageBox errorBox;
             errorBox.setIcon(QMessageBox::Warning);
-            errorBox.setText(tr("The original PDF imported in OpenBoard seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure."));
+            errorBox.setText(tr("The original PDF imported in OpenBoard-ML seems not valid and could not be merged with your annotations. Please repair it and then reimport it in OpenBoard-ML. The current export will be done with detailed (heavy) images of the pages of the original PDF instead, to avoid complete export failure."));
             QApplication::restoreOverrideCursor();
             errorBox.exec();
             QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));

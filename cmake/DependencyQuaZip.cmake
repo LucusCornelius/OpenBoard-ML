@@ -3,7 +3,7 @@
 find_package(QuaZip-Qt${QT_VERSION} 1.0 QUIET)
 
 if(QuaZip-Qt${QT_VERSION}_FOUND)
-    target_link_libraries(openboard
+    target_link_libraries(${PROJECT_NAME}
         QuaZip::QuaZip
     )
 else()

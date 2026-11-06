@@ -130,7 +130,7 @@ target_sources(${PROJECT_NAME} PRIVATE
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)
-    target_sources(openboard PRIVATE
+    target_sources(${PROJECT_NAME} PRIVATE
         UBKeyboardPalette_linux.cpp
     )
 endif()

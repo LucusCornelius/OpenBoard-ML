@@ -20,7 +20,9 @@ SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$SCRIPT_PATH/../.."
 
 
-APPLICATION_NAME="OpenBoard"
+APPLICATION_NAME="OpenBoard-ML"
+# name of the project file (OpenBoard.pro) and of the PackageMaker project (OpenBoard.packproj)
+PROJECT_NAME="OpenBoard"
 BASE_QT_DIR=/Users/dev/Qt/6.9.3/macos
 # Executables
 QMAKE=$BASE_QT_DIR/bin/qmake
@@ -66,18 +68,18 @@ function checkExecutable {
     fi
 }
 
-trap "defaults write org.oe-f.OpenBoard.release Running -bool NO" EXIT
+trap "defaults write org.openboard-ml.OpenBoard-ML.release Running -bool NO" EXIT
 
-notify "Running OpenBoard release script (`date`)"
+notify "Running $APPLICATION_NAME release script (`date`)"
 
 cd $PROJECT_ROOT
 
-script_is_running=`defaults read org.oe-f.OpenBoard.release Running 2>/dev/null`
+script_is_running=`defaults read org.openboard-ml.OpenBoard-ML.release Running 2>/dev/null`
 if [[ $? -eq 0 ]] && [[ "$script_is_running" = "1" ]]; then
     trap EXIT
     abort "another release script already running"
 fi
-defaults write org.oe-f.OpenBoard.release Running -bool YES
+defaults write org.openboard-ml.OpenBoard-ML.release Running -bool YES
 
 # Check for executables
 checkExecutable "$QMAKE"
@@ -114,7 +116,7 @@ GSYM_i386="$PRODUCT_DIR/$APPLICATION_NAME i386.sym"
 INFO_PLIST="$APP/Contents/Info.plist"
 
 if [ "$1" == "pkg" ]; then
-    BASE_ICEBERG_CONFIG_FILE="$SCRIPT_PATH/$APPLICATION_NAME.packproj"
+    BASE_ICEBERG_CONFIG_FILE="$SCRIPT_PATH/$PROJECT_NAME.packproj"
     #copy the standard file for working with
     ICEBERG_CONFIG_FILE="$APPLICATION_NAME-working.packproj"
     cp -r $BASE_ICEBERG_CONFIG_FILE $ICEBERG_CONFIG_FILE
