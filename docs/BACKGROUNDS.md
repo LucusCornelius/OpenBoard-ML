@@ -144,6 +144,85 @@ background, and switching the background re-colours existing strokes
 dark background the colour palette shows white first and a new stroke is drawn white. No
 change was necessary.
 
+## Dark appearance: the board follows dark mode
+
+When the application uses the dark appearance (*Appearance* menu, *Preferences > Display >
+Theme*, or the system in *Follow System*), the board is shown dark as well: dark background,
+light rulings, white instead of black ink, dark glass panels (on macOS the panels adapt to the
+board below them). Switching the appearance applies at once to the current page and to all
+pages that are loaded; pages opened later are shown the same way.
+
+The preference *Board follows dark mode* (*Preferences > Display*, next to *Theme*, setting
+`Board/FollowsDarkMode`, default on) turns this off: dark user interface with a white board.
+It is applied live.
+
+### How it works
+
+It reuses the existing light/dark background mechanism, there is no second colour system:
+
+* `UBBoardController::updateBoardAppearance()` computes *dark appearance and preference on*
+  and stores it as runtime state in `UBSettings::setBoardDarkFromAppearance()` (not saved),
+  which emits `boardAppearanceChanged`. It is called at start up, on
+  `UBThemeManager::themeChanged` and when the preference changes.
+* A scene distinguishes the background **of the page** (`isPageDarkBackground()`, saved as
+  `ub:dark-background`) from the way it is **shown** (`isDarkBackground()` = page dark *or*
+  board follows the dark appearance). Every scene listens to `boardAppearanceChanged`
+  (`UBGraphicsScene::updateAppearance`) and switches like the *Switch background color*
+  toggle does: rulings use their dark colours, strokes switch to their colour for dark
+  backgrounds (`recolorAllItems`), texts swap black and white.
+* `UBSettings::isDarkBackground()` likewise means *shown dark* (used by the colour palettes,
+  pen colours, text colours); `isPageDarkBackground()` is the saved choice used for new pages.
+* So in the dark appearance the pen palette shows the colours for dark backgrounds
+  (`PenDarkBackgroundColors`): black ink becomes white, dark blue becomes light blue, etc.
+  A stroke keeps both colours, so it is shown correctly in both appearances.
+
+### Persistence: the appearance only changes the display
+
+* The saved background of a page is never changed by the appearance. An old light document
+  opened in the dark appearance is shown dark; a page created in the dark appearance is saved
+  as a light page (unless *black* was chosen) and is shown light in the light appearance.
+* Switching the appearance does not mark pages as modified (the modified flag is kept while
+  recolouring).
+* Pages are saved with the colours for their own background: if a page is shown dark only
+  because of the appearance, it is written from a copy switched back to its own background
+  (`UBPersistenceManager::persistDocumentScene`, `setFollowsAppearance(false)`). The
+  asynchronous save already wrote a copy; that copy now never follows the appearance. Loading
+  reads the page as saved and applies the appearance afterwards (`UBSvgSubsetReader`).
+
+### The black background
+
+The *Switch background color* toggle still sets the page background (saved with the page).
+While the board follows the dark appearance every page is shown dark anyway, so the toggle is
+disabled (shown on) with a tooltip pointing to the preference; a page chosen black stays black
+in the light appearance. Choosing a ruling in the dark appearance keeps the page's own
+light/dark choice.
+
+All dark boards use one colour, `UBSettings::boardDarkBackgroundColor` = `#1C1C1E` (Apple's
+dark secondary background), also used by the dark background swatches. Before, the black
+background was pure black on the board while the swatch showed `#1C1C1E`.
+
+The default ruling colour on dark backgrounds (`Board/CrossColorDarkBackground`) is now
+`#66C0C0C0` (grey at 40 % opacity) instead of `#C8C0C0C0`, which was much stronger than the
+light blue lines on white. The opacity of the default ruling colour was ignored before
+(`UBBackgroundRuling::setLinePainter` replaced it); it is now applied, so the opacity sliders
+in *Preferences > Grid* work.
+
+### Exports, thumbnails, display screen
+
+* **PDF export uses the page as saved**, not the appearance: exporting from a Mac in dark mode
+  gives the same white pages as on any other computer and prints without ink-heavy black
+  pages. The existing preference *Export background color* still decides whether pages chosen
+  black are exported dark. (`UBExportPDF`, `UBExportFullPDF` switch the scene to its own
+  background while rendering.)
+* **Thumbnails show what you see**: they are rendered from the board when a page is saved,
+  so pages saved in the dark appearance get dark thumbnails. They are not regenerated when the
+  appearance changes; a page keeps its last thumbnail until it is modified.
+* The **display screen / projector** shows the same scene as the control screen, so it is dark
+  in the dark appearance. Use the preference to project a white board in dark mode.
+* *Capture* (screenshot of a board area into the page) captures what you see, including the
+  dark background.
+* Desktop annotation follows the board like before (white ink when the board is dark).
+
 ## Actions and shortcuts
 
 New actions in `resources/forms/mainWindow.ui`, registered in the *Background* group of the
@@ -161,6 +240,7 @@ shortcut preferences (`UBShortcutManager::addMainActions`), without default key 
 The ruling actions keep the current light/dark mode. The light/dark toggle now uses the state
 of the active page, so it also works correctly from a shortcut while the palette is closed or
 after changing pages.
+While the board follows the dark appearance, `actionLightDarkMode` is disabled.
 
 ## Settings
 
@@ -169,3 +249,5 @@ after changing pages.
 | `Board/BackgroundRulingList` | Blank, Lined, Grid 1 cm, Grid 0.5 cm   | backgrounds shown in the palette, in order |
 | `Board/PageBackground`       | Blank                                  | ruling of new pages (last chosen) |
 | `Board/ScreenPixelsPerCm`    | `0`                                    | screen calibration, 0 = automatic |
+| `Board/FollowsDarkMode`      | `true`                                 | show the board dark in the dark appearance |
+| `Board/CrossColorDarkBackground` | `#66C0C0C0`                        | default ruling colour on dark backgrounds |

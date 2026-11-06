@@ -97,9 +97,19 @@ class UBSettings : public QObject
         qreal currentEraserWidth();
 
         // Background related
+        // isDarkBackground(): the board is shown dark, either because of the background chosen
+        // for the page (isPageDarkBackground) or because the board follows the dark appearance
         bool isDarkBackground();
+        // the light/dark background chosen last for a page (saved, used for new pages)
+        bool isPageDarkBackground();
         QUuid pageBackgroundUuid();
         void setDarkBackground(bool isDarkBackground);
+
+        // The board follows the dark appearance of the application (runtime state, set by
+        // UBBoardController from the theme and the boardFollowsDarkMode preference). Pages are
+        // then displayed dark without changing their saved background.
+        bool isBoardDarkFromAppearance() const { return mBoardDarkFromAppearance; }
+        void setBoardDarkFromAppearance(bool dark);
         void setPageBackgroundUuid(const QUuid& background);
 
         // Stylus palette related
@@ -197,6 +207,9 @@ class UBSettings : public QObject
         static QColor penCirclePenColorLightBackground;
 
         static QColor documentSizeMarkColorDarkBackground;
+
+        // colour of a dark board (dark appearance and the dark page background)
+        static QColor boardDarkBackgroundColor;
         static QColor documentSizeMarkColorLightBackground;
 
         // Background grid
@@ -272,6 +285,7 @@ class UBSettings : public QObject
         UBSetting* appToolBarOrientationVertical;
         UBSetting* appPreferredLanguage;
         UBSetting* appThemeMode;
+        UBSetting* boardFollowsDarkMode;    // show the board dark in the dark appearance
         UBSetting* appRunInWindow;
         UBSetting* appMainWindowGeometry;   // normal (non-maximised) geometry of the main window in window mode
         UBSetting* appMainWindowState;      // "normal" or "maximized"
@@ -479,6 +493,7 @@ class UBSettings : public QObject
 
     signals:
         void colorContextChanged();
+        void boardAppearanceChanged(bool dark);
 
     private:
 
@@ -486,6 +501,8 @@ class UBSettings : public QObject
         QSettings* mUserSettings;
 
         QHash<QString, QVariant> mSettingsQueue;
+
+        bool mBoardDarkFromAppearance{false};
 
         static const int sDefaultFontPixelSize;
         static const char *sDefaultFontFamily;

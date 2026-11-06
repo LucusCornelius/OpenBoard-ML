@@ -99,6 +99,8 @@ QColor UBSettings::penCirclePenColorLightBackground = QColor(0, 0, 0, 127);
 QColor UBSettings::documentSizeMarkColorDarkBackground = QColor(44, 44, 44, 200);
 QColor UBSettings::documentSizeMarkColorLightBackground = QColor(241, 241, 241);
 
+QColor UBSettings::boardDarkBackgroundColor = QColor(0x1C, 0x1C, 0x1E);
+
 QColor UBSettings::paletteColor = QColor(127, 127, 127, 127);
 QColor UBSettings::opaquePaletteColor = QColor(66, 66, 66, 255);
 
@@ -273,6 +275,7 @@ void UBSettings::init()
     appToolBarOrientationVertical = new UBSetting(this, "App", "ToolBarOrientationVertical", false);
     appPreferredLanguage = new UBSetting(this,"App","PreferredLanguage", "");
     appThemeMode = new UBSetting(this, "App", "ThemeMode", 0);
+    boardFollowsDarkMode = new UBSetting(this, "Board", "FollowsDarkMode", true);
 
     // removed in version 1.7.0
     mUserSettings->remove("App/HideSwapDisplayScreens");
@@ -916,7 +919,24 @@ qreal UBSettings::currentEraserWidth()
 
 bool UBSettings::isDarkBackground()
 {
+    return mBoardDarkFromAppearance || isPageDarkBackground();
+}
+
+bool UBSettings::isPageDarkBackground()
+{
     return value("Board/DarkBackground", 0).toBool();
+}
+
+void UBSettings::setBoardDarkFromAppearance(bool dark)
+{
+    if (dark == mBoardDarkFromAppearance)
+    {
+        return;
+    }
+
+    mBoardDarkFromAppearance = dark;
+    emit boardAppearanceChanged(dark);
+    emit colorContextChanged();
 }
 
 

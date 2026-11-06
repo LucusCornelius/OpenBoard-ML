@@ -552,6 +552,16 @@
                 </item>
                </widget>
               </item>
+              <item row="2" column="1">
+               <widget class="QCheckBox" name="boardFollowsDarkModeCheckBox">
+                <property name="toolTip">
+                 <string>In the dark appearance, show the board with a dark background and light ink. The pages and their saved background are not changed.</string>
+                </property>
+                <property name="text">
+                 <string>Board follows dark mode</string>
+                </property>
+               </widget>
+              </item>
               <item row="0" column="2">
                <spacer name="horizontalSpacer_6">
                 <property name="sizeHint" stdset="0">

@@ -295,6 +295,7 @@ class UBBoardController : public UBDocumentContainer
 
     private:
         void initBackgroundGridSize();
+        void updateBoardAppearance();
         int calibratedGridSize() const;
         void updatePageSizeState();
         int autosaveTimeoutFromSettings() const;

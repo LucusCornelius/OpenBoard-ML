@@ -437,6 +437,8 @@ void UBSvgSubsetAdaptor::UBSvgSubsetReader::processElement()
             if (!mScene)
             {
                 mScene = std::make_shared<UBGraphicsScene>(mProxy, false);
+                // read the page as saved, the dark appearance is applied after loading
+                mScene->setFollowsAppearance(false);
                 mScene->setModified(false);
             }
 
@@ -587,7 +589,7 @@ void UBSvgSubsetAdaptor::UBSvgSubsetReader::processElement()
             {
                 const auto bgManager = UBApplication::boardController->backgroundManager();
                 bgManager->addBackground(bg);
-                mScene->setSceneBackground(mScene->isDarkBackground(), bgManager->background(bg.uuid()));
+                mScene->setSceneBackground(mScene->isPageDarkBackground(), bgManager->background(bg.uuid()));
             }
         }
         else if (name == "g")
@@ -1056,6 +1058,8 @@ std::shared_ptr<UBGraphicsScene> UBSvgSubsetAdaptor::UBSvgSubsetReader::scene()
                 mScene->addItem(iterator.value());
             }
 
+            // show the page dark in the dark appearance (recolours strokes and texts)
+            mScene->setFollowsAppearance(true);
             mScene->setModified(saveSceneAfterLoading);
             mScene->enableUndoRedoStack();
             qDebug() << "loadScene() : created scene and read file";
@@ -1243,7 +1247,8 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::writeSvgElement(std::shared_ptr<UBDo
         mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "nominal-size", QString("%1x%2").arg(pageNominalSize.width()).arg(pageNominalSize.height()));
     }
 
-    mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "dark-background", mScene->isDarkBackground() ? xmlTrue : xmlFalse);
+    // the background of the page as chosen, not the dark appearance it may be shown with
+    mXmlWriter.writeAttribute(UBSettings::uniboardDocumentNamespaceUri, "dark-background", mScene->isPageDarkBackground() ? xmlTrue : xmlFalse);
 
     bool crossedBackground = mScene->background() && mScene->background()->isCrossed();
     bool ruledBackground = mScene->background() && mScene->background()->isRuled();
@@ -1266,7 +1271,7 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::writeSvgElement(std::shared_ptr<UBDo
 
 
     mXmlWriter.writeStartElement("rect");
-    mXmlWriter.writeAttribute("fill", mScene->isDarkBackground() ? "black" : "white");
+    mXmlWriter.writeAttribute("fill", mScene->isPageDarkBackground() ? "black" : "white");
     mXmlWriter.writeAttribute("x", QString::number(normalized.x()));
     mXmlWriter.writeAttribute("y", QString::number(normalized.y()));
     mXmlWriter.writeAttribute("width", QString::number(normalized.width()));
@@ -1470,7 +1475,7 @@ bool UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistScene(std::shared_ptr<UBDocum
         if (shapeItem && shapeItem->isVisible())
         {
             UBShapeSvgSerializer::writeShape(mXmlWriter, UBSettings::uniboardDocumentNamespaceUri, shapeItem,
-                                             mScene->isDarkBackground(), mScene->isBackgroundObject(shapeItem));
+                                             mScene->isPageDarkBackground(), mScene->isBackgroundObject(shapeItem));
             continue;
         }
 

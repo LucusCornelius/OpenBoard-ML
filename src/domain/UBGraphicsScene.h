@@ -205,6 +205,11 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
             return mDocument;
         }
 
+        /**
+         * The board is shown with a dark background: the page has a dark background or the
+         * board follows the dark appearance of the application. Colours of strokes and texts
+         * follow this state.
+         */
         bool isDarkBackground() const
         {
             return mDarkBackground;
@@ -214,6 +219,26 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         {
             return !mDarkBackground;
         }
+
+        /**
+         * The background colour chosen for the page, as saved with the page.
+         * The dark appearance does not change it.
+         */
+        bool isPageDarkBackground() const
+        {
+            return mPageDarkBackground;
+        }
+
+        /**
+         * Whether the scene is shown dark in the dark appearance (default true). Exports and the
+         * copies used for saving switch it off to get the page as saved.
+         */
+        bool followsAppearance() const
+        {
+            return mFollowsAppearance;
+        }
+
+        void setFollowsAppearance(bool follows);
 
         const UBBackgroundRuling* background() const;
 
@@ -344,6 +369,7 @@ public slots:
         void hideTool();
 
         void setSceneBackground(bool pIsDark, const UBBackgroundRuling *background);
+        void updateAppearance();
         void setBackgroundZoomFactor(qreal zoom);
         void setBackgroundGridSize(int pSize);
         void setDrawingMode(bool bModeDesktop);
@@ -421,6 +447,8 @@ signals:
     private:
         void setDocumentUpdated();
         void updateBackground();
+        bool shownDark() const;
+        bool applyDarkBackground(bool dark);
         void createEraiser();
         void createPointer();
         void createMarkerCircle();
@@ -441,7 +469,9 @@ signals:
 
         std::shared_ptr<UBDocumentProxy> mDocument;
 
-        bool mDarkBackground;
+        bool mDarkBackground;               // shown dark (page background or dark appearance)
+        bool mPageDarkBackground{false};    // dark background of the page, saved with it
+        bool mFollowsAppearance{true};
         const UBBackgroundRuling* mBackground{nullptr};
         int mBackgroundGridSize;
 

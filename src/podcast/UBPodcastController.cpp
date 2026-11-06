@@ -595,7 +595,7 @@ void UBPodcastController::processScenePaintEvent()
         repaintRect = bv->mapToScene(QRect(0, 0, bv->width(), bv->height())).boundingRect();
 
         if (bv->scene()->isDarkBackground())
-            mLatestCapture.fill(Qt::black);
+            mLatestCapture.fill(UBSettings::boardDarkBackgroundColor);
         else
             mLatestCapture.fill(Qt::white);
 
@@ -626,7 +626,7 @@ void UBPodcastController::processScenePaintEvent()
         p.setClipRect(repaintRect);
 
         if (scene->isDarkBackground())
-            p.fillRect(repaintRect, Qt::black);
+            p.fillRect(repaintRect, UBSettings::boardDarkBackgroundColor);
         else
             p.fillRect(repaintRect, Qt::white);
 

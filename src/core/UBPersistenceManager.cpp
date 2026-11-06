@@ -835,7 +835,7 @@ std::shared_ptr<UBGraphicsScene> UBPersistenceManager::createDocumentSceneAt(std
         background = bgManager->background(UBBackgroundManager::blankBackground);
     }
 
-    newScene->setSceneBackground(UBSettings::settings()->isDarkBackground(), background);
+    newScene->setSceneBackground(UBSettings::settings()->isPageDarkBackground(), background);
 
     newScene->setBackgroundGridSize(UBSettings::settings()->crossSize);
 
@@ -921,11 +921,27 @@ void UBPersistenceManager::persistDocumentScene(std::shared_ptr<UBDocumentProxy>
     if(forceImmediateSaving)
     {
         mWorker->removePendingSaves(pDocumentProxy, pageId);
-        UBSvgSubsetAdaptor::persistScene(pDocumentProxy, pScene, pageId);
+
+        if (pScene->isDarkBackground() != pScene->isPageDarkBackground())
+        {
+            // the page is shown dark because of the dark appearance: save it as it is,
+            // with the colours for its own background (see docs/BACKGROUNDS.md)
+            std::shared_ptr<UBGraphicsScene> pageScene = pScene->sceneDeepCopy();
+            pageScene->setFollowsAppearance(false);
+            UBSvgSubsetAdaptor::persistScene(pDocumentProxy, pageScene, pageId);
+        }
+        else
+        {
+            UBSvgSubsetAdaptor::persistScene(pDocumentProxy, pScene, pageId);
+        }
     }
     else
     {
        std::shared_ptr<UBGraphicsScene> copiedScene = pScene->sceneDeepCopy();
+
+       // save the page with the colours for its own background, not for the dark appearance;
+       // the copy also must not follow appearance changes while it is written in the worker thread
+       copiedScene->setFollowsAppearance(false);
 
        // keep copiedScene alive until saving is finished
        mScenesToSave.append(copiedScene);

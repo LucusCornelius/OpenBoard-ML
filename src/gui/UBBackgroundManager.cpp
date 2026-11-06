@@ -250,7 +250,7 @@ QPixmap UBBackgroundManager::createButtonPixmap(const UBBackgroundRuling& backgr
 
     QPainterPath pagePath;
     pagePath.addRoundedRect(page, radius, radius);
-    painter.fillPath(pagePath, dark ? QColor(28, 28, 30) : QColor(Qt::white));
+    painter.fillPath(pagePath, dark ? UBSettings::boardDarkBackgroundColor : QColor(Qt::white));
 
     // the ruling as drawn on the board, scaled from the reference thumbnail size
     painter.save();

@@ -109,9 +109,10 @@ QPixmap UBThumbnailAdaptor::persistScene(UBDocument* document, std::shared_ptr<U
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
+        // thumbnails show the page as it is shown on the board, also in the dark appearance
         if (pScene->isDarkBackground())
         {
-            painter.fillRect(imageRect, Qt::black);
+            painter.fillRect(imageRect, UBSettings::boardDarkBackgroundColor);
         }
         else
         {

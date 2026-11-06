@@ -56,7 +56,7 @@
 #include "core/UBPersistenceManager.h"
 #include "core/UBSetting.h"
 #include "core/UBSettings.h"
-#include "core/UBSettings.h"
+#include "core/UBThemeManager.h"
 
 #include "document/UBDocument.h"
 #include "document/UBDocumentController.h"
@@ -136,6 +136,12 @@ UBBoardController::UBBoardController(UBMainWindow* mainWindow)
 
 void UBBoardController::init()
 {
+    // the board is dark in the dark appearance, unless the user turned it off; set before
+    // the first page is created, follow the appearance and the preference live
+    updateBoardAppearance();
+    connect(UBThemeManager::instance(), &UBThemeManager::themeChanged, this, &UBBoardController::updateBoardAppearance);
+    connect(UBSettings::settings()->boardFollowsDarkMode, &UBSetting::changed, this, &UBBoardController::updateBoardAppearance);
+
     setupViews();
     setupToolbar();
 
@@ -1662,7 +1668,7 @@ std::shared_ptr<UBGraphicsScene> UBBoardController::setActiveDocumentScene(std::
 
         adjustDisplayViews();
 
-        UBSettings::settings()->setDarkBackground(mActiveScene->isDarkBackground());
+        UBSettings::settings()->setDarkBackground(mActiveScene->isPageDarkBackground());
 
         if (mActiveScene->background())
         {
@@ -1833,6 +1839,38 @@ int UBBoardController::autosaveTimeoutFromSettings() const
     int minute = 60 * 1000;
 
     return value * minute;
+}
+
+void UBBoardController::updateBoardAppearance()
+{
+    const auto settings = UBSettings::settings();
+    const bool dark = UBThemeManager::instance()->isDarkMode() && settings->boardFollowsDarkMode->get().toBool();
+    const bool changed = dark != settings->isBoardDarkFromAppearance();
+
+    // all scenes follow this (UBGraphicsScene::updateAppearance), the pages are not modified
+    settings->setBoardDarkFromAppearance(dark);
+
+    // the light/dark switch has no effect while the board follows the dark appearance
+    QAction* lightDarkAction = mMainWindow->actionLightDarkMode;
+
+    if (!lightDarkAction->property("lightDarkToolTip").isValid())
+    {
+        lightDarkAction->setProperty("lightDarkToolTip", lightDarkAction->toolTip());
+    }
+
+    lightDarkAction->setEnabled(!dark);
+    lightDarkAction->setToolTip(dark ? tr("The board follows the dark appearance (Preferences > Display)")
+                                     : lightDarkAction->property("lightDarkToolTip").toString());
+
+    if (mActiveScene)
+    {
+        lightDarkAction->setChecked(mActiveScene->isDarkBackground());
+    }
+
+    if (changed)
+    {
+        emit backgroundChanged();
+    }
 }
 
 void UBBoardController::setBackground(bool isDark, const UBBackgroundRuling* background)

@@ -165,8 +165,12 @@ void UBBackgroundPalette::updateActions()
         return;
     }
 
+    // as shown: dark also when the board follows the dark appearance, then the switch is disabled
     const auto dark = scene->isDarkBackground();
     UBApplication::mainWindow->actionLightDarkMode->setChecked(dark);
+    mLightDarkModeLabel->setEnabled(UBApplication::mainWindow->actionLightDarkMode->isEnabled());
+    mLightDarkModeLabel->setToolTip(UBApplication::mainWindow->actionLightDarkMode->isEnabled()
+                                    ? QString() : UBApplication::mainWindow->actionLightDarkMode->toolTip());
     QUuid uuid;
 
     if (scene->background())
@@ -270,8 +274,8 @@ void UBBackgroundPalette::clearLayout()
 void UBBackgroundPalette::showEvent(QShowEvent* event)
 {
     const auto scene = UBApplication::boardController->activeScene();
-    mIsDark = scene->isDarkBackground();
-    mLightDarkModeSwitch->setChecked(mIsDark);
+    mIsDark = scene->isPageDarkBackground();
+    mLightDarkModeSwitch->setChecked(scene->isDarkBackground()); // as shown
     mBackground = scene->background();
 
     refresh();
@@ -307,8 +311,9 @@ void UBBackgroundPalette::toggleBackgroundColor(bool checked)
         return;
     }
 
-    // use the state of the active scene, the palette may be outdated when triggered by a shortcut
-    mIsDark = !scene->isDarkBackground();
+    // use the state of the active scene, the palette may be outdated when triggered by a shortcut;
+    // switch the background of the page, not the dark appearance it may be shown with
+    mIsDark = !scene->isPageDarkBackground();
     mBackground = scene->background();
     UBApplication::boardController->setBackground(mIsDark, mBackground);
     backgroundChanged();
@@ -337,7 +342,7 @@ void UBBackgroundPalette::selectBackground(const QUuid& uuid)
         return;
     }
 
-    mIsDark = scene->isDarkBackground();
+    mIsDark = scene->isPageDarkBackground(); // keep the page colour, even when shown dark
     mBackground = background;
     UBApplication::boardController->setBackground(mIsDark, mBackground);
     backgroundChanged();

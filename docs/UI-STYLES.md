@@ -34,6 +34,12 @@ the whole application and mirrored in Preferences > Display. In *Follow
 System* the application follows live changes of the system colour scheme
 (Qt 6.5+).
 
+The board follows the appearance: in *Dark* the board is dark too (`#1C1C1E`,
+white ink), so the adaptive glass panels become dark glass with white glyphs on
+macOS. *Preferences > Display > Board follows dark mode* (default on) keeps a
+white board in the dark appearance. The saved pages are not changed; see
+`BACKGROUNDS.md`, *Dark appearance*.
+
 For native code: `UBThemeManager::themeChanged(bool isDark)` is emitted after
 the palette and the stylesheets were applied, `themeModeChanged(int mode)`
 when the chosen mode changes. `UBThemeManager::instance()->isDarkMode()` gives

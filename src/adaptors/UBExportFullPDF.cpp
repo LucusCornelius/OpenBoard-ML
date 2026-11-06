@@ -114,8 +114,12 @@ void UBExportFullPDF::saveOverlayPdf(std::shared_ptr<UBDocumentProxy> pDocumentP
                 continue;
             }
 
+            // export the page with its own background, not with the dark appearance of the board
+            const bool followsAppearance = scene->followsAppearance();
+            scene->setFollowsAppearance(false);
+
             // set background according to PDF export settings
-            bool isDark = scene->isDarkBackground();
+            bool isDark = scene->isPageDarkBackground();
             const auto sceneBackground = scene->background();
 
             bool exportDark = isDark && UBSettings::settings()->exportBackgroundColor->get().toBool();
@@ -175,6 +179,7 @@ void UBExportFullPDF::saveOverlayPdf(std::shared_ptr<UBDocumentProxy> pDocumentP
             //restore background state
             scene->setDrawingMode(false);
             scene->setSceneBackground(isDark, sceneBackground);
+            scene->setFollowsAppearance(followsAppearance);
         }
 
         if (pdfPainter) delete pdfPainter;

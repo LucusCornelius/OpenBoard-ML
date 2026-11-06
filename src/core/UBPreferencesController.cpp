@@ -321,6 +321,9 @@ void UBPreferencesController::wire()
             UBThemeManager::instance()->setThemeMode(index);
     });
 
+    // applied live (UBBoardController::updateBoardAppearance)
+    connect(mPreferencesUI->boardFollowsDarkModeCheckBox, &QCheckBox::clicked, settings->boardFollowsDarkMode, &UBSetting::setBool);
+
     // the appearance can also be chosen in the menu of the board: stay in sync
     connect(UBThemeManager::instance(), &UBThemeManager::themeModeChanged, this, [this](int mode) {
         const QSignalBlocker blocker(mPreferencesUI->themeComboBox);
@@ -497,6 +500,8 @@ void UBPreferencesController::init()
         mPreferencesUI->themeComboBox->setCurrentIndex(UBThemeManager::instance()->themeMode());
     }
 
+    mPreferencesUI->boardFollowsDarkModeCheckBox->setChecked(settings->boardFollowsDarkMode->get().toBool());
+
     mPreferencesUI->useExternalBrowserCheckBox->setChecked(settings->webUseExternalBrowser->get().toBool());
     mPreferencesUI->displayBrowserPageCheckBox->setChecked(settings->webShowPageImmediatelyOnMirroredScreen->get().toBool());
     mPreferencesUI->screenList->loadScreenList(settings->appScreenList->get().toStringList());
@@ -570,6 +575,7 @@ void UBPreferencesController::defaultSettings()
         mPreferencesUI->verticalChoice->setChecked(settings->appToolBarOrientationVertical->reset().toBool());
         mPreferencesUI->horizontalChoice->setChecked(!settings->appToolBarOrientationVertical->reset().toBool());
         mPreferencesUI->startModeComboBox->setCurrentIndex(0);
+        mPreferencesUI->boardFollowsDarkModeCheckBox->setChecked(settings->boardFollowsDarkMode->reset().toBool());
 
         mPreferencesUI->useSystemOSKCheckBox->setChecked(settings->useSystemOnScreenKeyboard->reset().toBool());
 

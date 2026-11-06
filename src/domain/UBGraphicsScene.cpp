@@ -320,7 +320,7 @@ UBGraphicsScene::UBGraphicsScene(std::shared_ptr<UBDocumentProxy> document, bool
     , mMarkerCircle(0)
     , mPenCircle(0)
     , mDocument(document)
-    , mDarkBackground(false)
+    , mDarkBackground(UBSettings::settings()->isBoardDarkFromAppearance())
     , mIsDesktopMode(false)
     , mZoomFactor(1)
     , mBackgroundObject(0)
@@ -352,6 +352,11 @@ UBGraphicsScene::UBGraphicsScene(std::shared_ptr<UBDocumentProxy> document, bool
     createMarkerCircle();
     createPenCircle();
 
+    // the scene may start dark (dark appearance)
+    updateEraserColor();
+    updateMarkerCircleColor();
+    updatePenCircleColor();
+
     if (UBApplication::applicationController)
     {
         setViewState(SceneViewState(1,
@@ -366,6 +371,9 @@ UBGraphicsScene::UBGraphicsScene(std::shared_ptr<UBDocumentProxy> document, bool
     connect(UBApplication::undoStack.data(), SIGNAL(indexChanged(int)), this, SLOT(updateSelectionFrameWrapper(int)));
     connect(UBDrawingController::drawingController(), SIGNAL(stylusToolChanged(int,int)), this, SLOT(stylusToolChanged(int,int)));
     connect(UBApplication::boardController, &UBBoardController::zoomChanged, this, &UBGraphicsScene::zoomChanged);
+
+    // show the board dark or light when the appearance of the application changes
+    connect(UBSettings::settings(), &UBSettings::boardAppearanceChanged, this, &UBGraphicsScene::updateAppearance);
 }
 
 UBGraphicsScene::~UBGraphicsScene()
@@ -1161,19 +1169,9 @@ void UBGraphicsScene::drawArcTo(const QPointF& pCenterPoint, qreal pSpanAngle)
 
 void UBGraphicsScene::setSceneBackground(bool pIsDark, const UBBackgroundRuling *background)
 {
-    bool needRepaint = false;
+    mPageDarkBackground = pIsDark;
 
-    if (mDarkBackground != pIsDark)
-    {
-        mDarkBackground = pIsDark;
-
-        updateEraserColor();
-        updateMarkerCircleColor();
-        updatePenCircleColor();
-        recolorAllItems();
-
-        needRepaint = true;
-    }
+    bool needRepaint = applyDarkBackground(shownDark());
 
     if (mBackground != background)
     {
@@ -1184,6 +1182,56 @@ void UBGraphicsScene::setSceneBackground(bool pIsDark, const UBBackgroundRuling 
     if (needRepaint)
     {
         updateBackground();
+    }
+}
+
+bool UBGraphicsScene::shownDark() const
+{
+    // the page background, or the dark appearance of the application if the board follows it
+    return mPageDarkBackground || (mFollowsAppearance && UBSettings::settings()->isBoardDarkFromAppearance());
+}
+
+bool UBGraphicsScene::applyDarkBackground(bool dark)
+{
+    if (mDarkBackground == dark)
+    {
+        return false;
+    }
+
+    mDarkBackground = dark;
+
+    updateEraserColor();
+    updateMarkerCircleColor();
+    updatePenCircleColor();
+    recolorAllItems();
+
+    return true;
+}
+
+void UBGraphicsScene::setFollowsAppearance(bool follows)
+{
+    if (mFollowsAppearance != follows)
+    {
+        mFollowsAppearance = follows;
+        updateAppearance();
+    }
+}
+
+void UBGraphicsScene::updateAppearance()
+{
+    // Only the way the page is shown changes, the page itself is not modified. Recolouring
+    // texts edits their documents, which would mark the scene as modified.
+    const bool wasModified = isModified();
+
+    if (applyDarkBackground(shownDark()))
+    {
+        setModified(wasModified);
+        updateBackground();
+
+        for (QGraphicsView* view : views())
+        {
+            view->viewport()->update();
+        }
     }
 }
 
@@ -1409,6 +1457,8 @@ std::shared_ptr<UBGraphicsScene> UBGraphicsScene::sceneDeepCopy() const
     copy->setUuid(this->uuid());
     copy->setBackgroundGridSize(mBackgroundGridSize);
     copy->mDarkBackground = mDarkBackground;
+    copy->mPageDarkBackground = mPageDarkBackground;
+    copy->mFollowsAppearance = mFollowsAppearance;
     copy->mBackground = mBackground;
     copy->setSceneRect(this->sceneRect());
 
@@ -2834,7 +2884,7 @@ void UBGraphicsScene::drawBackground(QPainter *painter, const QRectF &rect)
 
     if (darkBackground)
     {
-        painter->fillRect (rect, QBrush (QColor (Qt::black)));
+        painter->fillRect (rect, QBrush (UBSettings::boardDarkBackgroundColor));
     }
     else
     {

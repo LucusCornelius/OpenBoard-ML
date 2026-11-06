@@ -108,8 +108,12 @@ bool UBExportPDF::persistsDocument(std::shared_ptr<UBDocumentProxy> pDocumentPro
 
         UBApplication::showMessage(tr("Exporting page %1 of %2").arg(pageIndex + 1).arg(existingPageCount));
 
+        // export the page with its own background, not with the dark appearance of the board
+        const bool followsAppearance = scene->followsAppearance();
+        scene->setFollowsAppearance(false);
+
         // set background to white, no crossing for PDF output
-        bool isDark = scene->isDarkBackground();
+        bool isDark = scene->isPageDarkBackground();
         const auto pageBackground = scene->background();
 
         bool exportDark = isDark && UBSettings::settings()->exportBackgroundColor->get().toBool();
@@ -151,6 +155,7 @@ bool UBExportPDF::persistsDocument(std::shared_ptr<UBDocumentProxy> pDocumentPro
 
         // Restore background state
         scene->setSceneBackground(isDark, pageBackground);
+        scene->setFollowsAppearance(followsAppearance);
     }
 
     if(!painterNeedsBegin)
