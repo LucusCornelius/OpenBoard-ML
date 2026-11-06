@@ -710,9 +710,9 @@ void UBBackgroundRuling::setLinePainter(QPainter* painter, const Line& line, boo
     const auto colorOnDark = line.color().onDark();
     const auto colorOnLight = line.color().onLight();
 
-    // apply alpha value to defaults
-    defaultOnDark.setAlphaF(colorOnDark.alphaF());
-    defaultOnLight.setAlphaF(colorOnLight.alphaF());
+    // apply alpha value of the ruling to the defaults, keeping the opacity chosen in the preferences
+    defaultOnDark.setAlphaF(defaultOnDark.alphaF() * colorOnDark.alphaF());
+    defaultOnLight.setAlphaF(defaultOnLight.alphaF() * colorOnLight.alphaF());
 
     auto pen = painter->pen();
     pen.setWidth(line.width());

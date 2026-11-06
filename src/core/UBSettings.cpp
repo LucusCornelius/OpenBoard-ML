@@ -326,7 +326,7 @@ void UBSettings::init()
 
     pageSize = new UBSetting(this, "Board", "DefaultPageSize", documentSizes.value(DocumentSizeRatio::Ratio4_3));
 
-    boardCrossColorDarkBackground = new UBSetting(this, "Board", "CrossColorDarkBackground", "#C8C0C0C0");
+    boardCrossColorDarkBackground = new UBSetting(this, "Board", "CrossColorDarkBackground", "#66C0C0C0");
     boardCrossColorLightBackground = new UBSetting(this, "Board", "CrossColorLightBackground", "#A5E1FF");
 
     boardColorPaletteSize = new UBSetting(this, "Board", "ColorPaletteSize", defaultColorPaletteSize);
@@ -341,7 +341,7 @@ void UBSettings::init()
     boardGridLightBackgroundColors = new UBColorListSetting(this, "Board", "GridLightBackgroundColors", gridLightBackgroundColors, -1.0);
 
     QStringList gridDarkBackgroundColors;
-    gridDarkBackgroundColors << "#FFFFFF" << "#FF3400" << "#66C0FF" << "#81FF5C" << "#FFFF00" << "#B68360" << "#FF497E" << "#8D69FF" << "#C8C0C0C0";
+    gridDarkBackgroundColors << "#FFFFFF" << "#FF3400" << "#66C0FF" << "#81FF5C" << "#FFFF00" << "#B68360" << "#FF497E" << "#8D69FF" << "#66C0C0C0";
     boardGridDarkBackgroundColors = new UBColorListSetting(this, "Board", "GridDarkBackgroundColors", gridDarkBackgroundColors, -1.0);
 
     QStringList penLightBackgroundColors;
