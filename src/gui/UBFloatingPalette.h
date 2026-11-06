@@ -165,6 +165,8 @@ class UBFloatingPalette : public QWidget
         bool mOnDark;
         QTimer* mBackdropTimer;
         QElapsedTimer mBackdropAge;
+        /** hash of the last captured content behind the palette (0: none) */
+        size_t mBackdropHash = 0;
         QObject* mWatcher;
         QList<QPointer<QWidget>> mWatched;
 

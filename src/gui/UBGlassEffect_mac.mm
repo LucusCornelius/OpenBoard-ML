@@ -53,6 +53,7 @@
 
 #include <QtGlobal>
 #include <QEvent>
+#include <QBackingStore>
 #include <QGraphicsEffect>
 #include <QImage>
 #include <QAction>
@@ -822,6 +823,11 @@ namespace
                 }
             }
 
+            QBackingStore* windowBackingStore() const
+            {
+                return mPanel ? mPanel->window()->backingStore() : nullptr;
+            }
+
             /** the panel was painted: show the rendered controls on the glass */
             void setImage(const QPixmap& pixmap, const QPoint& offset)
             {
@@ -831,10 +837,23 @@ namespace
                 if (pixmap.cacheKey() == mImageKey && offset == mImageOffset)
                     return;
 
+                QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+                // the panel is also repainted when only the content below it changes: same controls, no update
+                const size_t contentHash = qHashBits(image.constBits(), image.sizeInBytes());
+
+                if (contentHash == mContentHash && image.size() == mContentSize && offset == mImageOffset && mImageKey != 0)
+                {
+                    mImageKey = pixmap.cacheKey();
+                    // the glass body may have changed with the paint (dock tabs publish it there)
+                    sync();
+                    return;
+                }
+
                 mImageKey = pixmap.cacheKey();
                 mImageOffset = offset;
-
-                QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
+                mContentHash = contentHash;
+                mContentSize = image.size();
                 CGImageRef cgImage = image.toCGImage();
 
                 @try
@@ -1070,6 +1089,8 @@ namespace
             QPointer<UBGlassMirrorEffect> mEffect;
             qint64 mImageKey;
             QPoint mImageOffset;
+            size_t mContentHash = 0;
+            QSize mContentSize;
             bool mSyncPending;
             bool mSuspended = false;
             QList<QPointer<QWidget>> mWatched;
@@ -1085,6 +1106,16 @@ namespace
         if (!mGlass || mGlass->suspended())
         {
             drawSource(painter);
+            return;
+        }
+
+        // only a paint of the window counts: other glass panels render this one while they
+        // capture the content behind them (clipped to their area); that result must not
+        // replace the controls on the native glass
+        QBackingStore* store = mGlass->windowBackingStore();
+
+        if (!store || !painter || painter->device() != store->paintDevice())
+        {
             return;
         }
 

@@ -597,6 +597,19 @@ void UBFloatingPalette::updateBackdrop()
         qDebug() << "UBFloatingPalette: no content captured behind" << objectName() << "- glass without backdrop";
     }
 
+    // Nothing changed behind the palette: keep the backdrop and do not repaint. A repaint
+    // of this palette repaints the siblings below it in its area, which would otherwise
+    // be taken for new content and capture again, forever (at the throttle rate).
+    const size_t hash = qHashBits(raw.constBits(), raw.sizeInBytes());
+
+    if (hash == mBackdropHash && mBackdrop.isValid() && mBackdrop.rect.size() == QSizeF(size()))
+    {
+        mBackdropAge.restart();
+        return;
+    }
+
+    mBackdropHash = hash;
+
     UBGlassBackdrop backdrop;
     backdrop.rect = QRectF(rect());
     backdrop.blurred = UBGlassStyle::blurredBackdrop(raw, qRound(backdropBlurRadius * dpr), 4, 1.2);
@@ -614,7 +627,11 @@ void UBFloatingPalette::updateBackdrop()
     mBackdropAge.restart();
 
     updateMaterial();
-    update();
+
+    // native glass renders the content behind itself: only a change of material
+    // (updateMaterial) needs a repaint, the painted glass shows the new backdrop
+    if (!hasNativeGlass())
+        update();
 }
 
 
