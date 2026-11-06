@@ -34,6 +34,8 @@
 #include "UBDockPalette.h"
 #include "UBGlassStyle.h"
 #include "UBGlassEffect.h"
+#include "UBModernStyle.h"
+#include "UBUiStyle.h"
 
 #include "frameworks/UBPlatformUtils.h"
 
@@ -617,7 +619,8 @@ UBTabDockPalette::UBTabDockPalette(UBDockPalette *dockPalette, QWidget *parent) 
     setAttribute(Qt::WA_TranslucentBackground);
 
     // native glass of the platform behind the tabs, when available
-    UBGlassEffect::applyToPanel(this);
+    if (UBUiStyle::isGlass())
+        UBGlassEffect::applyToPanel(this);
 }
 
 void UBTabDockPalette::paintEvent(QPaintEvent *)
@@ -698,7 +701,11 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
                 painter.setOpacity(0.8);
             }
 
-            UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
+            if (UBUiStyle::isGlass())
+                UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
+            else
+                UBModernStyle::paintPanel(&painter, tabRect, UBModernStyle::panelRadius, UBGlassStyle::isDark());
+
             painter.setOpacity(1.0);
         }
 

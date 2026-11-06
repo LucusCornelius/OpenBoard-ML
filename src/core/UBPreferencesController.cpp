@@ -316,9 +316,15 @@ void UBPreferencesController::wire()
     });
     connect(mPreferencesUI->startModeComboBox, SIGNAL(currentIndexChanged(int)), settings->appStartMode, SLOT(setInt(int)));
 
-    connect(mPreferencesUI->themeComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [=](int index) {
-        settings->appThemeMode->setInt(index);
-        UBThemeManager::instance()->applyUserThemePreference();
+    connect(mPreferencesUI->themeComboBox, qOverload<int>(&QComboBox::currentIndexChanged), this, [](int index) {
+        if (index != UBThemeManager::instance()->themeMode())
+            UBThemeManager::instance()->setThemeMode(index);
+    });
+
+    // the appearance can also be chosen in the menu of the board: stay in sync
+    connect(UBThemeManager::instance(), &UBThemeManager::themeModeChanged, this, [this](int mode) {
+        const QSignalBlocker blocker(mPreferencesUI->themeComboBox);
+        mPreferencesUI->themeComboBox->setCurrentIndex(mode);
     });
 
     connect(mPreferencesUI->useExternalBrowserCheckBox, SIGNAL(clicked(bool)), settings->webUseExternalBrowser, SLOT(setBool(bool)));
@@ -486,7 +492,10 @@ void UBPreferencesController::init()
     mPreferencesUI->emptyTrashDaysValue->setValue(settings->emptyTrashDaysValue->get().toInt());
 
     mPreferencesUI->startModeComboBox->setCurrentIndex(settings->appStartMode->get().toInt());
-    mPreferencesUI->themeComboBox->setCurrentIndex(settings->appThemeMode->get().toInt());
+    {
+        const QSignalBlocker blocker(mPreferencesUI->themeComboBox);
+        mPreferencesUI->themeComboBox->setCurrentIndex(UBThemeManager::instance()->themeMode());
+    }
 
     mPreferencesUI->useExternalBrowserCheckBox->setChecked(settings->webUseExternalBrowser->get().toBool());
     mPreferencesUI->displayBrowserPageCheckBox->setChecked(settings->webShowPageImmediatelyOnMirroredScreen->get().toBool());

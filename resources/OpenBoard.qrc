@@ -434,6 +434,7 @@
         <file>images/glass/reload.svg</file>
         <file>images/glass/stop.svg</file>
         <file>images/glass/tools.svg</file>
+        <file>images/glass/appearance.svg</file>
     </qresource>
     <qresource prefix="/shortcutProfiles">
         <file alias="keyboard-default.json">etc/shortcutProfiles/keyboard-default.json</file>

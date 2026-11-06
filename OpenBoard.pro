@@ -113,6 +113,8 @@ win32 {
    LIBS += -lGdi32
    LIBS += -lAdvApi32
    LIBS += -lOle32
+   # dark title bars and rounded corners of the modern style (UBUiStyle)
+   LIBS += -lDwmapi
 
    THIRD_PARTY_PATH=../OpenBoard-ThirdParty
    include($$THIRD_PARTY_PATH/libs.pri)

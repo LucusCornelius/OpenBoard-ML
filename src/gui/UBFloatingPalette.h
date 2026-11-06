@@ -111,6 +111,9 @@ class UBFloatingPalette : public QWidget
         /** paint the glass background (shadow, blurred backdrop, tint and highlights) */
         void paintGlassBackground(QPainter& painter);
 
+        /** paint the background of the modern style (shadow and solid card), see UBUiStyle */
+        void paintModernBackground(QPainter& painter);
+
         virtual void enterEvent(UB::EnterEvent *event) override;
         virtual void paintEvent(QPaintEvent *event) override;
 

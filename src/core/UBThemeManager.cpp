@@ -36,6 +36,8 @@
 #include "gui/UBBoardThumbnailsView.h"
 #include "gui/UBFloatingPalette.h"
 #include "gui/UBGlassStyle.h"
+#include "gui/UBModernStyle.h"
+#include "gui/UBUiStyle.h"
 #include "gui/UBPageNavigationWidget.h"
 #include "gui/UBStartupHintsPalette.h"
 #include "gui/UBDocumentThumbnailsView.h"
@@ -57,6 +59,8 @@ UBThemeManager* UBThemeManager::sInstance = nullptr;
 UBThemeManager::UBThemeManager()
     : QObject(nullptr)
     , mIsDarkMode(false)
+    , mThemeMode(-1)
+    , mEnvironmentOverride(!qEnvironmentVariable("OPENBOARD_THEME").isEmpty())
 {
 }
 
@@ -73,19 +77,51 @@ UBThemeManager* UBThemeManager::instance()
     return sInstance;
 }
 
+int UBThemeManager::themeMode() const
+{
+    int themeMode = qBound(0, UBSettings::settings()->appThemeMode->get().toInt(), 2);
+
+    // testing override that leaves the saved preference alone: OPENBOARD_THEME=light|dark|auto,
+    // until the user chooses an appearance in the application
+    if (mEnvironmentOverride)
+    {
+        const QString themeOverride = qEnvironmentVariable("OPENBOARD_THEME").toLower();
+
+        if (themeOverride == "auto")
+            themeMode = 0;
+        else if (themeOverride == "light")
+            themeMode = 1;
+        else if (themeOverride == "dark")
+            themeMode = 2;
+    }
+
+    return themeMode;
+}
+
+void UBThemeManager::setThemeMode(int mode)
+{
+    mode = qBound(0, mode, 2);
+
+    // an explicit choice of the user replaces the testing override
+    mEnvironmentOverride = false;
+
+    if (UBSettings::settings()->appThemeMode->get().toInt() != mode)
+        UBSettings::settings()->appThemeMode->setInt(mode);
+
+    applyUserThemePreference();
+}
+
 void UBThemeManager::applyUserThemePreference()
 {
-    int themeMode = UBSettings::settings()->appThemeMode->get().toInt();
+    const int themeMode = this->themeMode();
 
-    // testing override that leaves the saved preference alone: OPENBOARD_THEME=light|dark|auto
-    const QString themeOverride = qEnvironmentVariable("OPENBOARD_THEME").toLower();
-
-    if (themeOverride == "auto")
-        themeMode = 0;
-    else if (themeOverride == "light")
-        themeMode = 1;
-    else if (themeOverride == "dark")
-        themeMode = 2;
+#if defined(Q_OS_WIN) && QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    // native parts (title bars, the windows11 widget style) follow the theme chosen in the
+    // application; in auto mode the colour scheme of the system is used again
+    QGuiApplication::styleHints()->setColorScheme(themeMode == 1 ? Qt::ColorScheme::Light
+                                                  : themeMode == 2 ? Qt::ColorScheme::Dark
+                                                                   : Qt::ColorScheme::Unknown);
+#endif
     
     bool isDarkMode = false;
     
@@ -127,6 +163,12 @@ void UBThemeManager::applyUserThemePreference()
     }
 
     applyTheme(isDarkMode);
+
+    if (themeMode != mThemeMode)
+    {
+        mThemeMode = themeMode;
+        emit themeModeChanged(themeMode);
+    }
 }
 
 void UBThemeManager::applyTheme(bool isDark)
@@ -143,9 +185,15 @@ void UBThemeManager::applyTheme(bool isDark)
         setupLightPalette();
     }
 
+    if (UBUiStyle::isModern())
+        applyModernColors();
+
     loadStylesheets();
 
     updateWidgets();
+
+    // dark or light title bars (Windows)
+    UBUiStyle::applyWindowChrome(mIsDarkMode);
     
     if (hasThemeChanged)
     {
@@ -237,6 +285,22 @@ void UBThemeManager::setupLightPalette()
     UBSettings::treeViewBackgroundColor = lightPalette.color(QPalette::Highlight);
 }
 
+void UBThemeManager::applyModernColors()
+{
+    // Fluent neutrals and the system accent instead of the blue tinted greys of the theme
+    QPalette palette = QApplication::palette();
+    UBModernStyle::adjustPalette(palette, mIsDarkMode);
+    QApplication::setPalette(palette);
+
+    const QColor card = UBModernStyle::surface(mIsDarkMode);
+    UBSettings::paletteColor = card;
+    UBSettings::opaquePaletteColor = card;
+    UBSettings::documentThumbnailsViewColor = palette.color(QPalette::Window);
+    UBSettings::boardThumbnailsViewColor = card;
+    UBSettings::pageNavigationWidgetColor = card;
+    UBSettings::treeViewBackgroundColor = palette.color(QPalette::Highlight);
+}
+
 void UBThemeManager::loadStylesheets()
 {
     QString fullStylesheet;
@@ -286,6 +350,10 @@ void UBThemeManager::loadStylesheets()
         }
     }
 
+    // the modern style uses neutral greys and the system accent
+    if (UBUiStyle::isModern())
+        fullStylesheet = UBModernStyle::neutralizeThemeStyleSheet(fullStylesheet);
+
     // Layer 3: Standard CSS (user customizable, uses palette() references)
     QString css = UBFileSystemUtils::readTextFile(
         UBPlatformUtils::applicationEtcDirectory() + "/" + qApp->applicationName() + ".css");
@@ -296,9 +364,10 @@ void UBThemeManager::loadStylesheets()
         fullStylesheet += css;
     }
     
-    // Layer 4: Liquid Glass controls (top bar, floating palettes, pen panel, menus)
+    // Layer 4: Liquid Glass or modern controls (top bar, floating palettes, pen panel, menus)
     fullStylesheet += "\n";
-    fullStylesheet += UBGlassStyle::styleSheet(mIsDarkMode);
+    fullStylesheet += UBUiStyle::isGlass() ? UBGlassStyle::styleSheet(mIsDarkMode)
+                                           : UBModernStyle::styleSheet(mIsDarkMode);
 
     // Apply the combined stylesheet once
     qApp->setStyleSheet(fullStylesheet);
@@ -410,6 +479,11 @@ void UBThemeManager::updateWidgets()
 void UBThemeManager::onColorSchemeChanged(Qt::ColorScheme colorScheme)
 {
     qDebug() << "System color scheme changed to:" << (colorScheme == Qt::ColorScheme::Dark ? "Dark" : "Light");
+
+    // only "follow system" follows the system; light and dark stay as chosen
+    if (themeMode() != 0 || colorScheme == Qt::ColorScheme::Unknown)
+        return;
+
     applyTheme(colorScheme == Qt::ColorScheme::Dark);
 }
 #endif

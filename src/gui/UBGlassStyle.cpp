@@ -38,6 +38,8 @@
 
 #include "core/UBThemeManager.h"
 #include "gui/UBMainWindow.h"
+#include "gui/UBModernStyle.h"
+#include "gui/UBUiStyle.h"
 
 #include "core/memcheck.h"
 
@@ -68,8 +70,9 @@ namespace
             if (mode == QIcon::Disabled)
                 return withAlpha(fg, 0.30);
 
+            // checked: white on the accent capsule (glass), accent on a tinted fill (modern)
             if (state == QIcon::On)
-                return QColor(Qt::white);
+                return UBUiStyle::isGlass() ? QColor(Qt::white) : UBModernStyle::checkedForeground(onDark);
 
             return withAlpha(fg, 0.90);
         }
@@ -782,7 +785,14 @@ QIcon UBGlassStyle::swatchIcon(const QColor& color)
             painter.drawEllipse(circle);
         }
 
-        // a soft highlight gives the swatch a little depth
+        // a soft highlight gives the swatch a little depth (glass only, modern swatches are flat)
+        if (!UBUiStyle::isGlass())
+        {
+            icon.addPixmap(pixmap, QIcon::Normal, QIcon::Off);
+            icon.addPixmap(pixmap, QIcon::Normal, QIcon::On);
+            continue;
+        }
+
         QRadialGradient gloss(circle.center() - QPointF(size * 0.15, size * 0.2), size * 0.6);
         gloss.setColorAt(0.0, QColor(255, 255, 255, 60));
         gloss.setColorAt(1.0, QColor(255, 255, 255, 0));
