@@ -168,34 +168,6 @@ void UBMainWindow::changeEvent(QEvent *event)
 #endif
 }
 
-// work around for handling tablet events on MAC OS with Qt 4.8.0 and above
-#if defined(Q_OS_OSX)
-bool UBMainWindow::event(QEvent *event)
-{
-    bool bRes = QMainWindow::event(event);
-
-    if (NULL != UBApplication::boardController)
-    {
-        UBBoardView *controlV = UBApplication::boardController->controlView();
-        if (controlV && controlV->isVisible())
-        {
-            switch (event->type())
-            {
-            case QEvent::TabletEnterProximity:
-            case QEvent::TabletLeaveProximity:
-            case QEvent::TabletMove:
-            case QEvent::TabletPress:
-            case QEvent::TabletRelease:
-                {
-                    return controlV->directTabletEvent(event);
-                }
-            }
-        }
-    }
-    return bRes;
-}
-#endif
-
 void UBMainWindow::onExportDone()
 {
     // HACK :  When opening the file save dialog during the document exportation,
