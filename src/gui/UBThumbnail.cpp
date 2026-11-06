@@ -31,16 +31,107 @@
 #include "gui/UBThumbnailArranger.h"
 #include "gui/UBThumbnailScene.h"
 #include "gui/UBThumbnailTextItem.h"
+#include "gui/UBGlassStyle.h"
+#include "core/UBThemeManager.h"
+
+#include <QPainterPath>
 
 
 constexpr int cSelectionWidth{8};
 constexpr QMarginsF cSelectionMargins{QMarginsF{} + cSelectionWidth / 2 + 1};
 constexpr int cLabelOffset{5};
 
+// flat page cards: rounded corners, a thin hairline, a soft shadow and an accent ring
+constexpr qreal cCardRadius{6};
+constexpr qreal cRingWidth{3};
+constexpr qreal cRingGap{2};
+
+namespace
+{
+    /** the page image with rounded corners (painted through a brush, antialiased) */
+    class UBThumbnailPixmapItem : public QGraphicsPixmapItem
+    {
+        public:
+            explicit UBThumbnailPixmapItem(QGraphicsItem* parent)
+                : QGraphicsPixmapItem(parent)
+            {
+            }
+
+            void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override
+            {
+                Q_UNUSED(option);
+                Q_UNUSED(widget);
+
+                const QPixmap image = pixmap();
+
+                if (image.isNull())
+                    return;
+
+                // the item is scaled to the thumbnail size: the radius is given in view pixels
+                const qreal scale = transform().m11() > 0 ? transform().m11() : 1.0;
+                const qreal radius = cCardRadius / scale;
+
+                painter->save();
+                painter->setRenderHint(QPainter::Antialiasing);
+                painter->setRenderHint(QPainter::SmoothPixmapTransform, transformationMode() == Qt::SmoothTransformation);
+                painter->setPen(Qt::NoPen);
+                painter->setBrush(QBrush(image));
+                painter->drawRoundedRect(QRectF(offset(), QSizeF(image.size()) / image.devicePixelRatio()), radius, radius);
+                painter->restore();
+            }
+    };
+
+    /** soft shadow below a page card, in the coordinates of the thumbnail */
+    class UBThumbnailCardItem : public QGraphicsRectItem
+    {
+        public:
+            explicit UBThumbnailCardItem(QGraphicsItem* parent)
+                : QGraphicsRectItem(parent)
+            {
+                setPen(Qt::NoPen);
+            }
+
+            QRectF boundingRect() const override
+            {
+                return rect().adjusted(-6, -6, 6, 8);
+            }
+
+            void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override
+            {
+                Q_UNUSED(option);
+                Q_UNUSED(widget);
+
+                if (rect().isEmpty())
+                    return;
+
+                const QColor shadow = UBGlassStyle::documentModeColors(UBThemeManager::instance()->isDarkMode()).cardShadow;
+
+                painter->save();
+                painter->setRenderHint(QPainter::Antialiasing);
+                painter->setPen(Qt::NoPen);
+
+                // a few widening, fading layers, slightly offset downwards: soft and flat
+                for (int i = 4; i >= 1; --i)
+                {
+                    QColor layer = shadow;
+                    layer.setAlphaF(shadow.alphaF() * 0.30 / i);
+                    painter->setBrush(layer);
+                    painter->drawRoundedRect(rect().adjusted(-i, -i + 1.5, i, i + 1.5), cCardRadius + i, cCardRadius + i);
+                }
+
+                painter->restore();
+            }
+    };
+}
+
 UBThumbnail::UBThumbnail()
-    : mPixmapItem{new QGraphicsPixmapItem{this}}
+    : mPixmapItem{new UBThumbnailPixmapItem{this}}
     , mTextItem{new UBThumbnailTextItem}
 {
+    mCardItem = new UBThumbnailCardItem{this};
+    mCardItem->setFlag(QGraphicsItem::ItemStacksBehindParent);
+    mCardItem->setZValue(-1);
+
     mTextItem->setParentItem(this);
 
     // accept hover to show/hide UI buttons
@@ -77,6 +168,16 @@ void UBThumbnail::setPixmap(const QPixmap& pixmap)
     if (needsAdjust)
     {
         adjustThumbnail();
+    }
+
+    updateCardGeometry();
+}
+
+void UBThumbnail::updateCardGeometry()
+{
+    if (mCardItem)
+    {
+        mCardItem->setRect(mapRectFromItem(mPixmapItem, mPixmapItem->boundingRect()));
     }
 }
 
@@ -133,6 +234,8 @@ void UBThumbnail::setThumbnailSize(QSizeF size)
 
     // position label below pixmap
     mTextItem->setPos(0, pixmapSize.height() * scaleFactor + cLabelOffset);
+
+    updateCardGeometry();
 }
 
 void UBThumbnail::setColumn(int column)
@@ -271,7 +374,9 @@ void UBThumbnail::hoverEnterEvent(QGraphicsSceneHoverEvent* event)
 
     if (thumbnailScene)
     {
-        mEditable = thumbnailScene->currentThumbnailArranger()->isUIEnabled();
+        // no arranger while no view of the scene is visible
+        auto arranger = thumbnailScene->currentThumbnailArranger();
+        mEditable = arranger && arranger->isUIEnabled();
     }
 
     QGraphicsRectItem::hoverEnterEvent(event);
@@ -296,7 +401,9 @@ void UBThumbnail::mousePressEvent(QGraphicsSceneMouseEvent* event)
         if (mDeletable && getIcon("close")->triggered(p))
         {
             // deleting must be performed later, don't kill yourself
-            QTimer::singleShot(0, [this, thumbnailScene]() { thumbnailScene->document()->deletePages({mIndex}); });
+            // the scene is the context: no call when the document was closed meanwhile
+            const int index = mIndex;
+            QTimer::singleShot(0, thumbnailScene, [thumbnailScene, index]() { thumbnailScene->document()->deletePages({index}); });
             return;
         }
         else if (getIcon("duplicate")->triggered(p))
@@ -311,12 +418,35 @@ void UBThumbnail::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
 void UBThumbnail::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 {
-    // paint a selection frame but only around the pixmap
+    // flat page card: a thin hairline around the page, an accent ring around a selected page
+    // (the shadow is painted by the card item, the page by the pixmap item, both behind)
+    const auto colors = UBGlassStyle::documentModeColors(UBThemeManager::instance()->isDarkMode());
+    const QRectF card = mapRectFromItem(mPixmapItem, mPixmapItem->boundingRect());
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    painter->setBrush(Qt::NoBrush);
+
+    QPen hairline(colors.cardBorder, 1);
+    hairline.setCosmetic(true);
+    painter->setPen(hairline);
+    painter->drawRoundedRect(card.adjusted(0.5, 0.5, -0.5, -0.5), cCardRadius - 0.5, cCardRadius - 0.5);
+
     if (isSelected())
     {
-        const auto selectionRect = mapRectFromItem(mPixmapItem, mPixmapItem->boundingRect()) + cSelectionMargins;
-        painter->setPen(QPen(qApp->palette().color(QPalette::Highlight), cSelectionWidth));
-        painter->drawRect(selectionRect);
+        const qreal offset = cRingGap + cRingWidth / 2;
+        painter->setPen(QPen(colors.accent, cRingWidth));
+        painter->drawRoundedRect(card.adjusted(-offset, -offset, offset, offset), cCardRadius + offset, cCardRadius + offset);
+    }
+
+    painter->restore();
+
+    // page number in the theme colour, the accent for selected pages
+    const QColor labelColor = isSelected() ? colors.accent : colors.secondary;
+
+    if (mTextItem->defaultTextColor() != labelColor)
+    {
+        mTextItem->setDefaultTextColor(labelColor);
     }
 
     // paint the buttons

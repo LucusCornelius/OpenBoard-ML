@@ -38,6 +38,11 @@
 #include "gui/UBThumbnailArranger.h"
 #include "gui/UBThumbnailScene.h"
 
+#include "core/UBThemeManager.h"
+#include "gui/UBGlassStyle.h"
+
+#include <QPainter>
+
 #include "core/memcheck.h"
 
 
@@ -134,6 +139,7 @@ void UBDocumentThumbnailWidget::dragLeaveEvent(QDragLeaveEvent *event)
         mScrollTimer->stop();
     }
     deleteDropCaret();
+    mClosestDropItem = nullptr;
     UBDocumentThumbnailsView::dragLeaveEvent(event);
 }
 
@@ -199,12 +205,13 @@ void UBDocumentThumbnailWidget::dragMoveEvent(QDragMoveEvent *event)
 
         mDropIsRight = mapToScene(eventPos).x() > itemCenter.x();
 
-        if (!mDropCaretRectItem && selectedItems().count() < document()->thumbnailScene()->thumbnailCount())
+        if (!mDropCaretRectItem && document() && selectedItems().count() < document()->thumbnailScene()->thumbnailCount())
         {
             mDropCaretRectItem = new QGraphicsRectItem();
             scene()->addItem(mDropCaretRectItem);
-            mDropCaretRectItem->setPen(QPen(Qt::darkGray));
-            mDropCaretRectItem->setBrush(QBrush(Qt::lightGray));
+            // flat accent insertion bar
+            mDropCaretRectItem->setPen(Qt::NoPen);
+            mDropCaretRectItem->setBrush(UBGlassStyle::documentModeColors(UBThemeManager::instance()->isDarkMode()).accent);
         }
 
         const auto thumbnailWidth = thumbnailArranger()->thumbnailWidth();
@@ -233,8 +240,13 @@ void UBDocumentThumbnailWidget::dropEvent(QDropEvent *event)
     }
     deleteDropCaret();
 
-    if (mClosestDropItem)
+    // the thumbnail found in dragMoveEvent; it belongs to the scene shown now
+    UBThumbnail* closestDropItem = mClosestDropItem;
+    mClosestDropItem = nullptr;
+
+    if (closestDropItem && scene() && closestDropItem->scene() == scene())
     {
+        mClosestDropItem = closestDropItem;
         int targetIndex = mDropIsRight ? mClosestDropItem->sceneIndex() + 1 : mClosestDropItem->sceneIndex();
 
         QList<UBMimeDataItem> mimeDataItems;
@@ -276,6 +288,8 @@ void UBDocumentThumbnailWidget::dropEvent(QDropEvent *event)
                 sourceIndexOffset += 1;
             }
         }
+
+        mClosestDropItem = nullptr;
     }
     UBDocumentThumbnailsView::dropEvent(event);
 }
@@ -304,5 +318,44 @@ bool UBDocumentThumbnailWidget::dragEnabled() const
 
 void UBDocumentThumbnailWidget::hightlightItem(int index)
 {
-    document()->thumbnailScene()->hightlightItem(index);
+    if (document())
+    {
+        document()->thumbnailScene()->hightlightItem(index);
+    }
+}
+
+
+void UBDocumentThumbnailWidget::paintEvent(QPaintEvent *event)
+{
+    UBDocumentThumbnailsView::paintEvent(event);
+
+    if (document())
+        return;
+
+    // empty state: no document selected (nothing, a folder or several items)
+    const auto colors = UBGlassStyle::documentModeColors(UBThemeManager::instance()->isDarkMode());
+    const QRect area = viewport()->rect();
+
+    QPainter painter(viewport());
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.fillRect(area, colors.content);
+
+    const int glyphSize = 44;
+    const QPoint center = area.center() - QPoint(0, 30);
+    const QRect glyphRect(center.x() - glyphSize / 2, center.y() - glyphSize, glyphSize, glyphSize);
+    painter.drawPixmap(glyphRect, UBGlassStyle::glyphPixmap("documents", colors.secondary, glyphSize, devicePixelRatioF()));
+
+    QFont titleFont = font();
+    titleFont.setPointSizeF(titleFont.pointSizeF() * 1.15);
+    titleFont.setWeight(QFont::DemiBold);
+    painter.setFont(titleFont);
+    painter.setPen(colors.foreground);
+    const QRect titleRect(area.left() + 20, glyphRect.bottom() + 14, area.width() - 40, QFontMetrics(titleFont).height());
+    painter.drawText(titleRect, Qt::AlignHCenter | Qt::AlignVCenter, tr("No document selected"));
+
+    painter.setFont(font());
+    painter.setPen(colors.secondary);
+    const QRect hintRect(area.left() + 20, titleRect.bottom() + 6, area.width() - 40, QFontMetrics(font()).height() * 2);
+    painter.drawText(hintRect, Qt::AlignHCenter | Qt::AlignTop | Qt::TextWordWrap,
+                     tr("Select a document in the list to see its pages."));
 }

@@ -403,6 +403,15 @@
         <file>images/glass/close.svg</file>
         <file>images/glass/desktop.svg</file>
         <file>images/glass/documents.svg</file>
+        <file>images/glass/folder.svg</file>
+        <file>images/glass/document.svg</file>
+        <file>images/glass/documentCurrent.svg</file>
+        <file>images/glass/myDocuments.svg</file>
+        <file>images/glass/sortAscending.svg</file>
+        <file>images/glass/sortDescending.svg</file>
+        <file>images/glass/search.svg</file>
+        <file>images/glass/comboArrowOnLight.svg</file>
+        <file>images/glass/comboArrowOnDark.svg</file>
         <file>images/glass/erase.svg</file>
         <file>images/glass/eraserLarge.svg</file>
         <file>images/glass/eraserMedium.svg</file>

@@ -29,6 +29,7 @@
 #include <QString>
 
 class QPainter;
+class QPixmap;
 class QPainterPath;
 class QToolBar;
 class QWidget;
@@ -152,6 +153,41 @@ class UBGlassStyle
 
         /** material of the widget currently being painted (-1 when not on glass) */
         static int currentPaintMaterial();
+
+        /**
+         * Colours and metrics of document mode (documents explorer), for the glass
+         * style (macOS) and the modern style (Windows, Linux): flat content area, a
+         * floating sidebar card, flat rounded controls, page cards with a hairline.
+         */
+        struct DocumentModeColors
+        {
+            QColor content;           // window background behind the sidebar and the page grid
+            QColor sidebar;           // sidebar card (document tree)
+            QColor sidebarBorder;     // hairline around the sidebar card
+            QColor foreground;        // text and glyphs
+            QColor secondary;         // dates, page labels, placeholder text
+            QColor accent;            // selection, folder glyphs, drop target
+            QColor onAccent;          // text and glyphs on the accent
+            QColor hover;             // hover fill of rows and buttons
+            QColor selectionInactive; // selected rows while the tree has no focus
+            QColor control;           // fill of the sort box and the search field
+            QColor controlHover;
+            QColor track;             // zoom slider track
+            QColor cardBorder;        // hairline around the page thumbnails
+            QColor cardShadow;        // soft shadow below the page thumbnails
+            int sidebarRadius = 12;
+            int controlRadius = 8;
+            int rowRadius = 6;
+            bool accentPill = true;   // selected row: solid accent pill (glass) or tinted fill and indicator (modern)
+        };
+
+        static DocumentModeColors documentModeColors(bool dark);
+
+        /** stylesheet block of document mode, used by the glass and the modern layer */
+        static QString documentModeStyleSheet(bool dark);
+
+        /** pixmap of a glyph of :/images/glass/<name>.svg in one colour (cached) */
+        static QPixmap glyphPixmap(const QString& name, const QColor& color, int size, qreal dpr);
 };
 
 #endif /* UBGLASSSTYLE_H_ */

@@ -73,9 +73,11 @@ protected:
 
 private:
     static int labelSpacing();
+    void updateCardGeometry();
 
 private:
     QGraphicsPixmapItem* mPixmapItem{nullptr};
+    QGraphicsRectItem* mCardItem{nullptr}; // soft shadow of the page card
     UBThumbnailTextItem* mTextItem{nullptr};
     bool mLoaded{false};
     int mIndex{0};
