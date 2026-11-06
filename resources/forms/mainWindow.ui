@@ -1120,14 +1120,17 @@
     <bool>true</bool>
    </property>
    <property name="checked">
-    <bool>true</bool>
+    <bool>false</bool>
    </property>
    <property name="icon">
     <iconset resource="../OpenBoard.qrc">
      <normaloff>:/images/toolbar/display.png</normaloff>:/images/toolbar/display.png</iconset>
    </property>
    <property name="text">
-    <string>Multi Screen</string>
+    <string>Show on Second Screen</string>
+   </property>
+   <property name="toolTip">
+    <string>Show the board full screen on the other screen or projector</string>
    </property>
   </action>
   <action name="actionWidePageSize">

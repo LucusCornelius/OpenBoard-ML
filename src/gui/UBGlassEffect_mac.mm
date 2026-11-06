@@ -790,6 +790,12 @@ namespace
                         gpuVisible = true;
                 }
 
+                // a panel moved into a translucent window (the desktop annotation overlay takes the
+                // dock palettes and the "add to" palette) paints its glass itself, like the panels
+                // created there: no native material on top of the desktop
+                if (mPanel && mPanel->window()->testAttribute(Qt::WA_TranslucentBackground))
+                    gpuVisible = true;
+
                 if (gpuVisible != mSuspended)
                 {
                     mSuspended = gpuVisible;
@@ -1077,14 +1083,16 @@ namespace
                     if (appearance && ![[[mHost appearance] name] isEqualToString:[appearance name]])
                         [mHost setAppearance:appearance];
 
-                    // wait for the first rendered image, an empty glass body would flash; a panel
-                    // without size (a collapsed dock) is not painted any more: its last body and
-                    // controls would stay on the native glass, which is not clipped to the panel
+                    // wait for the first rendered image, an empty glass body would flash
+                    // (never in a translucent window, see suspended()); a panel without size
+                    // (a collapsed dock) is not painted any more: its last body and controls
+                    // would stay on the native glass, which is not clipped to the panel
                     // (it opens again with the next rendered image, not with the old controls)
                     if (size.isEmpty())
                         mImageKey = 0;
 
-                    const bool visible = mPanel->isVisible() && !size.isEmpty() && mImageKey != 0 && !mSuspended;
+                    const bool visible = mPanel->isVisible() && !size.isEmpty() && mImageKey != 0 && !mSuspended
+                            && !mPanel->window()->testAttribute(Qt::WA_TranslucentBackground);
                     [mHost setHidden:(visible ? NO : YES)];
                 }
                 @catch (NSException* exception)

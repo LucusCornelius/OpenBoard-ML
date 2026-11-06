@@ -73,7 +73,7 @@ UBDesktopPenPalette::UBDesktopPenPalette(QWidget *parent, UBRightPalette* rightP
     colorActions.append(UBApplication::mainWindow->actionColorPreferences);
 
     UBToolbarButtonGroup *colorChoice =
-            new UBToolbarButtonGroup(UBApplication::mainWindow->boardToolBar, colorActions, objectNamePrefix, UBSettings::settings()->colorPaletteSize);
+            new UBToolbarButtonGroup(this, colorActions, objectNamePrefix, UBSettings::settings()->colorPaletteSize, QSize(24, 24));
 
     colorChoice->displayText(false);
 
@@ -95,7 +95,7 @@ UBDesktopPenPalette::UBDesktopPenPalette(QWidget *parent, UBRightPalette* rightP
     lineWidthActions.append(UBApplication::mainWindow->actionLineLarge);
 
     UBToolbarButtonGroup *lineWidthChoice =
-            new UBToolbarButtonGroup(UBApplication::mainWindow->boardToolBar, lineWidthActions, objectNamePrefix);
+            new UBToolbarButtonGroup(this, lineWidthActions, objectNamePrefix, -1, QSize(22, 22));
     lineWidthChoice->displayText(false);
 
     connect(lineWidthChoice, SIGNAL(activated(int)), UBDrawingController::drawingController(), SLOT(setLineWidthIndex(int)));
@@ -146,7 +146,7 @@ UBDesktopEraserPalette::UBDesktopEraserPalette(QWidget *parent, UBRightPalette* 
     eraserWidthActions.append(UBApplication::mainWindow->actionEraserMedium);
     eraserWidthActions.append(UBApplication::mainWindow->actionEraserLarge);
 
-    UBToolbarButtonGroup *eraserWidthChoice = new UBToolbarButtonGroup(UBApplication::mainWindow->boardToolBar, eraserWidthActions, objectNamePrefix);
+    UBToolbarButtonGroup *eraserWidthChoice = new UBToolbarButtonGroup(this, eraserWidthActions, objectNamePrefix, -1, QSize(22, 22));
 
     connect(eraserWidthChoice, SIGNAL(activated(int)), UBDrawingController::drawingController(), SLOT(setEraserWidthIndex(int)));
     connect(eraserWidthChoice, SIGNAL(activated(int)), this, SLOT(close()));
@@ -179,7 +179,7 @@ UBDesktopMarkerPalette::UBDesktopMarkerPalette(QWidget *parent, UBRightPalette* 
     colorActions.append(UBApplication::mainWindow->actionCustomColor);
     colorActions.append(UBApplication::mainWindow->actionColorPreferences);
 
-    UBToolbarButtonGroup *colorChoice = new UBToolbarButtonGroup(UBApplication::mainWindow->boardToolBar, colorActions, objectNamePrefix, UBSettings::settings()->colorPaletteSize);
+    UBToolbarButtonGroup *colorChoice = new UBToolbarButtonGroup(this, colorActions, objectNamePrefix, UBSettings::settings()->colorPaletteSize, QSize(24, 24));
     colorChoice->displayText(false);
 
     //connect(colorChoice, SIGNAL(activated(int)), this, SLOT(UBApplication::boardController->setColorIndex(int)));
@@ -199,7 +199,7 @@ UBDesktopMarkerPalette::UBDesktopMarkerPalette(QWidget *parent, UBRightPalette* 
     lineWidthActions.append(UBApplication::mainWindow->actionLineMedium);
     lineWidthActions.append(UBApplication::mainWindow->actionLineLarge);
 
-    UBToolbarButtonGroup *lineWidthChoice = new UBToolbarButtonGroup(UBApplication::mainWindow->boardToolBar, lineWidthActions, objectNamePrefix);
+    UBToolbarButtonGroup *lineWidthChoice = new UBToolbarButtonGroup(this, lineWidthActions, objectNamePrefix, -1, QSize(22, 22));
     lineWidthChoice->displayText(false);
 
     connect(lineWidthChoice, SIGNAL(activated(int)), UBDrawingController::drawingController(), SLOT(setLineWidthIndex(int)));

@@ -324,6 +324,13 @@ void UBPreferencesController::wire()
     // applied live (UBBoardController::updateBoardAppearance)
     connect(mPreferencesUI->boardFollowsDarkModeCheckBox, &QCheckBox::clicked, settings->boardFollowsDarkMode, &UBSetting::setBool);
 
+    // same as "Show on Second Screen" in the OpenBoard menu, applied at once
+    connect(mPreferencesUI->useMultiScreenCheckBox, &QCheckBox::clicked, UBApplication::applicationController, &UBApplicationController::useMultiScreen);
+    connect(settings->appUseMultiscreen, &UBSetting::changed, mPreferencesUI->useMultiScreenCheckBox, [this](const QVariant& use) {
+        const QSignalBlocker blocker(mPreferencesUI->useMultiScreenCheckBox);
+        mPreferencesUI->useMultiScreenCheckBox->setChecked(use.toBool());
+    });
+
     // the appearance can also be chosen in the menu of the board: stay in sync
     connect(UBThemeManager::instance(), &UBThemeManager::themeModeChanged, this, [this](int mode) {
         const QSignalBlocker blocker(mPreferencesUI->themeComboBox);
@@ -501,6 +508,7 @@ void UBPreferencesController::init()
     }
 
     mPreferencesUI->boardFollowsDarkModeCheckBox->setChecked(settings->boardFollowsDarkMode->get().toBool());
+    mPreferencesUI->useMultiScreenCheckBox->setChecked(settings->appUseMultiscreen->get().toBool());
 
     mPreferencesUI->useExternalBrowserCheckBox->setChecked(settings->webUseExternalBrowser->get().toBool());
     mPreferencesUI->displayBrowserPageCheckBox->setChecked(settings->webShowPageImmediatelyOnMirroredScreen->get().toBool());

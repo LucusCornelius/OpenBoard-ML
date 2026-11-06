@@ -132,7 +132,13 @@ class UBDesktopAnnotationController : public QObject
         void setAssociatedPalettePosition(UBActionPalette* palette, const QString& actionName);
         void togglePropertyPalette(UBActionPalette* palette);
         void updateMask(bool bTransparent);
+        void scheduleMaskRefresh();
         static QPixmap clipboardScreenshot();
+
+    protected:
+        bool eventFilter(QObject* watched, QEvent* event) override;
+
+    private:
 
         UBDesktopPalette *mDesktopPalette;
         //UBKeyboardPalette *mKeyboardPalette;
@@ -162,6 +168,7 @@ class UBDesktopAnnotationController : public QObject
         int mDesktopStylusTool;
 
         QPixmap mMask;
+        bool mMaskRefreshPending{false};
 
 };
 

@@ -458,6 +458,12 @@ void UBApplicationController::showDocument()
 
 void UBApplicationController::showDesktop(bool dontSwitchFrontProcess)
 {
+    if (mIsShowingDesktop)
+        return;
+
+    // the overlay goes to the screen the window is on now
+    UBApplication::displayManager->followControlWindow();
+
     if (UBApplication::boardController)
         UBApplication::boardController->hide();
 
@@ -523,6 +529,13 @@ void UBApplicationController::hideDesktop()
     UBApplication::displayManager->adjustScreens();
 
     emit desktopMode(false);
+
+    // back in front of the overlay's former place; the keyboard focus only when OpenBoard is the
+    // active application (the user clicked the palette), never taken from another application
+    mMainWindow->raise();
+
+    if (QGuiApplication::applicationState() == Qt::ApplicationActive)
+        mMainWindow->activateWindow();
 }
 
 void UBApplicationController::setMirrorSourceWidget(QWidget* pWidget)
@@ -550,7 +563,7 @@ void UBApplicationController::mirroringEnabled(bool enabled)
             mMirror->stop();
         }
 
-        mMirror->setVisible(enabled && UBApplication::displayManager->numScreens() > 1);
+        mMirror->setVisible(enabled && UBApplication::displayManager->hasDisplay());
         mUninoteController->updateShowHideState(enabled);
         UBApplication::mainWindow->actionWebShowHideOnDisplay->setChecked(enabled);
     }
@@ -636,18 +649,30 @@ void UBApplicationController::importFile(const QString& pFilePath)
 
 void UBApplicationController::useMultiScreen(bool use)
 {
-    if (use && !mMirror)
-        mMirror = new UBScreenMirror();
-    if (!use && mMirror) {
-        mirroringEnabled(false);
-        delete mMirror;
-        mMirror = NULL;
+    UBDisplayManager* displayManager = UBApplication::displayManager;
+
+    if (use == displayManager->useMultiScreen())
+    {
+        // e.g. the menu and the preferences both reflect the setting
+        UBSettings::settings()->appUseMultiscreen->set(use);
+        return;
     }
 
-    UBApplication::displayManager->setUseMultiScreen(use);
-    UBApplication::displayManager->adjustScreens();
+    if (!use && mMirror)
+    {
+        mirroringEnabled(false);
+        delete mMirror;
+        mMirror = nullptr;
+    }
+
+    // the setting first: menu item and preferences follow its changed() signal
     UBSettings::settings()->appUseMultiscreen->set(use);
 
+    displayManager->setUseMultiScreen(use);
+
+    // the roles: the display screen is the first screen the control window is not on;
+    // places or hides the projection and creates the mirror (screenLayoutChanged)
+    displayManager->adjustScreens();
 }
 
 

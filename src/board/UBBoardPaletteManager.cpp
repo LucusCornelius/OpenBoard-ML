@@ -332,7 +332,8 @@ void UBBoardPaletteManager::setupPalettes()
 
     mAddItemPalette = new UBActionPalette(addItemActions, Qt::Horizontal, mContainer);
     mAddItemPalette->setObjectName("AddItemPalette");
-    mAddItemPalette->setButtonIconSize(QSize(128, 128));
+    // monochrome glyphs (UBGlassStyle::applyIcons) with the label below
+    mAddItemPalette->setButtonIconSize(QSize(32, 32));
     mAddItemPalette->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
     mAddItemPalette->groupActions();
     mAddItemPalette->setClosable(true);

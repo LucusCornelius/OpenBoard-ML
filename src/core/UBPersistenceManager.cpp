@@ -163,22 +163,50 @@ void UBPersistenceManager::errorString(QString error)
 
 void UBPersistenceManager::createDocumentProxiesStructure(const QFileInfoList &contentInfoList, bool interactive)
 {
-    // Create a QFutureWatcher and connect signals and slots.
-    QFutureWatcher<std::shared_ptr<UBDocumentProxy>> futureWatcher;
-    QObject::connect(&futureWatcher, &QFutureWatcher<void>::finished, &mProgress, &QProgressDialog::reset);
-    QObject::connect(&futureWatcher,  &QFutureWatcher<void>::progressRangeChanged, &mProgress, &QProgressDialog::setRange);
-    QObject::connect(&futureWatcher, &QFutureWatcher<void>::progressValueChanged,  &mProgress, &QProgressDialog::setValue);
-
     // Start the computation.
     QFuture<std::shared_ptr<UBDocumentProxy>> proxiesFuture = QtConcurrent::mapped(contentInfoList, &UBPersistenceManager::createDocumentProxyStructure);
-    futureWatcher.setFuture(proxiesFuture);
 
-    // Display the dialog and start the event loop.
-    mProgress.exec();
+    // Wait without a modal dialog. A modal dialog activates the application and, at start up,
+    // appeared before the main window, centred on the primary screen. Usually the documents
+    // are found in a fraction of a second: then no event is processed and nothing is shown.
+    // Only a long load shows a non modal progress window on the screen of the main window
+    // (showLoadingProgress); user input stays held back, like with the modal dialog.
+    QElapsedTimer elapsed;
+    elapsed.start();
+    QPointer<QProgressDialog> progress;
+    bool progressRequested = false;
 
-    futureWatcher.waitForFinished();
+    while (!proxiesFuture.isFinished())
+    {
+        if (!progressRequested && elapsed.elapsed() >= 1500)
+        {
+            progressRequested = true;
+            progress = showLoadingProgress(contentInfoList.size());
 
-    QList<std::shared_ptr<UBDocumentProxy>> proxies = futureWatcher.future().results();
+            if (progress)
+            {
+                progress->setRange(proxiesFuture.progressMinimum(), proxiesFuture.progressMaximum());
+            }
+        }
+
+        if (progress)
+        {
+            progress->setValue(proxiesFuture.progressValue());
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents, 50);
+        }
+
+        QThread::msleep(10);
+    }
+
+    proxiesFuture.waitForFinished();
+
+    if (progress)
+    {
+        progress->hide();
+        delete progress.data();
+    }
+
+    QList<std::shared_ptr<UBDocumentProxy>> proxies = proxiesFuture.results();
 
     for (auto&& proxy : std::as_const(proxies))
     {
@@ -206,6 +234,59 @@ void UBPersistenceManager::createDocumentProxiesStructure(const QFileInfoList &c
     mReplaceDialogReturnedCancel = false;
 }
 
+QProgressDialog* UBPersistenceManager::showLoadingProgress(int documentCount)
+{
+    // Shown on the screen of the main window only: over the visible window, or at start up
+    // (window not shown yet) where the window will be restored. Never anywhere else, never
+    // modal, never activating the application.
+    QWidget* mainWindow = UBApplication::mainWindow;
+    QRect target;
+
+    if (mainWindow && mainWindow->isVisible())
+    {
+        target = mainWindow->frameGeometry();
+    }
+    else if (UBSettings::settings()->appRunInWindow->get().toBool())
+    {
+        // the window will be restored there when its title bar is on that screen
+        // (UBDisplayManager::positionControlWindow), else it is placed elsewhere: no window
+        const QRect saved = UBSettings::settings()->appMainWindowGeometry->get().toRect();
+        QScreen* screen = saved.isValid() ? QGuiApplication::screenAt(saved.center()) : nullptr;
+
+        if (screen && QGuiApplication::screenAt(QPoint(saved.center().x(), saved.top() + 10)) == screen)
+        {
+            target = saved;
+        }
+    }
+
+    if (!target.isValid())
+    {
+        // first start (no window geometry yet): no progress window
+        return nullptr;
+    }
+
+    QWidget* parent = mainWindow && mainWindow->isVisible() ? mainWindow : nullptr;
+    QProgressDialog* progress = new QProgressDialog(parent, Qt::Dialog | Qt::WindowTitleHint | Qt::CustomizeWindowHint
+                                                    | Qt::WindowDoesNotAcceptFocus);
+    progress->setWindowModality(Qt::NonModal);
+    progress->setAttribute(Qt::WA_ShowWithoutActivating);
+    progress->setFocusPolicy(Qt::NoFocus);
+    progress->setAutoClose(false);
+    progress->setAutoReset(false);
+    progress->setMinimumDuration(0);
+    progress->setCancelButton(nullptr);
+    progress->setLabelText(tr("Retrieving all your documents (found : %1)").arg(documentCount));
+    progress->adjustSize();
+
+    QRect geometry(QPoint(0, 0), progress->sizeHint());
+    geometry.moveCenter(target.center());
+    progress->setGeometry(geometry);
+    progress->show();
+
+    return progress;
+}
+
+
 void UBPersistenceManager::createDocumentProxiesStructure(bool interactive)
 {
     mDocumentRepositoryPath = UBSettings::userDocumentDirectory();
@@ -214,10 +295,6 @@ void UBPersistenceManager::createDocumentProxiesStructure(bool interactive)
     rootDir.mkpath(rootDir.path());
 
     QFileInfoList contentInfoList = rootDir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Time | QDir::Reversed);
-
-    mProgress.setWindowFlags(Qt::Window | Qt::WindowTitleHint | Qt::CustomizeWindowHint);
-    mProgress.setLabelText(tr("Retrieving all your documents (found : %1)").arg(contentInfoList.size()));
-    mProgress.setCancelButton(nullptr);
 
     createDocumentProxiesStructure(contentInfoList, interactive);
 

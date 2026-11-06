@@ -29,6 +29,7 @@
 #include "frameworks/UBPlatformUtils.h"
 
 #include "core/UBApplication.h"
+#include "core/UBApplicationController.h"
 #include "core/UBSettings.h"
 
 #include "board/UBBoardView.h"
@@ -53,6 +54,10 @@ UBDisplayManager::UBDisplayManager(QObject *parent)
     connect(qApp, &QGuiApplication::primaryScreenChanged, this, &UBDisplayManager::addOrRemoveScreen);
 
     connect(UBSettings::settings()->appScreenList, &UBSetting::changed, this, &UBDisplayManager::adjustScreens);
+
+    mFollowControlWindowTimer.setSingleShot(true);
+    mFollowControlWindowTimer.setInterval(500);
+    connect(&mFollowControlWindowTimer, &QTimer::timeout, this, &UBDisplayManager::followControlWindow);
 }
 
 UBDisplayManager::~UBDisplayManager()
@@ -165,35 +170,86 @@ void UBDisplayManager::createScreenLabels()
 
 void UBDisplayManager::initScreensByRole()
 {
-    mScreensByRole.clear();
-    bool swapScreens = UBSettings::settings()->swapControlAndDisplayScreens->get().toBool();
+    // without a screen list: primary screen for control, the next one for display
+    assignRoles();
+}
 
-    mScreensByRole[ScreenRole::Control] = mAvailableScreens[0];
 
-    if (mAvailableScreens.count() > 1)
+QList<QScreen*> UBDisplayManager::orderedScreens() const
+{
+    QList<QScreen*> ordered;
+    const QVariant appScreenList = UBSettings::settings()->appScreenList->get();
+    const QStringList screenList = appScreenList.toStringList();
+
+    if (!appScreenList.isValid())
     {
-        QScreen* controlScreen = mAvailableScreens[0];
-        QScreen* displayScreen = mAvailableScreens[1];
+        // no entry in configuration files ("old" configuration mode):
+        // primary screen for control, next screen for display, the others for previous pages
+        ordered = mAvailableScreens;
 
-        if (swapScreens)
+        if (ordered.count() > 1 && UBSettings::settings()->swapControlAndDisplayScreens->get().toBool())
         {
-            std::swap(controlScreen, displayScreen);
+            std::swap(ordered[0], ordered[1]);
         }
-
-        mScreensByRole[ScreenRole::Control] = controlScreen;
-
-        mScreensByRole[ScreenRole::Display] = displayScreen;
-
-        ScreenRole role(ScreenRole::Previous1);
-
-        for (int i = 2; i < mAvailableScreens.count(); ++i)
+    }
+    else if (screenList.isEmpty() || screenList.at(0).isEmpty())
+    {
+        // explicitly stored an empty list (converting an empty entry to a QStringList
+        // creates a list with one empty QString): take all available screens
+        ordered = mAvailableScreens;
+    }
+    else
+    {
+        // "new" configuration mode using a list of screen indexes (1 based)
+        for (const QString& entry : screenList)
         {
-            mScreensByRole[role++] = mAvailableScreens[i];
+            const int index = entry.toInt();
+
+            if (index < 1 || index > mAvailableScreens.size())
+            {
+                qDebug() << "Warning: Screen index out of range, skipped:" << index;
+                continue;
+            }
+
+            QScreen* screen = mAvailableScreens[index - 1];
+
+            if (screen && !ordered.contains(screen))
+            {
+                ordered << screen;
+            }
         }
     }
 
-    // Desktop screen is same as Control screen
-    mScreensByRole[ScreenRole::Desktop] = mScreensByRole[ScreenRole::Control];
+    if (ordered.isEmpty() && !mAvailableScreens.isEmpty())
+    {
+        // by default use the primary screen
+        ordered << mAvailableScreens.first();
+    }
+
+    return ordered;
+}
+
+
+QScreen* UBDisplayManager::controlWindowScreen() const
+{
+    QWidget* controlWidget = widget(ScreenRole::Control);
+
+    // the legacy kiosk window (frameless) is placed on the control screen by OpenBoard,
+    // a normal window (also in full screen) is wherever the user put it
+    if (!controlWidget || !mControlWindowInitialized || (controlWidget->windowFlags() & Qt::FramelessWindowHint))
+    {
+        return nullptr;
+    }
+
+    QScreen* screen = QGuiApplication::screenAt(controlWidget->geometry().center());
+
+    if (!screen)
+    {
+        screen = controlWidget->screen();
+    }
+
+    // screens duplicating another screen are not in the list
+    return mAvailableScreens.contains(screen) ? screen : nullptr;
 }
 
 
@@ -206,82 +262,54 @@ void UBDisplayManager::assignRoles()
     // disable screen labels of screens in list
     disableScreenLabels(screenList);
 
-    if (!appScreenList.isValid())
+    QList<QScreen*> ordered = orderedScreens();
+
+    // The control role belongs to the screen the control window is on: the projection
+    // goes to another screen and must never cover the window, the desktop annotation
+    // overlay and screen captures are on the screen the user works on.
+    if (QScreen* windowScreen = controlWindowScreen())
     {
-        // no entry in configuration files
-        // "old" configuration mode
-        initScreensByRole();
+        ordered.removeAll(windowScreen);
+        ordered.prepend(windowScreen);
     }
-    else
+
+    // "show on second screen" was switched on: use another screen for the display
+    // even when the screen list names only one
+    if (mUseMultiScreen && ordered.count() < 2)
     {
-        mScreensByRole.clear();
-        // converting an empty entry to a QStringList creates a list with one empty QString
-        if (appScreenList.toStringList().isEmpty() || appScreenList.toStringList().at(0).isEmpty())
+        for (QScreen* screen : std::as_const(mAvailableScreens))
         {
-            screenList.clear();
-
-            // explicitly stored an empty list, take all available screens
-            for (int index = 1; index <= mAvailableScreens.count(); ++index)
+            if (!ordered.contains(screen))
             {
-                screenList << QString::number(index);
+                ordered << screen;
+                break;
             }
         }
-
-        // "new" configuration mode using list of screen indexes
-        // convert to index list and check: are all numbers in range?
-        QList<int> indexList;
-
-        for (QString& entry : screenList)
-        {
-            int index = entry.toInt();
-
-            if (index < 1 || index > mAvailableScreens.size())
-            {
-                qDebug() << "Warning: Screen index out of range, skipped:" << index;
-            }
-            else
-            {
-                indexList << index - 1;
-            }
-        }
-
-        // configure control screen, by default use primary screen
-        QScreen* controlScreen = mAvailableScreens[0];
-
-        if (!indexList.empty() && mAvailableScreens[indexList[0]])
-        {
-            controlScreen = mAvailableScreens[indexList[0]];
-        }
-
-        mScreensByRole[ScreenRole::Control] = controlScreen;
-
-        // configure display screen
-        if (mUseMultiScreen && indexList.count() > 1)
-        {
-            QScreen* displayScreen = mAvailableScreens[indexList[1]];
-
-            if (displayScreen)
-            {
-                mScreensByRole[ScreenRole::Display] = displayScreen;
-            }
-        }
-
-        // configure previous screens
-        ScreenRole role = ScreenRole::Previous1;
-
-        for (int i = 2; i < indexList.count(); ++i)
-        {
-            QScreen* previousScreen = mAvailableScreens[indexList[i]];
-
-            if (previousScreen)
-            {
-                mScreensByRole[role++] = previousScreen;
-            }
-        }
-
-        // Desktop screen is same as Control screen
-        mScreensByRole[ScreenRole::Desktop] = mScreensByRole[ScreenRole::Control];
     }
+
+    mScreensByRole.clear();
+
+    if (!ordered.isEmpty())
+    {
+        mScreensByRole[ScreenRole::Control] = ordered[0];
+    }
+
+    // the display (projection) screen only exists in multi screen mode
+    if (mUseMultiScreen && ordered.count() > 1)
+    {
+        mScreensByRole[ScreenRole::Display] = ordered[1];
+    }
+
+    // configure previous screens
+    ScreenRole role = ScreenRole::Previous1;
+
+    for (int i = 2; i < ordered.count() && role <= ScreenRole::Previous5; ++i)
+    {
+        mScreensByRole[role++] = ordered[i];
+    }
+
+    // Desktop screen is same as Control screen
+    mScreensByRole[ScreenRole::Desktop] = mScreensByRole.value(ScreenRole::Control);
 
     emit screenRolesAssigned();
 }
@@ -337,7 +365,8 @@ void UBDisplayManager::setDisplayWidget(QWidget* pDisplayWidget)
 
         mWidgetsByRole[ScreenRole::Display] = pDisplayWidget;
 
-        if (screen(ScreenRole::Display))
+        // only shown in multi screen mode, never on top of the control window
+        if (hasDisplay())
         {
             pDisplayWidget->setGeometry(screen(ScreenRole::Display)->geometry());
             UBPlatformUtils::showFullScreen(pDisplayWidget);
@@ -431,11 +460,7 @@ void UBDisplayManager::positionScreens()
     } resizeEventFilter;
 
     qDebug() << "positionScreens";
-    if (widget(ScreenRole::Desktop) && hasControl())
-    {
-        widget(ScreenRole::Desktop)->hide();
-        widget(ScreenRole::Desktop)->setGeometry(screen(ScreenRole::Control)->geometry());
-    }
+    const bool desktopMode = isDesktopModeActive();
 
     if (widget(ScreenRole::Control) && hasControl())
     {
@@ -451,12 +476,13 @@ void UBDisplayManager::positionScreens()
         else if (!(controlWidget->windowFlags() & Qt::FramelessWindowHint) && controlWidget->isFullScreen())
         {
             // full screen entered at runtime from window mode: keep it as it is
-            if (controlWidget->isHidden())
+            // (hidden while the desktop annotation overlay is shown)
+            if (controlWidget->isHidden() && !desktopMode)
             {
                 controlWidget->show();
             }
         }
-        else
+        else if (!desktopMode)
         {
             // Sometimes moving control screen to the left won't operate...
             // found out that resetting the geometry solves theses cases better than "showNormal() workaround"
@@ -477,12 +503,50 @@ void UBDisplayManager::positionScreens()
         }
     }
 
-    if (widget(ScreenRole::Display) && hasDisplay() && mUseMultiScreen)
+    // a normal window may have been restored on another screen than the configured
+    // control screen: the roles follow the window (see assignRoles)
+    QScreen* windowScreen = controlWindowScreen();
+
+    if (windowScreen && windowScreen != screen(ScreenRole::Control))
     {
-        qDebug() << "display geometry" << screenGeometry(ScreenRole::Display);
-        widget(ScreenRole::Display)->showNormal();
-        widget(ScreenRole::Display)->setGeometry(screenGeometry(ScreenRole::Display));
-        UBPlatformUtils::showFullScreen(widget(ScreenRole::Display));
+        assignRoles();
+    }
+
+    watchControlWindow();
+
+    // the desktop annotation overlay covers the screen of the control window
+    if (widget(ScreenRole::Desktop) && hasControl())
+    {
+        QWidget* desktopWidget = widget(ScreenRole::Desktop);
+        const QRect desktopGeometry = screenGeometry(ScreenRole::Desktop);
+
+        if (desktopMode && desktopWidget->isVisible())
+        {
+            if (desktopWidget->geometry() != desktopGeometry)
+            {
+                desktopWidget->setGeometry(desktopGeometry);
+            }
+        }
+        else
+        {
+            desktopWidget->hide();
+            desktopWidget->setGeometry(desktopGeometry);
+        }
+    }
+
+    if (widget(ScreenRole::Display) && hasDisplay())
+    {
+        QWidget* displayWidget = widget(ScreenRole::Display);
+        const QRect displayGeometry = screenGeometry(ScreenRole::Display);
+        qDebug() << "display geometry" << displayGeometry;
+
+        // (re)place the projection only when needed: it is never shown on another screen first
+        if (!isShownOn(displayWidget, screen(ScreenRole::Display)))
+        {
+            displayWidget->hide();
+            displayWidget->setGeometry(displayGeometry);
+            UBPlatformUtils::showFullScreen(displayWidget);
+        }
     }
     else if (widget(ScreenRole::Display))
     {
@@ -497,9 +561,13 @@ void UBDisplayManager::positionScreens()
             {
                 QWidget* previous = widget(role);
                 qDebug() << "previous display geometry" << screenGeometry(role);
-                previous->showNormal();
-                previous->setGeometry(screenGeometry(role));
-                UBPlatformUtils::showFullScreen(previous);
+
+                if (!isShownOn(previous, screen(role)))
+                {
+                    previous->hide();
+                    previous->setGeometry(screenGeometry(role));
+                    UBPlatformUtils::showFullScreen(previous);
+                }
             }
             else
             {
@@ -508,12 +576,76 @@ void UBDisplayManager::positionScreens()
         }
     }
 
-    if (widget(ScreenRole::Control) && hasControl())
+    // keep the keyboard focus on the control window, but never take it from another application
+    if (widget(ScreenRole::Control) && hasControl() && !desktopMode
+            && QGuiApplication::applicationState() == Qt::ApplicationActive)
     {
         widget(ScreenRole::Control)->activateWindow();
     }
 
     emit screenLayoutChanged();
+}
+
+
+bool UBDisplayManager::isShownOn(QWidget* widget, QScreen* screen)
+{
+    return widget && screen && widget->isVisible()
+            && QGuiApplication::screenAt(widget->geometry().center()) == screen;
+}
+
+
+bool UBDisplayManager::isDesktopModeActive() const
+{
+    return UBApplication::applicationController && UBApplication::applicationController->isShowingDesktop();
+}
+
+
+void UBDisplayManager::watchControlWindow()
+{
+    QWidget* controlWidget = widget(ScreenRole::Control);
+    QWindow* handle = controlWidget ? controlWidget->windowHandle() : nullptr;
+
+    if (!handle || handle == mWatchedControlWindow)
+    {
+        return;
+    }
+
+    if (mWatchedControlWindow)
+    {
+        disconnect(mWatchedControlWindow, nullptr, this, nullptr);
+    }
+
+    mWatchedControlWindow = handle;
+
+    // the user moved the window to another screen: let the roles follow once it settled
+    connect(handle, &QWindow::screenChanged, this, [this]() {
+        mFollowControlWindowTimer.start();
+    });
+}
+
+
+void UBDisplayManager::followControlWindow()
+{
+    QScreen* windowScreen = controlWindowScreen();
+
+    if (!windowScreen || windowScreen == screen(ScreenRole::Control) || isDesktopModeActive())
+    {
+        return;
+    }
+
+    qDebug() << "control window moved to" << windowScreen->name();
+
+    if (hasDisplay())
+    {
+        // the projection moves to a screen the control window is not on
+        adjustScreens();
+    }
+    else
+    {
+        // calibrated grid size, captures and the desktop overlay follow the window;
+        // the board itself is not touched
+        assignRoles();
+    }
 }
 
 
@@ -622,6 +754,27 @@ void UBDisplayManager::addOrRemoveScreen(QScreen *screen)
 
     // positioning must be delayed, because OS also tries to position the widgets
     QTimer::singleShot(3000, this, [this](){
+        QWidget* controlWidget = widget(ScreenRole::Control);
+        const bool normalWindow = controlWidget && !(controlWidget->windowFlags() & Qt::FramelessWindowHint);
+
+        if (normalWindow && !mUseMultiScreen)
+        {
+            // a normal window without projection: nothing to rearrange, the window stays
+            // where it is (only brought back when its screen is gone) and the board is not
+            // re-centred
+            assignRoles();
+            positionControlWindow(controlWidget);
+
+            QWidget* desktopWidget = widget(ScreenRole::Desktop);
+
+            if (desktopWidget && desktopWidget->isVisible() && hasControl())
+            {
+                desktopWidget->setGeometry(screenGeometry(ScreenRole::Desktop));
+            }
+
+            return;
+        }
+
         positionScreens();
     });
 }
@@ -807,7 +960,8 @@ void UBDisplayManager::positionControlWindow(QWidget* controlWidget)
         controlWidget->resize(geometry.size());
     }
 
-    if (controlWidget->isHidden())
+    // hidden while the desktop annotation overlay is shown
+    if (controlWidget->isHidden() && !isDesktopModeActive())
     {
         controlWidget->show();
     }
