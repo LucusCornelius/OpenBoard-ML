@@ -59,6 +59,7 @@ HEADERS +=  \
     src/gui/UBGlassStyle.h \
     src/gui/UBGlassEffect.h \
     src/gui/UBPenPanel.h \
+    src/gui/UBPaletteSwitchButton.h \
     src/gui/UBToolClusterPalette.h \
     src/gui/UBUiStyle.h \
     src/gui/UBModernStyle.h
@@ -122,6 +123,7 @@ SOURCES +=  \
     src/gui/UBInkWriter.cpp \
     src/gui/UBGlassStyle.cpp \
     src/gui/UBPenPanel.cpp \
+    src/gui/UBPaletteSwitchButton.cpp \
     src/gui/UBToolClusterPalette.cpp \
     src/gui/UBUiStyle.cpp \
     src/gui/UBModernStyle.cpp

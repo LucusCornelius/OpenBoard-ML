@@ -84,6 +84,7 @@
 #include "gui/UBToolWidget.h"
 #include "gui/UBToolbarButtonGroup.h"
 #include "gui/UBPenPanel.h"
+#include "gui/UBPaletteSwitchButton.h"
 #include "gui/UBToolClusterPalette.h"
 #include "gui/UBGlassStyle.h"
 #include "gui/UBGlassEffect.h"
@@ -425,9 +426,19 @@ void UBBoardController::setupToolbar()
 
     buildColorActions();
 
-    mColorChoice = new UBToolbarButtonGroup(penPanel, mColorActions, QStringLiteral("glass"), settings->colorPaletteSize, swatchIconSize);
+    // colour section: the palette switch chevron directly before the swatches
+    QWidget* colorSection = new QWidget(penPanel);
+    colorSection->setObjectName("penColorSection");
+    QHBoxLayout* colorSectionLayout = new QHBoxLayout(colorSection);
+    colorSectionLayout->setContentsMargins(0, 0, 0, 0);
+    colorSectionLayout->setSpacing(0);
+
+    UBPaletteSwitchButton* paletteSwitch = new UBPaletteSwitchButton(mMainWindow->actionNextColorPalette, colorSection);
+    mColorChoice = new UBToolbarButtonGroup(colorSection, mColorActions, QStringLiteral("glass"), settings->colorPaletteSize, swatchIconSize);
     mColorChoice->setLabel(tr("Color"));
-    penPanel->addSection(mColorChoice);
+    colorSectionLayout->addWidget(paletteSwitch, 0, Qt::AlignVCenter);
+    colorSectionLayout->addWidget(mColorChoice, 0, Qt::AlignVCenter);
+    penPanel->addSection(colorSection);
 
     connect(mColorChoice, SIGNAL(activated(int)), this, SLOT(setColorIndex(int)));
     connect(UBDrawingController::drawingController(), SIGNAL(colorIndexChanged(int)), mColorChoice, SLOT(setCurrentIndex(int)));
