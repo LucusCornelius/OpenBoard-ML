@@ -691,6 +691,18 @@ void UBGraphicsTextItemDelegate::changeTextSize(qreal factor, textChangeMode cha
 
 void UBGraphicsTextItemDelegate::recolor()
 {
+    // text without an explicit colour uses the default colour: swap black and white as well
+    const bool dark = delegated()->scene() && delegated()->scene()->isDarkBackground();
+
+    if (dark && delegated()->defaultTextColor() == Qt::black)
+    {
+        delegated()->setDefaultTextColor(Qt::white);
+    }
+    else if (!dark && delegated()->defaultTextColor() == Qt::white)
+    {
+        delegated()->setDefaultTextColor(Qt::black);
+    }
+
     QTextCursor cursor = delegated()->textCursor();
     QTextCharFormat textFormat;
 
@@ -707,8 +719,6 @@ void UBGraphicsTextItemDelegate::recolor()
     int startPos = qMin(cursor.anchor(), cursor.position());
     int endPos = qMax(cursor.anchor(), cursor.position());
 
-    QFont curFont;
-    QFont nextCharFont;
     bool bEndofTheSameBlock;
     int iBlockLen;
     int iCursorPos = startPos;
@@ -767,10 +777,10 @@ void UBGraphicsTextItemDelegate::recolor()
         iCursorPos += iBlockLen;
         cursor.setPosition (iCursorPos, QTextCursor::MoveAnchor);
 
-        curFont = nextCharFont;
     }
 
-    delegated()->setFont(curFont);
+    // the font of the item is kept: setting a default constructed font here reset the size of
+    // the text whenever the background colour or the appearance changed
     //returning initial selection
     cursor.setPosition (anchorPos, QTextCursor::MoveAnchor);
     cursor.setPosition (cursorPos, QTextCursor::KeepAnchor);

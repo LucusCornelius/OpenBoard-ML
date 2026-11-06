@@ -67,6 +67,10 @@ UBGraphicsTextItem::UBGraphicsTextItem(QGraphicsItem * parent)
 
     setTextInteractionFlags(Qt::TextEditorInteraction);
 
+    // Text without an explicit colour would use the text colour of the application palette,
+    // white in the dark appearance. Use the board colours instead, see itemChange().
+    setDefaultTextColor(Qt::black);
+
     setUuid(QUuid::createUuid());
 
     connect(document(), SIGNAL(contentsChanged()), Delegate(), SLOT(contentsChanged()));
@@ -158,6 +162,21 @@ void UBGraphicsTextItem::setSelected(bool selected)
 QVariant UBGraphicsTextItem::itemChange(GraphicsItemChange change, const QVariant &value)
 {
     QVariant newValue = value;
+
+    if (change == QGraphicsItem::ItemSceneHasChanged)
+    {
+        // default text colour for the background the item is shown on (as recolor() does)
+        const UBGraphicsScene* ubScene = dynamic_cast<const UBGraphicsScene*>(QGraphicsItem::scene());
+
+        if (ubScene && ubScene->isDarkBackground() && defaultTextColor() == Qt::black)
+        {
+            setDefaultTextColor(Qt::white);
+        }
+        else if (ubScene && !ubScene->isDarkBackground() && defaultTextColor() == Qt::white)
+        {
+            setDefaultTextColor(Qt::black);
+        }
+    }
 
     if(Delegate())
         newValue = Delegate()->itemChange(change, value);
