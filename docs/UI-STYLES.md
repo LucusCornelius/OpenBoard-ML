@@ -20,7 +20,7 @@ Environment variables (for testing and previews; nothing is saved):
 
 * `OPENBOARD_UI_STYLE=glass|modern` overrides the platform default, e.g. to
   preview the Windows look on a Mac:
-  `OPENBOARD_UI_STYLE=modern OPENBOARD_THEME=dark open OpenBoard.app`
+  `OPENBOARD_UI_STYLE=modern OPENBOARD_THEME=dark open OpenBoard-ML.app`
 * `OPENBOARD_QT_STYLE=<key>` forces the Qt widget style (`fusion`, `windows11`, ...).
 * `OPENBOARD_THEME=light|dark|auto` overrides the saved appearance until an
   appearance is chosen in the menu.
