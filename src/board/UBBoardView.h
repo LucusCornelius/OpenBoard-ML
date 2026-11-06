@@ -43,6 +43,7 @@ class UBGraphicsScene;
 class UBGraphicsWidgetItem;
 class UBRubberBand;
 class UBSnapIndicator;
+class UBLineAngleIndicator;
 
 class UBBoardView : public QGraphicsView
 {
@@ -206,6 +207,10 @@ private:
 
     QMargins mMargins{};
     UBSnapIndicator* mSnapIndicator{nullptr};
+
+    // angle readout while a straight line is drawn, follows UBGraphicsScene::lineAngleFeedback()
+    UBLineAngleIndicator* mLineAngleIndicator{nullptr};
+    void updateLineAngleIndicator();
 
     static bool hasSelectedParents(QGraphicsItem * item);
 

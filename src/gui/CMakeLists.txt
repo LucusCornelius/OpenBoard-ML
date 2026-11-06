@@ -45,6 +45,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBKeyboardPalette.h
     UBLeftPalette.cpp
     UBLeftPalette.h
+    UBLineAngleIndicator.cpp
+    UBLineAngleIndicator.h
     UBMagnifer.cpp
     UBMagnifer.h
     UBMainWindow.cpp
