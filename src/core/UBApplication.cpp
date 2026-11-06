@@ -58,6 +58,7 @@
 #include "document/UBDocumentProxy.h"
 
 #include "gui/UBMainWindow.h"
+#include "gui/UBGlassEffect.h"
 #include "gui/UBGlassStyle.h"
 #include "gui/UBUiStyle.h"
 #include "gui/UBResources.h"
@@ -672,7 +673,7 @@ void UBApplication::decorateActionMenu(QAction* action)
             pageSizeGroup->addAction(mainWindow->actionRegularPageSize);
             pageSizeGroup->addAction(mainWindow->actionCustomPageSize);
 
-            QMenu* documentSizeMenu = menu->addMenu(QIcon(":/images/toolbar/pageSize.png"),tr("Page Size"));
+            QMenu* documentSizeMenu = menu->addMenu(UBGlassStyle::icon("pageSize"), tr("Page Size"));
             documentSizeMenu->addAction(mainWindow->actionWidePageSize);
             documentSizeMenu->addAction(mainWindow->actionRegularPageSize);
             documentSizeMenu->addAction(mainWindow->actionCustomPageSize);
@@ -703,6 +704,10 @@ void UBApplication::decorateActionMenu(QAction* action)
             menu->addAction(mainWindow->actionQuit);
 
             tb->setMenu(menu);
+
+            // native menu material on macOS (glass style)
+            if (UBUiStyle::isGlass())
+                UBGlassEffect::applyToMenu(menu);
         }
     }
 }

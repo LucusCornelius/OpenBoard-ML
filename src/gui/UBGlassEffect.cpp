@@ -39,6 +39,12 @@ void UBGlassEffect::applyToPanel(QWidget* panel)
 }
 
 
+void UBGlassEffect::applyToMenu(QWidget* menu)
+{
+    Q_UNUSED(menu);
+}
+
+
 int UBGlassEffect::topInset(QWidget* widget)
 {
     Q_UNUSED(widget);

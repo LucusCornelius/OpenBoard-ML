@@ -110,6 +110,29 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
 
     connect(UBApplication::displayManager, SIGNAL(screenLayoutChanged()), this, SLOT(onResizeRequest()));
     connect(UBApplication::boardController->controlView(), SIGNAL(resized(QResizeEvent*)), this, SLOT(onResizeRequest()));
+
+    // native glass of the platform behind the dock body, when available
+    if (UBUiStyle::isGlass())
+    {
+        UBGlassEffect::applyToPanel(this);
+
+        if (property("ubNativeGlass").toBool())
+            setStyleSheet(styleSheet() + glassCardStyle());
+    }
+}
+
+/**
+ * \brief Stylesheet rules turning the boxes inside a dock with native glass into frosted cards
+ */
+QString UBDockPalette::glassCardStyle()
+{
+    return QStringLiteral(
+        "\nQWidget#DockPaletteWidgetBox, QWidget#UBBoardThumbnailsView, QWidget#UBLibPathViewer,"
+        "QWidget#UBLibNavigatorWidget, QWidget#UBLibItemProperties, QWidget#UBDownloadWidget,"
+        "QWidget#UBTeacherGuideWidget, QWidget#UBFeaturesNavigatorWidget, QWidget#PathList,"
+        "QWidget#UBFeaturesCentralWidget"
+        " {background: rgba(128, 128, 128, 0.10); border: 1px solid rgba(128, 128, 128, 0.25); border-radius: 12px;}"
+        "\nQWidget#UBPageNavigationWidget {background: transparent;}\n");
 }
 
 /**
@@ -234,6 +257,15 @@ void UBDockPalette::paintEvent(QPaintEvent *event)
     painter.setBrush(mBackgroundBrush);
     QPainterPath path;
     path.setFillRule(Qt::WindingFill);
+
+    // native glass (UBGlassEffect): a floating glass sidebar, inset from the edges, the content is painted on it
+    if (property("ubNativeGlass").toBool())
+    {
+        const int inset = 6;
+        setProperty("ubGlassBody", rect().adjusted(inset, inset, -inset, -inset));
+        setProperty("ubGlassRadius", 18.0);
+        return;
+    }
 
     int nbTabs = mTabWidgets.size();
     if(0 < nbTabs)
@@ -488,6 +520,19 @@ void UBDockPalette::registerWidget(UBDockPaletteWidget *widget)
         // Update the parent of this widget
         widget->setParent(this);
         mRegisteredWidgets.append(widget);
+
+        // the widgets bring their own style sheet: glass cards need the overrides in it
+        if (property("ubNativeGlass").toBool() || property("ubNativeGlassInstalled").toBool())
+        {
+            QList<QWidget*> styled = widget->findChildren<QWidget*>();
+            styled.prepend(widget);
+
+            for (QWidget* w : std::as_const(styled))
+            {
+                if (!w->styleSheet().isEmpty())
+                    w->setStyleSheet(w->styleSheet() + glassCardStyle());
+            }
+        }
 
         // By default, the widget is hidden
         widget->hide();

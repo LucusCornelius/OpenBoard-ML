@@ -49,6 +49,12 @@ class UBGlassEffect
         static void applyToPanel(QWidget* panel);
 
         /**
+         * Give a popup menu (and its sub menus) the native menu material of the
+         * platform: translucent, rounded, system shadow. Nothing elsewhere.
+         */
+        static void applyToMenu(QWidget* menu);
+
+        /**
          * Height of the window title bar overlapping the top of the given
          * widget (full size content windows on macOS), 0 elsewhere. Controls
          * anchored at the top edge stay below it (traffic lights).

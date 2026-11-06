@@ -70,6 +70,7 @@
 #include "core/UBThemeManager.h"
 
 #import <AppKit/AppKit.h>
+#import <QuartzCore/QuartzCore.h>
 
 /**
  * Overlay of one panel: transparent for the mouse, holds the material view
@@ -174,6 +175,128 @@
 
 @end
 
+/**
+ * Depth of a glass panel that the system material does not draw in a
+ * non-key window and hardly over a plain white board: a soft drop shadow
+ * around the body (never under it, where it would darken the glass) and a
+ * thin specular rim, bright at the top and fading towards the bottom.
+ */
+@interface OBGlassDecorView : NSView
+{
+    CALayer* mShadow;
+    CAShapeLayer* mShadowMask;
+    CAGradientLayer* mRim;
+    CAShapeLayer* mRimMask;
+}
+- (void)setBody:(NSRect)body radius:(CGFloat)radius shadowOpacity:(CGFloat)shadowOpacity
+     rimTop:(CGFloat)rimTop rimBottom:(CGFloat)rimBottom rimColor:(NSColor*)rimColor;
+@end
+
+@implementation OBGlassDecorView
+
+- (instancetype)initWithFrame:(NSRect)frame
+{
+    self = [super initWithFrame:frame];
+
+    if (self)
+    {
+        [self setWantsLayer:YES];
+
+        // QuartzCore classes by name: no extra framework to link
+        mShadow = [[NSClassFromString(@"CALayer") alloc] init];
+        mShadowMask = [[NSClassFromString(@"CAShapeLayer") alloc] init];
+        [mShadowMask setFillRule:@"even-odd"];
+        [mShadow setMask:mShadowMask];
+        [mShadow setShadowColor:[[NSColor blackColor] CGColor]];
+
+        mRim = [[NSClassFromString(@"CAGradientLayer") alloc] init];
+        mRimMask = [[NSClassFromString(@"CAShapeLayer") alloc] init];
+        [mRimMask setFillColor:nil];
+        [mRimMask setStrokeColor:[[NSColor blackColor] CGColor]];
+        [mRim setMask:mRimMask];
+
+        [[self layer] addSublayer:mShadow];
+        [[self layer] addSublayer:mRim];
+    }
+
+    return self;
+}
+
+- (void)dealloc
+{
+#if !__has_feature(objc_arc)
+    [mShadow release];
+    [mShadowMask release];
+    [mRim release];
+    [mRimMask release];
+    [super dealloc];
+#endif
+}
+
+- (BOOL)isFlipped
+{
+    return YES;
+}
+
+- (NSView*)hitTest:(NSPoint)point
+{
+    Q_UNUSED(point);
+    return nil;
+}
+
+- (void)setBody:(NSRect)body radius:(CGFloat)radius shadowOpacity:(CGFloat)shadowOpacity
+     rimTop:(CGFloat)rimTop rimBottom:(CGFloat)rimBottom rimColor:(NSColor*)rimColor
+{
+    [NSClassFromString(@"CATransaction") begin];
+    [NSClassFromString(@"CATransaction") setDisableActions:YES];
+
+    const CGFloat r = qMin<CGFloat>(radius, qMin(NSWidth(body), NSHeight(body)) / 2.0);
+    const bool flipped = [[self layer] isGeometryFlipped] != [self isFlipped];
+
+    // shadow: path of the body, masked to the outside of the body
+    const NSRect bounds = [self bounds];
+    [mShadow setFrame:bounds];
+    CGPathRef bodyPath = CGPathCreateWithRoundedRect(body, r, r, NULL);
+    [mShadow setShadowPath:bodyPath];
+    [mShadow setShadowOpacity:shadowOpacity];
+    [mShadow setShadowRadius:14.0];
+    [mShadow setShadowOffset:CGSizeMake(0, flipped ? 5.0 : -5.0)];
+
+    CGMutablePathRef outside = CGPathCreateMutable();
+    CGPathAddRect(outside, NULL, NSInsetRect(bounds, -60, -60));
+    CGPathAddPath(outside, NULL, bodyPath);
+    [mShadowMask setFrame:bounds];
+    [mShadowMask setPath:outside];
+    CGPathRelease(outside);
+    CGPathRelease(bodyPath);
+
+    // rim: a gradient seen through a stroked outline of the body
+    [mRim setFrame:body];
+    const CGFloat lineWidth = 1.0;
+    const NSRect local = NSInsetRect(NSMakeRect(0, 0, NSWidth(body), NSHeight(body)), lineWidth / 2.0, lineWidth / 2.0);
+    const CGFloat rr = qMax<CGFloat>(0.0, r - lineWidth / 2.0);
+    CGPathRef rimPath = CGPathCreateWithRoundedRect(local, rr, rr, NULL);
+    [mRimMask setFrame:NSMakeRect(0, 0, NSWidth(body), NSHeight(body))];
+    [mRimMask setPath:rimPath];
+    [mRimMask setLineWidth:lineWidth];
+    CGPathRelease(rimPath);
+
+    NSColor* color = rimColor ? rimColor : [NSColor whiteColor];
+    id top = (__bridge id)[[color colorWithAlphaComponent:rimTop] CGColor];
+    id middle = (__bridge id)[[color colorWithAlphaComponent:rimBottom * 0.4] CGColor];
+    id bottom = (__bridge id)[[color colorWithAlphaComponent:rimBottom] CGColor];
+    [mRim setColors:@[top, middle, bottom]];
+    [mRim setLocations:@[@0.0, @0.55, @1.0]];
+    // the top of the body is at y = 0 in a flipped layer
+    const bool topAtZero = [[self layer] isGeometryFlipped] || [self isFlipped];
+    [mRim setStartPoint:CGPointMake(0.5, topAtZero ? 0.0 : 1.0)];
+    [mRim setEndPoint:CGPointMake(0.5, topAtZero ? 1.0 : 0.0)];
+
+    [NSClassFromString(@"CATransaction") commit];
+}
+
+@end
+
 namespace
 {
     enum class PanelMaterial
@@ -225,16 +348,18 @@ namespace
     }
 
     /**
-     * Veil inside the system glass. Over the (usually white) board the plain
-     * glass of the dark appearance is a mid grey, too light for white glyphs:
-     * the dark theme darkens it. The light glass is used as it is.
+     * Flat veil of the NSVisualEffectView fallback in the dark theme. The
+     * system glass gets a gradient veil instead (smoked glass, see sync()):
+     * over the (usually white) board the plain dark glass is a mid grey, too
+     * light for white glyphs.
      */
     NSColor* glassVeil(bool dark, PanelMaterial material)
     {
-        if (!dark)
+        // the system glass gets the gradient veil instead (see sync())
+        if (!dark || material == PanelMaterial::Glass)
             return nil;
 
-        return [NSColor colorWithWhite:0.0 alpha:(material == PanelMaterial::Glass ? 0.5 : 0.3)];
+        return [NSColor colorWithWhite:0.0 alpha:0.3];
     }
 
     /** the content view of the window holding the widget, nil when not created */
@@ -395,6 +520,92 @@ namespace
             QPointer<QWidget> mWindow;
     };
 
+    /**
+     * The native menu material (NSVisualEffectView, menu material, behind the
+     * window) below the content of a translucent Qt popup menu, with rounded corners.
+     */
+    class UBMacMenuMaterial : public QObject
+    {
+        public:
+            explicit UBMacMenuMaterial(QWidget* menu)
+                : QObject(menu)
+                , mMenu(menu)
+            {
+                menu->installEventFilter(this);
+            }
+
+            bool eventFilter(QObject* watched, QEvent* event) override
+            {
+                if (watched == mMenu && event->type() == QEvent::Show)
+                    install();
+
+                return false;
+            }
+
+        private:
+            void install()
+            {
+                NSView* content = nativeTopView(mMenu);
+                NSWindow* window = content ? [content window] : nil;
+
+                if (!window)
+                    return;
+
+                // the material in the light or dark appearance of the application theme
+                NSAppearance* appearance = themeAppearance();
+
+                if (appearance && ![[[window appearance] name] isEqualToString:[appearance name]])
+                    [window setAppearance:appearance];
+
+                if (mInstalledIn == (__bridge void*)window)
+                    return;
+
+                @try
+                {
+                    NSView* frameView = [content superview];
+
+                    if (!frameView)
+                        return;
+
+                    mInstalledIn = (__bridge void*)window;
+
+                    [window setOpaque:NO];
+                    [window setBackgroundColor:[NSColor clearColor]];
+                    [window setHasShadow:YES];
+
+                    const CGFloat radius = 10.0;
+                    NSVisualEffectView* material = [[NSVisualEffectView alloc] initWithFrame:[frameView bounds]];
+                    [material setMaterial:NSVisualEffectMaterialMenu];
+                    [material setBlendingMode:NSVisualEffectBlendingModeBehindWindow];
+                    [material setState:NSVisualEffectStateActive];
+                    [material setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+
+                    NSImage* mask = [NSImage imageWithSize:NSMakeSize(2 * radius + 1, 2 * radius + 1) flipped:NO
+                                            drawingHandler:^BOOL(NSRect rect) {
+                        [[NSColor blackColor] setFill];
+                        [[NSBezierPath bezierPathWithRoundedRect:rect xRadius:radius yRadius:radius] fill];
+                        return YES;
+                    }];
+                    [mask setCapInsets:NSEdgeInsetsMake(radius, radius, radius, radius)];
+                    [mask setResizingMode:NSImageResizingModeStretch];
+                    [material setMaskImage:mask];
+
+                    [frameView addSubview:material positioned:NSWindowBelow relativeTo:content];
+#if !__has_feature(objc_arc)
+                    [material release];
+#endif
+                    [window invalidateShadow];
+                }
+                @catch (NSException* exception)
+                {
+                    qWarning("UBGlassEffect: native menu material failed: %s", [[exception reason] UTF8String]);
+                }
+            }
+
+            QPointer<QWidget> mMenu;
+            void* mInstalledIn = nullptr;
+    };
+
     class UBMacPanelGlass;
 
     /**
@@ -478,8 +689,11 @@ namespace
 
                 mContent = [[OBGlassPanelContentView alloc] initWithFrame:NSZeroRect];
 
+                mDecor = [[OBGlassDecorView alloc] initWithFrame:NSZeroRect];
+
                 [mHost addSubview:mMaterialView];
-                [mHost addSubview:mContent positioned:NSWindowAbove relativeTo:mMaterialView];
+                [mHost addSubview:mDecor positioned:NSWindowAbove relativeTo:mMaterialView];
+                [mHost addSubview:mContent positioned:NSWindowAbove relativeTo:mDecor];
                 [mHost setHidden:YES];
 
                 mEffect = new UBGlassMirrorEffect(this, panel);
@@ -489,6 +703,7 @@ namespace
                     scheduleSync();
                 });
 
+                findGpuChildren();
                 watchAncestors();
                 sync();
             }
@@ -509,6 +724,8 @@ namespace
                     qWarning("UBGlassEffect: removing the panel glass failed: %s", [[exception reason] UTF8String]);
                 }
 #if !__has_feature(objc_arc)
+                [mDecor release];
+                [mVeilGradient release];
                 [mVeil release];
                 [mContent release];
                 [mMaterialView release];
@@ -525,9 +742,15 @@ namespace
 
                 switch (event->type())
                 {
+                    case QEvent::Show:
+                        if (watched == mPanel)
+                            findGpuChildren();
+                        sync();
+                        scheduleSync();
+                        break;
+
                     case QEvent::Move:
                     case QEvent::Resize:
-                    case QEvent::Show:
                     case QEvent::Hide:
                     case QEvent::ZOrderChange:
                     case QEvent::EnabledChange:
@@ -548,6 +771,54 @@ namespace
                 }
 
                 return false;
+            }
+
+            /**
+             * Content composed by the GPU (web views) cannot be rendered through the
+             * effect: while such a child is visible the panel paints itself (Qt
+             * painted glass) and the native overlay is hidden.
+             */
+            bool suspended()
+            {
+                bool gpuVisible = false;
+
+                for (const QPointer<QWidget>& child : std::as_const(mGpuChildren))
+                {
+                    if (child && child->isVisible())
+                        gpuVisible = true;
+                }
+
+                if (gpuVisible != mSuspended)
+                {
+                    mSuspended = gpuVisible;
+
+                    // the panel paints its glass body itself while suspended
+                    if (mPanel)
+                        mPanel->setProperty("ubNativeGlass", !mSuspended);
+
+                    QTimer::singleShot(0, this, [this]() {
+                        sync();
+
+                        if (mPanel)
+                            mPanel->update();
+                    });
+                }
+
+                return mSuspended;
+            }
+
+            void findGpuChildren()
+            {
+                mGpuChildren.clear();
+
+                if (!mPanel)
+                    return;
+
+                for (QWidget* child : mPanel->findChildren<QWidget*>())
+                {
+                    if (child->inherits("QOpenGLWidget") || child->inherits("QQuickWidget") || child->inherits("QWebEngineView"))
+                        mGpuChildren << child;
+                }
             }
 
             /** the panel was painted: show the rendered controls on the glass */
@@ -734,6 +1005,7 @@ namespace
                         [mMaterialView setFrame:bodyFrame];
 
                     const CGFloat radius = qMax(0.0, mPanel->property("ubGlassRadius").toReal());
+                    const bool dark = UBThemeManager::instance()->isDarkMode();
 
 #if defined(__MAC_26_0)
                     if (@available(macOS 26.0, *))
@@ -744,6 +1016,7 @@ namespace
 
                             if ([glass cornerRadius] != radius)
                                 [glass setCornerRadius:radius];
+
                         }
                     }
 #endif
@@ -755,9 +1028,44 @@ namespace
 
                     if (mVeil)
                     {
+                        // the veil: a vertical gradient, a faint sheen at the top, the material below
+                        if (!mVeilGradient)
+                        {
+                            mVeilGradient = [[NSClassFromString(@"CAGradientLayer") alloc] init];
+                            [[mVeil layer] addSublayer:mVeilGradient];
+                        }
+
+                        [NSClassFromString(@"CATransaction") begin];
+                        [NSClassFromString(@"CATransaction") setDisableActions:YES];
+                        [mVeilGradient setFrame:[mVeil bounds]];
+                        [mVeilGradient setCornerRadius:radius];
+                        [mVeilGradient setMasksToBounds:YES];
+                        const bool topAtZero = [[mVeil layer] isGeometryFlipped] || [mVeil isFlipped];
+                        [mVeilGradient setStartPoint:CGPointMake(0.5, topAtZero ? 0.0 : 1.0)];
+                        [mVeilGradient setEndPoint:CGPointMake(0.5, topAtZero ? 1.0 : 0.0)];
+                        // dark theme: smoked glass, a little lighter at the top; light theme: the plain system glass
+                        const bool smoked = dark && mMaterial == PanelMaterial::Glass;
+                        [mVeilGradient setColors:@[(__bridge id)[[NSColor colorWithWhite:0.0 alpha:(smoked ? 0.36 : 0.0)] CGColor],
+                                                   (__bridge id)[[NSColor colorWithWhite:0.0 alpha:(smoked ? 0.44 : 0.0)] CGColor],
+                                                   (__bridge id)[[NSColor colorWithWhite:0.0 alpha:(smoked ? 0.52 : 0.0)] CGColor]]];
+                        [mVeilGradient setLocations:@[@0.0, @0.45, @1.0]];
+                        [NSClassFromString(@"CATransaction") commit];
+
                         NSColor* veil = glassVeil(UBThemeManager::instance()->isDarkMode(), mMaterial);
                         [[mVeil layer] setBackgroundColor:veil ? [veil CGColor] : nil];
                         [[mVeil layer] setCornerRadius:radius];
+                    }
+
+                    if (mDecor)
+                    {
+                        if (!NSEqualRects([mDecor frame], [mHost bounds]))
+                            [mDecor setFrame:[mHost bounds]];
+
+                        [mDecor setBody:bodyFrame radius:radius
+                          shadowOpacity:(dark ? 0.35 : 0.16)
+                                 rimTop:(dark ? 0.55 : 0.9)
+                              rimBottom:(dark ? 0.15 : 0.35)
+                               rimColor:nil];
                     }
 
                     // light glass in the light theme, dark glass in the dark theme
@@ -767,7 +1075,7 @@ namespace
                         [mHost setAppearance:appearance];
 
                     // wait for the first rendered image, an empty glass body would flash
-                    const bool visible = mPanel->isVisible() && mImageKey != 0;
+                    const bool visible = mPanel->isVisible() && mImageKey != 0 && !mSuspended;
                     [mHost setHidden:(visible ? NO : YES)];
                 }
                 @catch (NSException* exception)
@@ -781,12 +1089,16 @@ namespace
             NSView* mHost;
             NSView* mMaterialView;
             NSView* mVeil = nil;
+            OBGlassDecorView* mDecor = nil;
+            CAGradientLayer* mVeilGradient = nil;
             OBGlassPanelContentView* mContent;
             QPointer<UBGlassMirrorEffect> mEffect;
             qint64 mImageKey;
             QPoint mImageOffset;
             bool mSyncPending;
+            bool mSuspended = false;
             QList<QPointer<QWidget>> mWatched;
+            QList<QPointer<QWidget>> mGpuChildren;
 
             static QList<UBMacPanelGlass*> sInstances;
     };
@@ -795,7 +1107,7 @@ namespace
 
     void UBGlassMirrorEffect::draw(QPainter* painter)
     {
-        if (!mGlass)
+        if (!mGlass || mGlass->suspended())
         {
             drawSource(painter);
             return;
@@ -848,6 +1160,28 @@ void UBGlassEffect::applyToWindow(QWidget* widget)
 }
 
 
+void UBGlassEffect::applyToMenu(QWidget* menu)
+{
+    if (!menu || nativeGlassDisabled() || menu->property("ubNativeMenu").toBool())
+        return;
+
+    QList<QWidget*> menus = menu->findChildren<QWidget*>();
+    menus.prepend(menu);
+
+    for (QWidget* m : std::as_const(menus))
+    {
+        if (!m->inherits("QMenu") || m->property("ubNativeMenu").toBool())
+            continue;
+
+        // translucent before the native window exists: the material shows through the Qt content
+        m->setProperty("ubNativeMenu", true);
+        m->setAttribute(Qt::WA_TranslucentBackground);
+        m->setStyleSheet(QStringLiteral("QMenu { background: transparent; border: none; padding: 5px 0px; }"));
+        new UBMacMenuMaterial(m);
+    }
+}
+
+
 int UBGlassEffect::topInset(QWidget* widget)
 {
     if (!widget || nativeGlassDisabled())
@@ -870,7 +1204,7 @@ void UBGlassEffect::applyToPanel(QWidget* panel)
     if (!panel || panel->isWindow() || panelMaterial() == PanelMaterial::Painted)
         return;
 
-    if (panel->property("ubNativeGlass").toBool() || panel->property("ubNativeGlassFailed").toBool())
+    if (panel->property("ubNativeGlassInstalled").toBool() || panel->property("ubNativeGlassFailed").toBool())
         return;
 
     // another effect (e.g. an animation) owns the painting of the panel
@@ -878,15 +1212,15 @@ void UBGlassEffect::applyToPanel(QWidget* panel)
         return;
 
     // translucent windows (desktop annotation) show the desktop behind them, the painted glass
-    // is made for that; content composed by the GPU (web, Quick, OpenGL) cannot be rendered
+    // is made for that
     // through the graphics effect
     if (panel->window()->testAttribute(Qt::WA_TranslucentBackground))
         return;
 
+    // native child views would be stacked above the overlay
     for (QWidget* child : panel->findChildren<QWidget*>())
     {
-        if (child->inherits("QOpenGLWidget") || child->inherits("QQuickWidget") || child->inherits("QWebEngineView")
-                || child->internalWinId())
+        if (child->internalWinId())
             return;
     }
 
@@ -894,6 +1228,7 @@ void UBGlassEffect::applyToPanel(QWidget* panel)
     {
         // the panel paints its controls only, the native material is drawn below them
         panel->setProperty("ubNativeGlass", true);
+        panel->setProperty("ubNativeGlassInstalled", true);
         new UBMacPanelGlass(panel, panelMaterial());
         panel->update();
     }

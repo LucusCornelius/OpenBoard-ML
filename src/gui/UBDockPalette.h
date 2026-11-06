@@ -210,6 +210,7 @@ private slots:
     void onResizeRequest();
 
 private:
+    static QString glassCardStyle();
     void tabClicked(int tabIndex);
     int tabSpacing();
     void toggleCollapseExpand();
