@@ -30,6 +30,7 @@
 #include <QPoint>
 #include <QPointF>
 #include <QPainterPath>
+#include <QApplication>
 
 #include "UBDockPalette.h"
 #include "UBGlassStyle.h"
@@ -652,6 +653,23 @@ bool UBDockPalette::switchMode(eUBDockPaletteWidgetMode mode)
 }
 
 
+/**
+ * \brief Monochrome glass glyph for the tab of a dock widget (glass style), its own pixmap otherwise
+ */
+static QPixmap glassTabIcon(UBDockPaletteWidget* widget)
+{
+    if (UBUiStyle::isGlass())
+    {
+        const QString name = widget->name() == "PageNavigator" ? QStringLiteral("pageList")
+                : widget->name() == "FeaturesWidget" ? QStringLiteral("library") : QString();
+
+        if (!name.isEmpty())
+            return UBGlassStyle::icon(name).pixmap(QSize(18, 18), qApp->devicePixelRatio());
+    }
+
+    return widget->tabIcon();
+}
+
 UBTabDockPalette::UBTabDockPalette(UBDockPalette *dockPalette, QWidget *parent) :
             QWidget(parent)
 , dock(dockPalette)
@@ -703,7 +721,7 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
                 } else {
                     arrow = Qt::LeftArrow;
                 }
-                tabIcon = pCrntWidget->tabIcon();
+                tabIcon = glassTabIcon(pCrntWidget);
             }
             break;
 
@@ -716,7 +734,7 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
                 } else {
                     arrow = Qt::RightArrow;
                 }
-                tabIcon = pCrntWidget->tabIcon();
+                tabIcon = glassTabIcon(pCrntWidget);
             }
             break;
 
@@ -757,8 +775,10 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
         // Optional tab icon
         if (!tabIcon.isNull()) {
             qreal iconTarget = 18.0;
-            QPixmap iconScaled = tabIcon.scaled(iconTarget, iconTarget, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            QPointF iconPos((width() - iconScaled.width()) / 2.0, yFrom + 4);
+            // glass glyphs come at the target size (high DPI), the old pixmaps are scaled
+            QPixmap iconScaled = tabIcon.deviceIndependentSize().toSize() == QSize(iconTarget, iconTarget)
+                    ? tabIcon : tabIcon.scaled(iconTarget, iconTarget, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            QPointF iconPos((width() - iconScaled.deviceIndependentSize().width()) / 2.0, yFrom + 4);
             painter.drawPixmap(iconPos, iconScaled);
         }
 

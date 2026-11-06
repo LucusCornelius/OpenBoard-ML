@@ -462,6 +462,11 @@
         <file>images/glass/window.svg</file>
         <file>images/glass/captureArea.svg</file>
         <file>images/glass/webCapture.svg</file>
+        <file>images/glass/pen.svg</file>
+        <file>images/glass/marker.svg</file>
+        <file>images/glass/eraser.svg</file>
+        <file>images/glass/pageList.svg</file>
+        <file>images/glass/library.svg</file>
     </qresource>
     <qresource prefix="/shortcutProfiles">
         <file alias="keyboard-default.json">etc/shortcutProfiles/keyboard-default.json</file>

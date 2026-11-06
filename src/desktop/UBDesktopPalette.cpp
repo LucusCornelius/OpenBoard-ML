@@ -27,6 +27,7 @@
 
 
 
+#include "gui/UBGlassStyle.h"
 #include "UBDesktopPalette.h"
 
 #include <QtGui>
@@ -229,18 +230,11 @@ void UBDesktopPalette::showEvent(QShowEvent *event)
 void UBDesktopPalette::hideEvent(QHideEvent *event)
 {
     Q_UNUSED(event);
-    QIcon penIcon;
-    QIcon markerIcon;
-    QIcon eraserIcon;
-    penIcon.addFile(":images/stylusPalette/pen.svg", QSize(), QIcon::Normal, QIcon::Off);
-    penIcon.addFile(":images/stylusPalette/penOn.svg", QSize(), QIcon::Normal, QIcon::On);
-    UBApplication::mainWindow->actionPen->setIcon(penIcon);
-    markerIcon.addFile(":images/stylusPalette/marker.svg", QSize(), QIcon::Normal, QIcon::Off);
-    markerIcon.addFile(":images/stylusPalette/markerOn.svg", QSize(), QIcon::Normal, QIcon::On);
-    UBApplication::mainWindow->actionMarker->setIcon(markerIcon);
-    eraserIcon.addFile(":images/stylusPalette/eraser.svg", QSize(), QIcon::Normal, QIcon::Off);
-    eraserIcon.addFile(":images/stylusPalette/eraserOn.svg", QSize(), QIcon::Normal, QIcon::On);
-    UBApplication::mainWindow->actionEraser->setIcon(eraserIcon);
+
+    // back to the monochrome board icons
+    UBApplication::mainWindow->actionPen->setIcon(UBGlassStyle::icon("pen"));
+    UBApplication::mainWindow->actionMarker->setIcon(UBGlassStyle::icon("marker"));
+    UBApplication::mainWindow->actionEraser->setIcon(UBGlassStyle::icon("eraser"));
 }
 
 QPoint UBDesktopPalette::buttonPos(QAction *action)

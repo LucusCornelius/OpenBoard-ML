@@ -519,77 +519,29 @@ void UBGlassStyle::paintGlass(QPainter* painter, const QRectF& body, qreal radiu
         }
     }
 
-    // 3. luminosity: the light material brightens, the dark material darkens the content
-    QLinearGradient tint(body.topLeft(), body.bottomLeft());
+    // 3. luminosity: one flat, even tint; the light material brightens, the dark material darkens the content
+    QColor tint;
 
     if (onDark)
     {
         // a dark grey rather than black: over black content the glass still reads as a surface
-        const QColor base = hasBackdrop ? QColor(46, 46, 52) : QColor(30, 30, 34);
-        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.34 : 0.62));
-        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.40 : 0.70));
+        tint = withAlpha(hasBackdrop ? QColor(46, 46, 52) : QColor(30, 30, 34), hasBackdrop ? 0.36 : 0.66);
     }
     else
     {
-        const QColor base = hasBackdrop ? QColor(255, 255, 255) : QColor(250, 250, 252);
-        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.38 : 0.72));
-        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.28 : 0.64));
+        tint = withAlpha(hasBackdrop ? QColor(255, 255, 255) : QColor(250, 250, 252), hasBackdrop ? 0.34 : 0.68);
     }
 
     painter->fillPath(path, tint);
 
-    // 4. specular highlight: light caught by the curved upper surface
-    const qreal specularHeight = qMax<qreal>(8.0, body.height() * 0.35);
-    QLinearGradient specular(body.topLeft(), body.topLeft() + QPointF(0, specularHeight));
-    specular.setColorAt(0.0, QColor(255, 255, 255, onDark ? 40 : 70));
-    specular.setColorAt(0.55, QColor(255, 255, 255, onDark ? 12 : 22));
-    specular.setColorAt(1.0, QColor(255, 255, 255, 0));
-    painter->fillRect(QRectF(body.left(), body.top(), body.width(), specularHeight), specular);
-
-    // small bright streak near the top left, where the light enters
-    {
-        const qreal streakWidth = qMin<qreal>(body.width() * 0.22, 90.0);
-        const qreal streakHeight = qMin<qreal>(body.height() * 0.16, 9.0);
-        const QPointF centre(body.left() + qMax<qreal>(r * 0.85, 14.0) + streakWidth * 0.35, body.top() + streakHeight * 0.55);
-
-        painter->save();
-        painter->translate(centre);
-        painter->scale(streakWidth, streakHeight);
-        QRadialGradient streak(QPointF(0, 0), 1.0);
-        streak.setColorAt(0.0, QColor(255, 255, 255, onDark ? 70 : 130));
-        streak.setColorAt(1.0, QColor(255, 255, 255, 0));
-        painter->setBrush(streak);
-        painter->drawEllipse(QPointF(0, 0), 1.0, 1.0);
-        painter->restore();
-    }
-
-    // 5. faint inner shadow along the lower edge
-    const qreal shadowHeight = qMin<qreal>(body.height() * 0.25, 16.0);
-    QLinearGradient innerShadow(body.bottomLeft(), body.bottomLeft() - QPointF(0, shadowHeight));
-    innerShadow.setColorAt(0.0, QColor(0, 0, 0, onDark ? 46 : 18));
-    innerShadow.setColorAt(1.0, QColor(0, 0, 0, 0));
-    painter->fillRect(QRectF(body.left(), body.bottom() - shadowHeight, body.width(), shadowHeight), innerShadow);
-
     painter->restore();
 
-    // 6. contours: a darker outer line and a bright inner rim, brightest where the light comes from
+    // 4. edge: one thin, even, light hairline (Liquid Glass is flat: no bevel, no specular)
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
     painter->setBrush(Qt::NoBrush);
-
-    painter->setPen(QPen(QColor(0, 0, 0, onDark ? 52 : 26), 1.0));
+    painter->setPen(QPen(QColor(255, 255, 255, onDark ? 56 : 210), 1.0));
     painter->drawPath(roundedPath(body.adjusted(0.5, 0.5, -0.5, -0.5), qMax(0.0, r - 0.5)));
-
-    const qreal hi = onDark ? 0.42 : 0.62;
-    const qreal lo = onDark ? 0.10 : 0.30;
-    QLinearGradient rim(body.topLeft(), body.bottomRight());
-    rim.setColorAt(0.0, QColor(255, 255, 255, qRound(255 * hi)));
-    rim.setColorAt(0.35, QColor(255, 255, 255, qRound(255 * lo)));
-    rim.setColorAt(0.7, QColor(255, 255, 255, qRound(255 * lo * 0.8)));
-    rim.setColorAt(1.0, QColor(255, 255, 255, qRound(255 * hi * 0.7)));
-    painter->setPen(QPen(QBrush(rim), 1.0));
-    painter->drawPath(roundedPath(body.adjusted(1.5, 1.5, -1.5, -1.5), qMax(0.0, r - 1.5)));
-
     painter->restore();
 }
 
@@ -774,30 +726,9 @@ QIcon UBGlassStyle::swatchIcon(const QColor& color)
         const qreal border = qMax(1.0, size / 24.0);
         const QRectF circle = QRectF(0, 0, size, size).adjusted(border, border, -border, -border);
 
+        // flat filled circle; a neutral hairline keeps white and black swatches visible on any glass
         painter.setBrush(color);
-        painter.setPen(QPen(QColor(0, 0, 0, isDark() ? 0 : 45), border));
-        painter.drawEllipse(circle);
-
-        if (isDark())
-        {
-            painter.setBrush(Qt::NoBrush);
-            painter.setPen(QPen(QColor(255, 255, 255, 60), border));
-            painter.drawEllipse(circle);
-        }
-
-        // a soft highlight gives the swatch a little depth (glass only, modern swatches are flat)
-        if (!UBUiStyle::isGlass())
-        {
-            icon.addPixmap(pixmap, QIcon::Normal, QIcon::Off);
-            icon.addPixmap(pixmap, QIcon::Normal, QIcon::On);
-            continue;
-        }
-
-        QRadialGradient gloss(circle.center() - QPointF(size * 0.15, size * 0.2), size * 0.6);
-        gloss.setColorAt(0.0, QColor(255, 255, 255, 60));
-        gloss.setColorAt(1.0, QColor(255, 255, 255, 0));
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(gloss);
+        painter.setPen(QPen(QColor(128, 128, 128, 110), border));
         painter.drawEllipse(circle);
 
         icon.addPixmap(pixmap, QIcon::Normal, QIcon::Off);
@@ -827,6 +758,9 @@ void UBGlassStyle::applyIcons(UBMainWindow* mainWindow)
         {mainWindow->actionDocument, "documents"},
         {mainWindow->actionDesktop, "desktop"},
         {mainWindow->actionMenu, "menu"},
+        {mainWindow->actionPen, "pen"},
+        {mainWindow->actionEraser, "eraser"},
+        {mainWindow->actionMarker, "marker"},
         {mainWindow->actionSelector, "selector"},
         {mainWindow->actionPlay, "play"},
         {mainWindow->actionHand, "hand"},
