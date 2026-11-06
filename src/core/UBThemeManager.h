@@ -58,6 +58,21 @@ public:
     void applyUserThemePreference();
 
     /**
+     * @brief Appearance mode in effect: 0 = follow the system, 1 = light, 2 = dark
+     *
+     * The saved preference (UBSettings::appThemeMode), or the OPENBOARD_THEME
+     * testing override until the user chooses an appearance.
+     */
+    int themeMode() const;
+
+    /**
+     * @brief Choose the appearance (0 = follow the system, 1 = light, 2 = dark)
+     *
+     * Saves the preference and applies it immediately to the whole application.
+     */
+    void setThemeMode(int mode);
+
+    /**
      * @brief Apply a specific theme (dark or light)
      * @param isDark true for dark mode, false for light mode
      */
@@ -91,10 +106,17 @@ public slots:
 
 signals:
     /**
-     * @brief Emitted when the theme changes
+     * @brief Emitted when the theme changes, after the palette and the stylesheets
+     * were applied. Native code (window appearance, native glass) can follow it.
      * @param isDark true if switched to dark mode
      */
     void themeChanged(bool isDark);
+
+    /**
+     * @brief Emitted when the appearance mode in effect changes
+     * @param mode 0 = follow the system, 1 = light, 2 = dark
+     */
+    void themeModeChanged(int mode);
 
 private:
     UBThemeManager();
@@ -125,6 +147,8 @@ private:
 
     static UBThemeManager* sInstance;
     bool mIsDarkMode;
+    int mThemeMode;
+    bool mEnvironmentOverride;
 };
 
 /**

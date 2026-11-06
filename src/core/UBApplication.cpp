@@ -58,6 +58,7 @@
 #include "document/UBDocumentProxy.h"
 
 #include "gui/UBMainWindow.h"
+#include "gui/UBGlassStyle.h"
 #include "gui/UBUiStyle.h"
 #include "gui/UBResources.h"
 #include "gui/UBThumbnail.h"
@@ -594,6 +595,60 @@ void UBApplication::setDisabled(bool disable)
 }
 
 
+namespace
+{
+    /**
+     * Appearance choices of the menu: follow the system, light, dark (exclusive,
+     * the values of UBSettings::appThemeMode). Shared by all menus, kept in sync
+     * with the theme manager (and so with the preferences).
+     */
+    QActionGroup* appearanceActions()
+    {
+        static QPointer<QActionGroup> group;
+
+        if (group)
+            return group;
+
+        group = new QActionGroup(UBApplication::mainWindow);
+        group->setExclusive(true);
+
+        const QStringList texts = {
+            UBApplication::tr("Follow System"),
+            UBApplication::tr("Light"),
+            UBApplication::tr("Dark")
+        };
+
+        for (int mode = 0; mode < texts.size(); ++mode)
+        {
+            QAction* choice = group->addAction(texts.at(mode));
+            choice->setCheckable(true);
+            choice->setData(mode);
+        }
+
+        auto showMode = [](int mode) {
+            if (!group)
+                return;
+
+            for (QAction* choice : group->actions())
+                choice->setChecked(choice->data().toInt() == mode);
+        };
+
+        showMode(UBThemeManager::instance()->themeMode());
+
+        QObject::connect(UBThemeManager::instance(), &UBThemeManager::themeModeChanged, group, showMode);
+        QObject::connect(group, &QActionGroup::triggered, group, [](QAction* choice) {
+            // restyle the application once the menu has closed, not while it is shown
+            const int mode = choice->data().toInt();
+            QTimer::singleShot(0, UBThemeManager::instance(), [mode]() {
+                UBThemeManager::instance()->setThemeMode(mode);
+            });
+        });
+
+        return group;
+    }
+}
+
+
 void UBApplication::decorateActionMenu(QAction* action)
 {
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -632,6 +687,11 @@ void UBApplication::decorateActionMenu(QAction* action)
             menu->addAction(mainWindow->actionHintsAndTips);
             menu->addSeparator();
             menu->addAction(mainWindow->actionPreferences);
+
+            // dark mode on, off or following the system, applied immediately
+            QMenu* appearanceMenu = menu->addMenu(UBGlassStyle::icon("appearance"), tr("Appearance"));
+            appearanceMenu->addActions(appearanceActions()->actions());
+
             menu->addAction(mainWindow->actionMultiScreen);
             menu->addAction(mainWindow->actionToggleFullScreen);
             menu->addSeparator();
