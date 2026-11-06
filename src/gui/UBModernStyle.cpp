@@ -957,5 +957,8 @@ QDialog#preferencesDialog QTabWidget::pane
         css += block;
     }
 
+    // document mode: shared with the glass layer, in the Fluent colours and radii
+    css += UBGlassStyle::documentModeStyleSheet(dark);
+
     return css;
 }

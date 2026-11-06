@@ -62,6 +62,7 @@ class UBDocumentThumbnailWidget: public UBDocumentThumbnailsView
         virtual void dragLeaveEvent(QDragLeaveEvent *event);
         virtual void dragMoveEvent(QDragMoveEvent *event);
         virtual void dropEvent(QDropEvent *event);
+        void paintEvent(QPaintEvent *event) override;
 
     private:
         void deleteDropCaret();

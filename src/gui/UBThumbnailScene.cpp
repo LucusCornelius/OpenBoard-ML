@@ -29,6 +29,8 @@
 #include "gui/UBThumbnailArranger.h"
 #include "gui/UBThumbnailsView.h"
 
+#include <QPointer>
+
 UBThumbnailScene::UBThumbnailScene(UBDocument* document)
     : mDocument{document}
     , mThumbnailItems{}
@@ -236,8 +238,15 @@ void UBThumbnailScene::createThumbnails(int startIndex)
             // to improve user experience when simultaneously interacting with the board
             if (index % 10 == 0)
             {
-                QTimer::singleShot(5, this, [this](){
-                    mLoader->resultProcessed();
+                // the loader may be aborted and deleted (page deleted or moved) or replaced
+                // within these 5 ms: only signal the loader which delivered this result
+                QPointer<UBBackgroundLoader> loader = mLoader;
+
+                QTimer::singleShot(5, this, [this, loader](){
+                    if (loader && loader == mLoader)
+                    {
+                        loader->resultProcessed();
+                    }
                 });
             }
             else
@@ -429,6 +438,11 @@ UBThumbnailArranger* UBThumbnailScene::currentThumbnailArranger()
 
 void UBThumbnailScene::loadThumbnail(int index, const QVariant& data)
 {
+    if (index < 0 || index >= mThumbnailItems.size())
+    {
+        return;
+    }
+
     auto thumbnailItem = mThumbnailItems.at(index);
 
     if (!thumbnailItem)

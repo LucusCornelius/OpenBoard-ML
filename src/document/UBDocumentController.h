@@ -175,7 +175,8 @@ public:
     enum eDocumentData{
         DataNode = Qt::UserRole +1,
         CreationDate,
-        UpdateDate
+        UpdateDate,
+        GlyphName // name of the monochrome glyph (:/images/glass/<name>.svg) of column 0
     };
 
     UBDocumentTreeModel(QObject *parent = 0);
@@ -240,7 +241,7 @@ public:
     UBDocumentTreeNode *nodeFromIndex(const QModelIndex &pIndex) const;
     static bool nodeLessThan(const UBDocumentTreeNode *firstIndex, const UBDocumentTreeNode *secondIndex);
     void setHighLighted(const QModelIndex &newHighLighted);
-    QModelIndex highLighted() {return mHighLighted;}
+    QModelIndex highLighted() const {return mHighLighted;}
     std::shared_ptr<UBDocumentProxy> findDocumentByFolderName(QString folderName) const;
     std::shared_ptr<UBDocumentProxy> findDocumentByFolderName(UBDocumentTreeNode* node, QString folderName) const;
 
@@ -265,6 +266,7 @@ private:
     UBDocumentTreeNode *mCurrentNode;
 
     UBDocumentTreeNode *findProxy(std::shared_ptr<UBDocumentProxy>pSearch, UBDocumentTreeNode *pParent) const;
+    QString glyphNameForNode(const QModelIndex& index, UBDocumentTreeNode* node) const;
     QModelIndex pIndexForNode(const QModelIndex &parent, UBDocumentTreeNode *pNode) const;
     QModelIndex addNode(UBDocumentTreeNode *pFreeNode, const QModelIndex &pParent, eAddItemMode pMode = aDetectPosition);
     int positionForParent(UBDocumentTreeNode *pFreeNode, UBDocumentTreeNode *pParentNode);
@@ -275,7 +277,7 @@ private:
     QPersistentModelIndex mTrash;
     QPersistentModelIndex mUntitledDocuments;
 
-    QModelIndex mHighLighted;
+    QPersistentModelIndex mHighLighted; // drop target, persistent: rows may be removed meanwhile
 
     //N/C - NNE - 20140407
     bool mAscendingOrder;
@@ -294,7 +296,8 @@ public:
     QModelIndexList indexes() const;
 
 private:
-    QModelIndexList mIndexes;
+    // persistent: the model may change while the drag runs (nested event loop)
+    QList<QPersistentModelIndex> mIndexes;
 };
 
 class UBDocumentTreeView : public QTreeView
@@ -319,6 +322,11 @@ protected:
     void dragMoveEvent(QDragMoveEvent *event) override;
     void dropEvent(QDropEvent *event) override;
     void paintEvent(QPaintEvent *event) override;
+    bool viewportEvent(QEvent *event) override;
+
+    // flat rows: one rounded pill per row for selection, hover and drop target, glyph chevrons
+    void drawRow(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+    void drawBranches(QPainter *painter, const QRect &rect, const QModelIndex &index) const override;
 
 
     UBDocumentTreeModel *fullModel() {return qobject_cast<UBDocumentTreeModel*>(model());}
@@ -328,6 +336,9 @@ private:
     bool isAcceptable(const QModelIndex &dragIndex, const QModelIndex &atIndex);
     UBDocumentTreeModel* baseModel() const;
     Qt::DropAction acceptableAction(const QModelIndex &dragIndex, const QModelIndex &atIndex);
+    QModelIndex documentDropTarget(const QModelIndex &targetIndex) const;
+
+    QPersistentModelIndex mHoverIndex; // row under the mouse (proxy index)
 };
 
 class UBValidator : public QValidator
@@ -373,6 +384,15 @@ protected:
     void setEditorData(QWidget *editor, const QModelIndex &index) const;
     void setModelData(QWidget *editor, QAbstractItemModel *model, const QModelIndex &index) const;
     void paint(QPainter * painter, const QStyleOptionViewItem & option, const QModelIndex &index) const;
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+    void updateEditorGeometry(QWidget *editor, const QStyleOptionViewItem &option, const QModelIndex &index) const override;
+
+public:
+    /** height of a row in the document tree */
+    static constexpr int rowHeight = 28;
+
+    /** size of the glyph of a row */
+    static constexpr int glyphSize = 17;
 
 private:
     mutable QStringList mExistingFileNames;
@@ -510,6 +530,7 @@ class UBDocumentController : public UBDocumentContainer
 
     protected:
         virtual void setupViews();
+        void setupDocumentModeStyle();
         virtual void setupToolbar();
         void setupPalettes();
         bool isOKToOpenDocument(std::shared_ptr<UBDocumentProxy> proxy);

@@ -1450,5 +1450,372 @@ QDialog#preferencesDialog QTabWidget::pane
         css += block;
     }
 
+    css += documentModeStyleSheet(dark);
+
     return css;
+}
+
+
+/* ---------- document mode (documents explorer) ---------- */
+
+UBGlassStyle::DocumentModeColors UBGlassStyle::documentModeColors(bool dark)
+{
+    DocumentModeColors c;
+
+    if (UBUiStyle::isModern())
+    {
+        // Fluent: window neutrals, card surface, 4 px controls, tinted selection with an indicator
+        c.content = dark ? QColor(0x20, 0x20, 0x20) : QColor(0xf3, 0xf3, 0xf3);
+        c.sidebar = UBModernStyle::surface(dark);
+        c.sidebarBorder = UBModernStyle::stroke(dark);
+        c.foreground = UBModernStyle::foreground(dark);
+        c.accent = UBModernStyle::accent(dark);
+        c.onAccent = dark ? QColor(0, 0, 0) : QColor(255, 255, 255);
+        c.sidebarRadius = UBModernStyle::panelRadius;
+        c.controlRadius = UBModernStyle::controlRadius;
+        c.rowRadius = UBModernStyle::controlRadius;
+        c.accentPill = false;
+    }
+    else
+    {
+        // macOS: graphite instead of grey slabs in the dark, a white sidebar card in the light
+        c.content = dark ? QColor(22, 22, 24) : QColor(240, 240, 243);
+        c.sidebar = dark ? QColor(36, 36, 39) : QColor(255, 255, 255);
+        c.sidebarBorder = dark ? QColor(255, 255, 255, 22) : QColor(0, 0, 0, 20);
+        c.foreground = dark ? QColor(242, 242, 247) : QColor(28, 28, 30);
+        c.accent = accent();
+        c.onAccent = QColor(255, 255, 255);
+    }
+
+    c.secondary = withAlpha(c.foreground, dark ? 0.55 : 0.52);
+    c.hover = dark ? QColor(255, 255, 255, 14) : QColor(0, 0, 0, 10);
+    c.selectionInactive = dark ? QColor(255, 255, 255, 28) : QColor(0, 0, 0, 18);
+    c.control = dark ? QColor(118, 118, 128, 56) : QColor(118, 118, 128, 26);
+    c.controlHover = dark ? QColor(118, 118, 128, 80) : QColor(118, 118, 128, 42);
+    c.track = dark ? QColor(255, 255, 255, 46) : QColor(0, 0, 0, 30);
+    c.cardBorder = dark ? QColor(255, 255, 255, 36) : QColor(0, 0, 0, 30);
+    c.cardShadow = dark ? QColor(0, 0, 0, 120) : QColor(0, 0, 0, 30);
+
+    return c;
+}
+
+
+QString UBGlassStyle::documentModeStyleSheet(bool dark)
+{
+    const DocumentModeColors c = documentModeColors(dark);
+
+    QString css = QStringLiteral(R"CSS(
+/* ---------- document mode (UBGlassStyle::documentModeStyleSheet) ---------- */
+
+QToolBar#documentToolBar
+{
+    background: @CONTENT@;
+    border: none;
+}
+
+QToolBar#documentToolBar QWidget#ubTrafficLightsSpacer
+{
+    background: transparent;
+}
+
+QWidget#documents,
+QWidget#documents QWidget#topWidget,
+QWidget#documents QFrame#topRightFrame,
+QWidget#documents QWidget#bottomRightFrame
+{
+    background: @CONTENT@;
+    border: none;
+}
+
+QWidget#documents QSplitter#splitter,
+QWidget#documents QSplitter#splitter::handle
+{
+    background: transparent;
+    border: none;
+}
+
+QWidget#documents QWidget#topLeftWidget
+{
+    background: @SIDEBAR@;
+    border: 1px solid @SIDEBARBORDER@;
+    border-radius: @SIDEBARRADIUS@px;
+}
+
+QWidget#documents UBDocumentTreeView
+{
+    background: transparent;
+    color: @FG@;
+    border: none;
+    outline: none;
+    show-decoration-selected: 0;
+    selection-background-color: transparent;
+    selection-color: @FG@;
+}
+
+QWidget#documents UBDocumentTreeView::item,
+QWidget#documents UBDocumentTreeView::item:hover,
+QWidget#documents UBDocumentTreeView::item:selected,
+QWidget#documents UBDocumentTreeView::item:selected:active,
+QWidget#documents UBDocumentTreeView::item:selected:!active,
+QWidget#documents UBDocumentTreeView::branch,
+QWidget#documents UBDocumentTreeView::branch:selected
+{
+    background: transparent;
+    border: none;
+}
+
+QWidget#documents UBDocumentTreeView QLineEdit
+{
+    color: @FG@;
+    background: @SIDEBAR@;
+    border: 1px solid @ACCENT@;
+    border-radius: 5px;
+    padding: 0px 4px;
+    margin: 0px;
+    selection-background-color: @ACCENT@;
+    selection-color: @ONACCENT@;
+}
+
+QWidget#documents UBDocumentTreeView QLineEdit[invalid="true"]
+{
+    border: 1px solid @ERROR@;
+    background: @ERRORFILL@;
+}
+
+QWidget#documents UBDocumentTreeView QScrollBar:vertical,
+QWidget#documents UBDocumentThumbnailWidget QScrollBar:vertical
+{
+    background: transparent;
+    border: none;
+    width: 10px;
+    margin: 4px 2px 4px 0px;
+}
+
+QWidget#documents UBDocumentTreeView QScrollBar::handle:vertical,
+QWidget#documents UBDocumentThumbnailWidget QScrollBar::handle:vertical
+{
+    background: @SCROLL@;
+    border: none;
+    border-radius: 4px;
+    min-height: 32px;
+}
+
+QWidget#documents UBDocumentTreeView QScrollBar::add-line,
+QWidget#documents UBDocumentTreeView QScrollBar::sub-line,
+QWidget#documents UBDocumentThumbnailWidget QScrollBar::add-line,
+QWidget#documents UBDocumentThumbnailWidget QScrollBar::sub-line
+{
+    height: 0px;
+    width: 0px;
+    border: none;
+    background: transparent;
+}
+
+QWidget#documents UBDocumentTreeView QScrollBar::add-page,
+QWidget#documents UBDocumentTreeView QScrollBar::sub-page,
+QWidget#documents UBDocumentThumbnailWidget QScrollBar::add-page,
+QWidget#documents UBDocumentThumbnailWidget QScrollBar::sub-page
+{
+    background: transparent;
+}
+
+QWidget#documents QComboBox#sortKind
+{
+    color: @FG@;
+    background: @CONTROL@;
+    border: none;
+    border-radius: @CONTROLRADIUS@px;
+    padding: 4px 6px 4px 10px;
+    min-height: 20px;
+}
+
+QWidget#documents QComboBox#sortKind:hover,
+QWidget#documents QComboBox#sortKind:on
+{
+    background: @CONTROLHOVER@;
+}
+
+QWidget#documents QComboBox#sortKind::drop-down
+{
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 18px;
+    border: none;
+    background: transparent;
+}
+
+QWidget#documents QComboBox#sortKind::down-arrow
+{
+    image: url(@ARROW@);
+    width: 10px;
+    height: 10px;
+}
+
+QWidget#documents QComboBox#sortKind QAbstractItemView
+{
+    color: @FG@;
+    background: @SIDEBAR@;
+    border: 1px solid @SIDEBARBORDER@;
+    padding: 4px;
+    outline: none;
+    selection-background-color: @ACCENT@;
+    selection-color: @ONACCENT@;
+}
+
+QWidget#documents QToolButton#sortOrder
+{
+    background: transparent;
+    border: none;
+    border-radius: @CONTROLRADIUS@px;
+    padding: 3px;
+    margin: 0px;
+    min-width: 22px;
+    min-height: 22px;
+}
+
+QWidget#documents QToolButton#sortOrder:hover,
+QWidget#documents QToolButton#sortOrder:checked:hover
+{
+    background: @CONTROLHOVER@;
+}
+
+QWidget#documents QToolButton#sortOrder:checked
+{
+    background: transparent;
+}
+
+QWidget#documents QLineEdit#filterText
+{
+    color: @FG@;
+    background: @CONTROL@;
+    border: 1px solid transparent;
+    border-radius: @CONTROLRADIUS@px;
+    padding: 3px 6px 3px 2px;
+    min-height: 20px;
+    selection-background-color: @ACCENT@;
+    selection-color: @ONACCENT@;
+}
+
+QWidget#documents QLineEdit#filterText:hover
+{
+    background: @CONTROLHOVER@;
+}
+
+QWidget#documents QLineEdit#filterText:focus
+{
+    background: @SIDEBAR@;
+    border: 1px solid @ACCENT@;
+}
+
+QWidget#documents QSlider#documentZoomSlider
+{
+    background: transparent;
+}
+
+QWidget#documents QSlider#documentZoomSlider::groove:horizontal
+{
+    height: 4px;
+    margin: 0px;
+    border: none;
+    border-radius: 2px;
+    background: @TRACK@;
+}
+
+QWidget#documents QSlider#documentZoomSlider::sub-page:horizontal
+{
+    border: none;
+    border-radius: 2px;
+    background: @ACCENT@;
+}
+
+QWidget#documents QSlider#documentZoomSlider::add-page:horizontal
+{
+    border: none;
+    border-radius: 2px;
+    background: @TRACK@;
+}
+
+QWidget#documents QSlider#documentZoomSlider::handle:horizontal
+{
+    width: 16px;
+    height: 16px;
+    margin: -6px 0px;
+    border-radius: 8px;
+    border: 1px solid @HANDLEBORDER@;
+    background: @HANDLE@;
+}
+
+QWidget#documents QToolButton#documentZoomOut,
+QWidget#documents QToolButton#documentZoomIn
+{
+    background: transparent;
+    border: none;
+    border-radius: @CONTROLRADIUS@px;
+    padding: 3px;
+    margin: 0px;
+}
+
+QWidget#documents QToolButton#documentZoomOut:hover,
+QWidget#documents QToolButton#documentZoomIn:hover
+{
+    background: @CONTROLHOVER@;
+}
+)CSS");
+
+    css.replace("@CONTENT@", rgba(c.content));
+    css.replace("@SIDEBARBORDER@", rgba(c.sidebarBorder));
+    css.replace("@SIDEBARRADIUS@", QString::number(c.sidebarRadius));
+    css.replace("@SIDEBAR@", rgba(c.sidebar));
+    css.replace("@FG@", rgba(c.foreground));
+    css.replace("@ONACCENT@", rgba(c.onAccent));
+    css.replace("@ACCENT@", rgba(c.accent));
+    // opaque: the field lies on the selection pill
+    const QColor error = dark ? QColor(255, 69, 58) : QColor(255, 59, 48);
+    const qreal errorShare = dark ? 0.22 : 0.10;
+    const QColor errorFill(qRound(c.sidebar.red() * (1 - errorShare) + error.red() * errorShare),
+                           qRound(c.sidebar.green() * (1 - errorShare) + error.green() * errorShare),
+                           qRound(c.sidebar.blue() * (1 - errorShare) + error.blue() * errorShare));
+    css.replace("@ERRORFILL@", rgba(errorFill));
+    css.replace("@ERROR@", rgba(dark ? QColor(255, 69, 58) : QColor(255, 59, 48)));
+    css.replace("@SCROLL@", rgba(dark ? QColor(255, 255, 255, 70) : QColor(0, 0, 0, 60)));
+    css.replace("@CONTROLHOVER@", rgba(c.controlHover));
+    css.replace("@CONTROLRADIUS@", QString::number(c.controlRadius));
+    css.replace("@CONTROL@", rgba(c.control));
+    css.replace("@ARROW@", dark ? QStringLiteral(":/images/glass/comboArrowOnDark.svg")
+                                : QStringLiteral(":/images/glass/comboArrowOnLight.svg"));
+    css.replace("@TRACK@", rgba(c.track));
+    css.replace("@HANDLEBORDER@", rgba(dark ? QColor(0, 0, 0, 90) : QColor(0, 0, 0, 40)));
+    css.replace("@HANDLE@", rgba(dark ? QColor(220, 220, 224) : QColor(255, 255, 255)));
+
+    return css;
+}
+
+
+QPixmap UBGlassStyle::glyphPixmap(const QString& name, const QColor& color, int size, qreal dpr)
+{
+    const QSize pixelSize(qRound(size * dpr), qRound(size * dpr));
+    const QString key = QString("ubglyph:%1:%2:%3").arg(name).arg(pixelSize.width()).arg(color.rgba(), 0, 16);
+
+    QPixmap cached;
+    if (QPixmapCache::find(key, &cached))
+        return cached;
+
+    QImage image(pixelSize, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+
+    QSvgRenderer renderer(QString(":/images/glass/%1.svg").arg(name));
+
+    if (renderer.isValid())
+    {
+        QPainter p(&image);
+        p.setRenderHint(QPainter::Antialiasing);
+        renderer.render(&p, QRectF(QPointF(0, 0), QSizeF(pixelSize)));
+        p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        p.fillRect(image.rect(), color);
+    }
+
+    cached = QPixmap::fromImage(image);
+    cached.setDevicePixelRatio(dpr);
+    QPixmapCache::insert(key, cached);
+    return cached;
 }

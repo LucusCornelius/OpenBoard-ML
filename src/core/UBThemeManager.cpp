@@ -237,7 +237,7 @@ void UBThemeManager::setupDarkPalette()
     // Update OpenBoard-specific palette colors
     UBSettings::paletteColor = UBTheme::Dark::PaletteColor;
     UBSettings::opaquePaletteColor = UBTheme::Dark::OpaquePaletteColor;
-    UBSettings::documentThumbnailsViewColor = darkPalette.color(QPalette::Window);
+    UBSettings::documentThumbnailsViewColor = UBGlassStyle::documentModeColors(true).content;
     UBSettings::boardThumbnailsViewColor = darkPalette.color(QPalette::Window);
     UBSettings::pageNavigationWidgetColor = darkPalette.color(QPalette::Base);
     UBSettings::treeViewBackgroundColor = darkPalette.color(QPalette::Highlight);
@@ -279,7 +279,7 @@ void UBThemeManager::setupLightPalette()
     // Update OpenBoard-specific palette colors
     UBSettings::paletteColor = UBTheme::Light::PaletteColor;
     UBSettings::opaquePaletteColor = UBTheme::Light::OpaquePaletteColor;
-    UBSettings::documentThumbnailsViewColor = QColor(214, 222, 235);
+    UBSettings::documentThumbnailsViewColor = UBGlassStyle::documentModeColors(false).content;
     UBSettings::boardThumbnailsViewColor = UBTheme::Light::PaletteColor;
     UBSettings::pageNavigationWidgetColor = UBTheme::Light::PaletteColor;
     UBSettings::treeViewBackgroundColor = lightPalette.color(QPalette::Highlight);
@@ -295,7 +295,7 @@ void UBThemeManager::applyModernColors()
     const QColor card = UBModernStyle::surface(mIsDarkMode);
     UBSettings::paletteColor = card;
     UBSettings::opaquePaletteColor = card;
-    UBSettings::documentThumbnailsViewColor = palette.color(QPalette::Window);
+    UBSettings::documentThumbnailsViewColor = UBGlassStyle::documentModeColors(mIsDarkMode).content;
     UBSettings::boardThumbnailsViewColor = card;
     UBSettings::pageNavigationWidgetColor = card;
     UBSettings::treeViewBackgroundColor = palette.color(QPalette::Highlight);
