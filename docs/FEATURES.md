@@ -6,7 +6,7 @@ with the normal upstream build instructions (CMake or qmake); no new dependencie
 
 | Feature | Where | Details |
 |---|---|---|
-| Any colour + multiple palettes | Colour wheel button after the swatches; right-click / long-press a swatch | [Colours](#colours-and-palettes) |
+| Any colour + multiple palettes | Colour wheel button after the swatches; right-click / long-press a swatch; palette chevron before the swatches | [Colours](#colours-and-palettes) |
 | Keyboard, mouse-button, pen-button and tablet shortcuts, device profiles | Preferences → Shortcut | [docs/INPUT-DEVICES.md](INPUT-DEVICES.md) |
 | Page backgrounds in real centimetres (blank, lined, 1 cm, 0.5 cm, black) | Backgrounds button; Preferences → Grid | [docs/BACKGROUNDS.md](BACKGROUNDS.md) |
 | Maths notation palette (√, ∫, Σ, lim, brackets, Greek, …) | "Maths" toolbar button (show/hide) | [Maths](#maths-notation-palette) |
@@ -23,8 +23,14 @@ with the normal upstream build instructions (CMake or qmake); no new dependencie
   (also Preferences → Pen / Marker → *Color palettes…*): create, rename, duplicate,
   delete palettes; add, edit, remove and reorder colours; palette size 5–10.
   Dark-background variants are derived automatically (near-black becomes white).
+* **Palette switch**: a small chevron directly before the swatches in the pen panel.
+  A click switches to the next palette (wraps around); the swatches and the palette size
+  follow at once. Right-click or press and hold (500 ms, stylus friendly) opens a compact
+  menu with all palettes (name, a row of their colours, a check mark on the active one) and
+  *Manage palettes...*. The tooltip names the active palette; the chevron is hidden while
+  there is only one palette.
 * Actions `Next Color Palette` / `Previous Color Palette` can get a shortcut in
-  Preferences → Shortcut (group *Colors*).
+  Preferences → Shortcut (group *Colors*); the chevron uses the same action, so they stay in sync.
 * Settings: `Board/ColorPalettes` (JSON), `Board/ActiveColorPalette`.
 
 ## Input devices

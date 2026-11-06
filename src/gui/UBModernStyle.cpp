@@ -729,6 +729,7 @@ QDialog#preferencesDialog QTabWidget::pane
 @P@ QStackedWidget,
 @P@ QStackedWidget > QWidget,
 @P@ QWidget#shapeToolWidget,
+@P@ QWidget#penColorSection,
 @P@ QSlider,
 @P@ QAbstractScrollArea,
 @P@ QAbstractScrollArea > QWidget#qt_scrollarea_viewport,
@@ -900,6 +901,30 @@ QDialog#preferencesDialog QTabWidget::pane
 @P@ UBToolbarButtonGroup QToolButton[colorPaletteConfigButton="true"]:hover
 {
     background: @HOVER@;
+}
+
+@P@ QToolButton#paletteSwitchButton
+{
+    color: @FG@;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    padding: 0px;
+    margin: 0px;
+    min-width: 20px;
+    max-width: 20px;
+    min-height: 36px;
+    max-height: 36px;
+}
+
+@P@ QToolButton#paletteSwitchButton:hover
+{
+    background: @HOVER@;
+}
+
+@P@ QToolButton#paletteSwitchButton:pressed
+{
+    background: @PRESSED@;
 }
 
 @P@ QFrame#glassDivider
