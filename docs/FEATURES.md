@@ -92,17 +92,43 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
 
 ## User interface (Liquid Glass)
 
-* Top bar: left cluster Undo, Redo | Backgrounds, Maths | Pages, Previous, Next, Erase;
-  right cluster Board, Web, Documents, Desktop, OpenBoard menu.
-* **Pen panel**: floating glass capsule at the top centre with colour swatches, custom
-  colour, line width (eraser width while erasing) and shape kind + fill for the Shapes tool.
-  Draggable; double-click its background to snap it back. Ctrl+T hides/shows it together
-  with the tool pill.
-* All floating palettes are glass panels: real blurred backdrop of the board, translucent
-  tint, refraction rim and shadow; light and dark theme (`App/ThemeMode`).
-* macOS: transparent title bar with native vibrancy behind the top bar
-  (`src/gui/UBGlassEffect_mac.mm`). Switches for troubleshooting:
-  `OPENBOARD_NO_VIBRANCY=1`, `OPENBOARD_NO_NATIVE_GLASS=1`.
+* **Freeform-style layout**: in board mode there is no toolbar strip. The board runs edge to
+  edge and the controls float above it as pieces of glass (the "control layer"):
+  * top-left cluster: Undo, Redo | Backgrounds, Maths | Pages, Previous, Next, Erase;
+  * top-right cluster: Web, Documents, Desktop | OpenBoard menu (Board while not on the board);
+  * pen panel capsule at the top centre, tool capsule at the bottom centre; Backgrounds and
+    Maths palettes float. Groups are separated by thin hairlines; the active item is a solid
+    accent capsule, hover/press show a light glass pill.
+  * Preference *toolbar at the bottom*: clusters and pen panel move to the bottom edge, the
+    tool capsule floats above them. Preference *toolbar text*: small labels under the
+    cluster icons; icon only is the default (`App/ToolBarDisplayText=false`).
+  * The board toolbar QActions stay alive (shortcuts, menus, states); web and document mode
+    keep their (restyled) toolbars. Dock palette tabs are kept clear of the clusters.
+* **Painted Liquid Glass** (all platforms, `UBGlassStyle::paintGlass`, `UBFloatingPalette`):
+  * always translucent: the board behind each panel is captured, blurred (about 20 px, at
+    quarter resolution) and its saturation raised (x1.2);
+  * adaptive luminosity: the mean luminance under the panel selects the light material
+    (white tint, dark glyphs) over light content and the dark material (black tint, white
+    glyphs) over dark content, independently of the app theme (the theme decides only when
+    nothing can be captured, e.g. over the desktop in annotation mode). The panel publishes
+    the material in the property `glassOnDark`; stylesheet colours and tinted icons follow it;
+  * lensing rim: a 14 px band along the edge shows less blurred content from slightly
+    outside the panel, as if bent by thick glass; bright inner contour, darker outer contour;
+  * specular highlight on the upper part with a small bright streak top-left, faint inner
+    shadow at the bottom, soft depth shadow;
+  * capsules for single-row panels, 26 px radius otherwise; 40 px buttons with 22 px
+    glyphs; round 24 px colour swatches with a 2 px ring; capsule sliders and fields; the
+    maths palette is compact (36 px glyphs, segmented tabs, size and ink text in one row).
+* **macOS** (`src/gui/UBGlassEffect_mac.mm`): transparent title bar without title and
+  separator, full size content view: the board extends under the title bar and the clusters
+  sit below the traffic lights. Menus, dialogs and the window follow the light/dark app theme.
+  * macOS 26+: native `NSGlassEffectView` behind each floating panel is available as an
+    opt-in experiment, `OPENBOARD_NATIVE_PANEL_GLASS=1` (the palette becomes a native child
+    view that paints only its controls; Qt's shared backing store may hide the glass, hence
+    not the default).
+  * `OPENBOARD_NO_NATIVE_GLASS=1` disables all native chrome (normal title bar, painted glass).
+* Dark/light theme (`App/ThemeMode`: 0 system, 1 light, 2 dark) applies to menus, dialogs,
+  dock palettes and the web/document toolbars; glass panels adapt to the content below.
 * The app runs in a normal resizable window by default (`App/RunInWindow=true`); window
   geometry is remembered. **Full screen**: Ctrl+Shift+F (OpenBoard menu), or the green
   zoom button on macOS.
