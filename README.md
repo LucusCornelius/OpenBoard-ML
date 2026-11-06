@@ -86,7 +86,9 @@ open build/macx/release/product/OpenBoard-ML.app
 `OpenBoard.pro` finds the libraries in `/opt/homebrew`, `/usr/local` or `/opt/local` on its own
 (override with `qmake OpenBoard.pro MAC_LIB_PREFIX=/some/prefix`). Qt from the Qt Online Installer
 works too: use its `qmake` and add the modules *Qt WebEngine*, *Qt Multimedia* and *Qt 5 Compatibility*.
-To make a distributable disk image: `macdeployqt build/macx/release/product/OpenBoard-ML.app -dmg`
+To make a distributable disk image run `release_scripts/osx/deploy-homebrew.sh <version> [output-dir]`.
+It runs `macdeployqt`, repairs the library links that `macdeployqt` gets wrong with Homebrew Qt (the
+Qt WebEngine helper process), signs the bundle ad hoc and writes `OpenBoard-ML-<version>-macOS-arm64.dmg`.
 (creates `OpenBoard-ML.dmg` next to the app).
 
 ### Windows
