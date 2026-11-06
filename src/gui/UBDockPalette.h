@@ -186,6 +186,11 @@ protected:
     QElapsedTimer mClickTime;
     /** The mouse pressed position */
     QPoint mMousePressPos;
+    /** The global x position of the mouse press and the width of the dock at that time */
+    int mMousePressGlobalX;
+    int mMousePressWidth;
+    /** The collapsed state at the last resize */
+    bool mWasCollapsed;
     /** The tab orientation */
     eUBDockTabOrientation mTabsOrientation;
     /** The h position of the tab */
@@ -214,6 +219,7 @@ private:
     void tabClicked(int tabIndex);
     int tabSpacing();
     void toggleCollapseExpand();
+    bool isCollapsed() const;
     void moveTabs();
     void resizeTabs();
 

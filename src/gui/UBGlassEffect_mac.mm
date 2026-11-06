@@ -1013,8 +1013,14 @@ namespace
                     if (!NSEqualRects([mHost frame], frame))
                         [mHost setFrame:frame];
 
-                    // the material covers the body of the panel, the margin around it stays clear
+                    // the material covers the body of the panel, the margin around it stays clear; a
+                    // body given as an inset follows the size at once (a resize is seen here before
+                    // the panel itself handles it)
                     QRect body = mPanel->property("ubGlassBody").toRect();
+                    const QVariant inset = mPanel->property("ubGlassInset");
+
+                    if (inset.isValid())
+                        body = mPanel->rect().adjusted(inset.toInt(), inset.toInt(), -inset.toInt(), -inset.toInt());
 
                     if (body.isEmpty())
                         body = mPanel->rect();
@@ -1069,8 +1075,14 @@ namespace
                     if (appearance && ![[[mHost appearance] name] isEqualToString:[appearance name]])
                         [mHost setAppearance:appearance];
 
-                    // wait for the first rendered image, an empty glass body would flash
-                    const bool visible = mPanel->isVisible() && mImageKey != 0 && !mSuspended;
+                    // wait for the first rendered image, an empty glass body would flash; a panel
+                    // without size (a collapsed dock) is not painted any more: its last body and
+                    // controls would stay on the native glass, which is not clipped to the panel
+                    // (it opens again with the next rendered image, not with the old controls)
+                    if (size.isEmpty())
+                        mImageKey = 0;
+
+                    const bool visible = mPanel->isVisible() && !size.isEmpty() && mImageKey != 0 && !mSuspended;
                     [mHost setHidden:(visible ? NO : YES)];
                 }
                 @catch (NSException* exception)

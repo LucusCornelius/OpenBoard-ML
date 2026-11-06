@@ -88,18 +88,22 @@ void UBLeftPalette::updateMaxWidth()
  */
 void UBLeftPalette::resizeEvent(QResizeEvent *event)
 {
-    int newWidth = width();
+    // the dock palette first: it keeps the last open width (also when collapsed by a drag)
+    UBDockPalette::resizeEvent(event);
+
+    const bool collapsed = width() == 0;
+    const int openWidth = mLastWidth;
+
     if(mCurrentMode == eUBDockPaletteWidget_BOARD){
-        if(newWidth > mCollapseWidth)
-            UBSettings::settings()->leftLibPaletteBoardModeWidth->set(newWidth);
-        UBSettings::settings()->leftLibPaletteBoardModeIsCollapsed->set(newWidth == 0);
+        if(openWidth > mCollapseWidth)
+            UBSettings::settings()->leftLibPaletteBoardModeWidth->set(openWidth);
+        UBSettings::settings()->leftLibPaletteBoardModeIsCollapsed->set(collapsed);
     }
     else{
-        if(newWidth > mCollapseWidth)
-            UBSettings::settings()->leftLibPaletteDesktopModeWidth->set(newWidth);
-        UBSettings::settings()->leftLibPaletteDesktopModeIsCollapsed->set(newWidth == 0);
+        if(openWidth > mCollapseWidth)
+            UBSettings::settings()->leftLibPaletteDesktopModeWidth->set(openWidth);
+        UBSettings::settings()->leftLibPaletteDesktopModeIsCollapsed->set(collapsed);
     }
-    UBDockPalette::resizeEvent(event);
 }
 
 

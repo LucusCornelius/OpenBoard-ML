@@ -64,6 +64,9 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
 , mResized(false)
 , mCollapseWidth(150)
 , mLastWidth(-1)
+, mMousePressGlobalX(0)
+, mMousePressWidth(0)
+, mWasCollapsed(false)
 , mHTab(0)
 , mpStackWidget(NULL)
 , mpLayout(NULL)
@@ -115,6 +118,11 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
     // native glass of the platform behind the dock body, when available
     if (UBUiStyle::isGlass())
     {
+        // a floating glass sidebar, inset from the edges; given as an inset, the glass
+        // follows every resize of the dock at once (drag, collapse, expand)
+        setProperty("ubGlassInset", 6);
+        setProperty("ubGlassRadius", 18.0);
+
         UBGlassEffect::applyToPanel(this);
 
         if (property("ubNativeGlass").toBool())
@@ -196,6 +204,20 @@ void UBDockPalette::resizeEvent(QResizeEvent *event)
 {
     Q_UNUSED(event);
     updateMaxWidth();
+
+    // remember the open width: a collapse (tab click or drag) and the next expand use it
+    if (width() >= mCollapseWidth)
+        mLastWidth = width();
+
+    // the arrow of the tab shows the collapsed state
+    const bool collapsed = isCollapsed();
+
+    if (collapsed != mWasCollapsed)
+    {
+        mWasCollapsed = collapsed;
+        mTabPalette->update();
+    }
+
     if(parentWidget())
     {
         setMinimumHeight(parentWidget()->height());
@@ -261,12 +283,7 @@ void UBDockPalette::paintEvent(QPaintEvent *event)
 
     // native glass (UBGlassEffect): a floating glass sidebar, inset from the edges, the content is painted on it
     if (property("ubNativeGlass").toBool())
-    {
-        const int inset = 6;
-        setProperty("ubGlassBody", rect().adjusted(inset, inset, -inset, -inset));
-        setProperty("ubGlassRadius", 18.0);
         return;
-    }
 
     int nbTabs = mTabWidgets.size();
     if(0 < nbTabs)
@@ -283,6 +300,14 @@ void UBDockPalette::paintEvent(QPaintEvent *event)
 
         painter.drawPath(path);
     }
+}
+
+/**
+ * \brief Collapsed: the dock is closed, only its tabs are shown
+ */
+bool UBDockPalette::isCollapsed() const
+{
+    return width() < mCollapseWidth;
 }
 
 /**
@@ -373,12 +398,17 @@ void UBDockPalette::showTabWidget(int tabIndex)
  */
 void UBDockPalette::toggleCollapseExpand()
 {
-    if(width() < mCollapseWidth)
-        resize(mLastWidth,height());
-    else{
+    if (isCollapsed())
+    {
+        // back at the last open width (it may not be known yet, e.g. never opened)
+        const int defaultWidth = 270;
+        const int openWidth = mLastWidth >= mCollapseWidth ? mLastWidth : defaultWidth;
+        resize(qMin(openWidth, maximumWidth()), height());
+    }
+    else
+    {
         mLastWidth = width();
-        update();
-        resize(0,height());
+        resize(0, height());
     }
 }
 
@@ -670,6 +700,18 @@ static QPixmap glassTabIcon(UBDockPaletteWidget* widget)
     return widget->tabIcon();
 }
 
+/**
+ * \brief Horizontal mouse position on the screen
+ */
+static int globalX(QMouseEvent* event)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    return qRound(event->globalPosition().x());
+#else
+    return event->globalPos().x();
+#endif
+}
+
 UBTabDockPalette::UBTabDockPalette(UBDockPalette *dockPalette, QWidget *parent) :
             QWidget(parent)
 , dock(dockPalette)
@@ -822,6 +864,8 @@ void UBTabDockPalette::mousePressEvent(QMouseEvent *event)
     // It is only possible to resize it if the border is selected
     QPoint p = event->pos();
     dock->mMousePressPos = p;
+    dock->mMousePressGlobalX = globalX(event);
+    dock->mMousePressWidth = dock->width();
     dock->mResized = false;
 
     switch(dock->mOrientation) {
@@ -845,10 +889,16 @@ void UBTabDockPalette::mouseMoveEvent(QMouseEvent *event)
 {
     QPoint p = event->pos();
 
-    if(dock->mCanResize && ((dock->mMousePressPos - p).manhattanLength() > QApplication::startDragDistance()))
+    // the tab moves with the dock edge: follow the distance the mouse moved sideways since the
+    // press (global coordinates), not its position on the tab, so the edge neither jumps nor
+    // stops following once the tab has caught up with the mouse; a click that wobbles a little
+    // stays a click
+    const int dx = globalX(event) - dock->mMousePressGlobalX;
+    const bool dragging = dock->mResized || qAbs(dx) > QApplication::startDragDistance();
+
+    if(dock->mCanResize && dragging)
     {
         if (qAbs(dock->mMousePressPos.y() - p.y()) > 10 && mFlotable) {
-            qDebug() << "y differences" << dock->mMousePressPos.y() << p.y();
             mVerticalOffset += p.y() - dock->mMousePressPos.y();
             move(this->pos().x(),  p.y());
         }
@@ -856,30 +906,23 @@ void UBTabDockPalette::mouseMoveEvent(QMouseEvent *event)
         switch(dock->mOrientation) {
 
         case eUBDockOrientation_Left:
-            p.setX(p.x() + dock->width());
-            if(p.x() < dock->collapseWidth() && p.x() >= dock->minimumWidth()) {
-                dock->update();
-                dock->resize(0, dock->height());
-                //dock->mLastWidth = dock->collapseWidth() + 1;
-                dock->mResized = true;
-            } else if (p.x() <= dock->maximumWidth() && p.x() >= dock->minimumWidth()) {
-                dock->resize(p.x(), dock->height());
-                dock->mResized = true;
-            }
-            break;
-
         case eUBDockOrientation_Right:
-            p.setX(p.x() - 2 * dock->border());
-            if((dock->x() + p.x() > dock->parentWidget()->width() - dock->collapseWidth()) && (dock->x() + p.x() < dock->parentWidget()->width())) {
-                dock->update();
-                dock->resize(0, dock->height());
-                //dock->mLastWidth = dock->collapseWidth() + 1;
-                dock->mResized = true;
-            } else if((dock->x() + p.x() >= dock->parentWidget()->width() - dock->maximumWidth()) && (dock->x() + p.x() <= dock->parentWidget()->width() - dock->minimumWidth())) {
-                dock->resize(dock->parentWidget()->width() - (dock->x() + p.x()), dock->height());
-                dock->mResized = true;
-            }
+        {
+            const int width = dock->mMousePressWidth + (dock->mOrientation == eUBDockOrientation_Left ? dx : -dx);
+
+            // narrower than the collapse width: collapse, else follow the mouse up to the maximum
+            const int newWidth = width < dock->collapseWidth() ? 0 : qMin(width, dock->maximumWidth());
+
+            // collapsed by dragging an open dock: it opens again at the width it had before the drag
+            if (newWidth == 0 && dock->mMousePressWidth >= dock->collapseWidth())
+                dock->mLastWidth = dock->mMousePressWidth;
+
+            if (newWidth != dock->width())
+                dock->resize(newWidth, dock->height());
+
+            dock->mResized = true;
             break;
+        }
 
         case eUBDockOrientation_Top:
         case eUBDockOrientation_Bottom:
