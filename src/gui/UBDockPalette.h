@@ -42,6 +42,8 @@ class UBDocumentProxy;
 #include <QPoint>
 #include <QPixmap>
 #include <QMap>
+#include <QMargins>
+#include <QPointer>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 #include <QVector>
@@ -85,6 +87,7 @@ protected:
     virtual void mousePressEvent(QMouseEvent *event);
     virtual void mouseMoveEvent(QMouseEvent *event);
     virtual void mouseReleaseEvent(QMouseEvent *event);
+    virtual void mouseDoubleClickEvent(QMouseEvent *event);
     virtual void tabletEvent(QTabletEvent *event);
     virtual void paintEvent(QPaintEvent *event);
 
@@ -92,6 +95,10 @@ private:
     UBDockPalette *dock;
     int mVerticalOffset;
     bool mFlotable;
+    /** the release of the second click of a double click is ignored */
+    bool mIgnoreRelease;
+    /** time of the last tablet press, to recognise a double tap */
+    QElapsedTimer mLastTabletPress;
 };
 
 
@@ -164,6 +171,7 @@ protected:
     virtual int customMargin();
     virtual void updateMaxWidth();
     virtual void resizeEvent(QResizeEvent *event);
+    virtual bool eventFilter(QObject *watched, QEvent *event) override;
     virtual int collapseWidth();
 
     /** The current dock orientation */
@@ -191,6 +199,12 @@ protected:
     int mMousePressWidth;
     /** The collapsed state at the last resize */
     bool mWasCollapsed;
+    /** The height of the window title bar over the top of the dock (macOS traffic lights) */
+    int mTopInset;
+    /** The margins of the layout without the title bar */
+    QMargins mBaseMargins;
+    /** The window watched for changes of its title bar height */
+    QPointer<QWidget> mWatchedWindow;
     /** The tab orientation */
     eUBDockTabOrientation mTabsOrientation;
     /** The h position of the tab */
@@ -220,6 +234,8 @@ private:
     int tabSpacing();
     void toggleCollapseExpand();
     bool isCollapsed() const;
+    void updateTopInset();
+    void watchWindow();
     void moveTabs();
     void resizeTabs();
 

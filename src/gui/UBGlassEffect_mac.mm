@@ -1019,7 +1019,9 @@ namespace
                     QRect body = mPanel->property("ubGlassBody").toRect();
                     const QVariant inset = mPanel->property("ubGlassInset");
 
-                    if (inset.isValid())
+                    if (inset.userType() == qMetaTypeId<QMargins>())
+                        body = mPanel->rect().marginsRemoved(inset.value<QMargins>());
+                    else if (inset.isValid())
                         body = mPanel->rect().adjusted(inset.toInt(), inset.toInt(), -inset.toInt(), -inset.toInt());
 
                     if (body.isEmpty())
