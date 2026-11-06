@@ -38,6 +38,7 @@
 #include <QPointer>
 
 #include "core/UB.h"
+#include "gui/UBGlassStyle.h"
 
 typedef enum
 {
@@ -84,9 +85,18 @@ class UBFloatingPalette : public QWidget
 
         /**
          * Enable or disable the blurred backdrop of the glass panel (enabled by default).
-         * Without backdrop the panel is painted with a more opaque tint.
+         * Without backdrop only a translucent tint is painted, the content behind shows through.
          */
         void setGlassBackdropEnabled(bool enabled);
+
+        /** margin around the glass body (room for the drop shadow) */
+        virtual int border();
+
+        /** true when the glass material is dark (white glyphs), it adapts to the content below */
+        bool isOnDarkMaterial() const { return mOnDark; }
+
+        /** the panel is drawn by a native glass view of the platform (UBGlassEffect), only the controls are painted */
+        bool hasNativeGlass() const;
 
     public slots:
         /** request a (throttled) refresh of the blurred backdrop */
@@ -105,7 +115,6 @@ class UBFloatingPalette : public QWidget
         virtual void paintEvent(QPaintEvent *event) override;
 
         virtual int radius();
-        virtual int border();
         virtual int gripSize();
         virtual int closeButtonMargin() const;
 
@@ -131,6 +140,8 @@ class UBFloatingPalette : public QWidget
         void buildCloseButton();
         bool backdropActive() const;
         void updateBackdrop();
+        void updateMaterial();
+        void publishGlassGeometry();
         void watchSiblings();
         void siblingEvent(QWidget* sibling, QEvent* event);
         void removeAllAssociatedPalette();
@@ -145,9 +156,10 @@ class UBFloatingPalette : public QWidget
         QToolButton* mCloseButton;
 
         bool mGlassBackdropEnabled;
-        QImage mRawBackdrop;
-        QImage mBlurredBackdrop;
+        UBGlassBackdrop mBackdrop;
         QImage mShadow;
+        bool mShadowOnDark;
+        bool mOnDark;
         QTimer* mBackdropTimer;
         QElapsedTimer mBackdropAge;
         QObject* mWatcher;

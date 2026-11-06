@@ -40,6 +40,7 @@
 #include "frameworks/UBPlatformUtils.h"
 
 #include "core/UBSettings.h"
+#include "core/UBThemeManager.h"
 
 #include "core/memcheck.h"
 
@@ -49,8 +50,13 @@ namespace
     constexpr int backdropThrottleMs = 40;
     // minimal period between two synchronous refreshes while dragging (about 60 fps)
     constexpr int backdropDragMs = 16;
-    // blur radius of the backdrop in pixels
-    constexpr int backdropBlurRadius = 12;
+    // blur radius of the backdrop in pixels (at 1x), the blur is done at a quarter of the resolution
+    constexpr int backdropBlurRadius = 20;
+    // light blur of the content seen through the rim (lensing), done at half resolution
+    constexpr int lensBlurRadius = 3;
+    // luminance thresholds (with hysteresis) for the dark material
+    constexpr qreal darkBelow = 0.42;
+    constexpr qreal lightAbove = 0.58;
 }
 
 int UBFloatingPalette::sRenderingBackdrop = 0;
@@ -94,9 +100,21 @@ UBFloatingPalette::UBFloatingPalette(Qt::Corner position, QWidget *parent)
     , mDefaultPosition(position)
     , mCloseButton(nullptr)
     , mGlassBackdropEnabled(true)
+    , mShadowOnDark(false)
+    , mOnDark(UBGlassStyle::isDark())
     , mBackdropTimer(nullptr)
     , mWatcher(nullptr)
 {
+    // glyphs and hover pills follow the material of the glass (see UBGlassStyle)
+    setProperty("glassOnDark", mOnDark);
+    UBGlassStyle::installMaterialTracker();
+
+    connect(UBThemeManager::instance(), &UBThemeManager::themeChanged, this, [this]() {
+        mShadow = QImage();
+        updateMaterial();
+        update();
+    });
+
     setCursor(Qt::ArrowCursor);
 
     mWatcher = new UBFloatingPaletteWatcher(this);
@@ -202,7 +220,8 @@ int UBFloatingPalette::border()
 
 int UBFloatingPalette::closeButtonMargin() const
 {
-    return 14;
+    // inside the rounded glass body, clear of its corner
+    return const_cast<UBFloatingPalette*>(this)->border() + 10;
 }
 
 int UBFloatingPalette::closeButtonTop() const
@@ -384,6 +403,10 @@ QRectF UBFloatingPalette::glassRect()
 
 void UBFloatingPalette::paintGlassBackground(QPainter& painter)
 {
+    // a native glass view of the platform is behind the panel: controls only
+    if (hasNativeGlass())
+        return;
+
     const QRectF body = glassRect();
     const qreal r = radius();
     const qreal dpr = devicePixelRatio();
@@ -391,30 +414,21 @@ void UBFloatingPalette::paintGlassBackground(QPainter& painter)
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing);
 
-    if (backdropActive())
+    if (mShadow.isNull() || mShadow.size() != size() * dpr || mShadowOnDark != mOnDark)
     {
-        // the palette paints all its pixels (WA_OpaquePaintEvent): first the
-        // unblurred content behind it, visible around the rounded body
-        if (mRawBackdrop.isNull() || mRawBackdrop.size() != size() * dpr)
-        {
-            painter.fillRect(rect(), parentWidget()->palette().color(QPalette::Window));
-            scheduleBackdropUpdate();
-        }
-
-        if (!mRawBackdrop.isNull())
-        {
-            painter.drawImage(QPointF(0, 0), mRawBackdrop);
-        }
-    }
-
-    if (mShadow.isNull() || mShadow.size() != size() * dpr)
-    {
-        mShadow = UBGlassStyle::shadowImage(size(), body, r, dpr);
+        mShadow = UBGlassStyle::shadowImage(size(), body, r, dpr, mOnDark);
+        mShadowOnDark = mOnDark;
     }
 
     painter.drawImage(QPointF(0, 0), mShadow);
 
-    UBGlassStyle::paintGlass(&painter, body, r, backdropActive() ? mBlurredBackdrop : QImage());
+    const bool active = backdropActive();
+
+    if (active && (!mBackdrop.isValid() || mBackdrop.rect.size() != QSizeF(size())))
+        scheduleBackdropUpdate();
+
+    // the widget is not opaque: without backdrop the content behind shows through the tint
+    UBGlassStyle::paintGlass(&painter, body, r, active ? mBackdrop : UBGlassBackdrop(), mOnDark);
 
     painter.restore();
 }
@@ -423,23 +437,26 @@ void UBFloatingPalette::paintGlassBackground(QPainter& painter)
 void UBFloatingPalette::setGlassBackdropEnabled(bool enabled)
 {
     mGlassBackdropEnabled = enabled;
-    setAttribute(Qt::WA_OpaquePaintEvent, backdropActive());
+
+    if (!enabled)
+        mBackdrop = UBGlassBackdrop();
+
+    updateMaterial();
     scheduleBackdropUpdate();
     update();
 }
 
 
+bool UBFloatingPalette::hasNativeGlass() const
+{
+    return property("ubNativeGlass").toBool();
+}
+
+
 bool UBFloatingPalette::backdropActive() const
 {
-    QWidget* parent = parentWidget();
-
-    if (!mGlassBackdropEnabled || !parent || isWindow())
-        return false;
-
-    // transparent windows (desktop annotation) show the desktop behind, which cannot be captured.
-    // The main window on macOS is only translucent for the vibrancy of its title bar (UBGlassEffect).
-    QWidget* top = window();
-    return !top->testAttribute(Qt::WA_TranslucentBackground) || top->property("ubGlassTranslucentWindow").toBool();
+    // with native glass the backdrop is still captured: its luminance selects the glyph colours
+    return mGlassBackdropEnabled && parentWidget() && !isWindow();
 }
 
 
@@ -453,21 +470,45 @@ void UBFloatingPalette::scheduleBackdropUpdate()
 }
 
 
+void UBFloatingPalette::updateMaterial()
+{
+    bool onDark = UBGlassStyle::isDark();
+
+    // the material adapts to the content below the glass, the theme decides without content
+    if (backdropActive() && mBackdrop.isValid() && mBackdrop.coverage > 0.5)
+    {
+        const bool wasDark = property("glassOnDark").toBool();
+        onDark = wasDark ? mBackdrop.luminance < lightAbove : mBackdrop.luminance < darkBelow;
+    }
+
+    if (onDark != mOnDark || property("glassOnDark").toBool() != onDark)
+    {
+        mOnDark = onDark;
+        UBGlassStyle::setPanelMaterial(this, onDark);
+        update();
+    }
+}
+
+
+void UBFloatingPalette::publishGlassGeometry()
+{
+    // used by the native glass of the platform (UBGlassEffect)
+    const QRectF body = glassRect();
+    setProperty("ubGlassBody", body.toRect());
+    setProperty("ubGlassRadius", qMin<qreal>(radius(), qMin(body.width(), body.height()) / 2.0));
+}
+
+
 void UBFloatingPalette::updateBackdrop()
 {
     mBackdropTimer->stop();
 
-    const bool active = backdropActive();
-
-    if (testAttribute(Qt::WA_OpaquePaintEvent) != active)
-        setAttribute(Qt::WA_OpaquePaintEvent, active);
-
-    if (!active || !isVisible() || sRenderingBackdrop > 0 || size().isEmpty())
+    if (!backdropActive() || !isVisible() || sRenderingBackdrop > 0 || size().isEmpty())
     {
-        if (!active)
+        if (!backdropActive())
         {
-            mRawBackdrop = QImage();
-            mBlurredBackdrop = QImage();
+            mBackdrop = UBGlassBackdrop();
+            updateMaterial();
         }
         return;
     }
@@ -476,9 +517,15 @@ void UBFloatingPalette::updateBackdrop()
     const QRect geometryInParent = geometry();
     const qreal dpr = devicePixelRatio();
 
+    // translucent windows (desktop annotation) show the desktop behind, which cannot
+    // be captured: only the content of the window is used, the rest stays transparent
+    const bool translucentWindow = window()->testAttribute(Qt::WA_TranslucentBackground);
+
     QImage raw(size() * dpr, QImage::Format_ARGB32_Premultiplied);
     raw.setDevicePixelRatio(dpr);
-    raw.fill(parent->palette().color(QPalette::Window));
+    raw.fill(translucentWindow ? QColor(Qt::transparent) : parent->palette().color(QPalette::Window));
+
+    int rendered = 0;
 
     ++sRenderingBackdrop;
     {
@@ -503,18 +550,36 @@ void UBFloatingPalette::updateBackdrop()
             const QRect source = overlap.translated(-sibling->pos());
             sibling->render(&painter, overlap.topLeft() - geometryInParent.topLeft(), QRegion(source),
                             QWidget::DrawWindowBackground | QWidget::DrawChildren);
+            ++rendered;
         }
     }
     --sRenderingBackdrop;
 
-    mRawBackdrop = raw;
+    static bool reported = false;
 
-    // blur only the body area
+    if (rendered == 0 && !translucentWindow && !reported)
+    {
+        reported = true;
+        qDebug() << "UBFloatingPalette: no content captured behind" << objectName() << "- glass without backdrop";
+    }
+
+    UBGlassBackdrop backdrop;
+    backdrop.rect = QRectF(rect());
+    backdrop.blurred = UBGlassStyle::blurredBackdrop(raw, qRound(backdropBlurRadius * dpr), 4, 1.2);
+    backdrop.lens = UBGlassStyle::blurredBackdrop(raw, qRound(lensBlurRadius * dpr), 2, 1.1);
+
+    // luminance of the content under the body only
     const QRectF body = glassRect();
-    const QRect bodyPixels = QRectF(body.topLeft() * dpr, body.size() * dpr).toAlignedRect() & QRect(QPoint(0, 0), raw.size());
-    mBlurredBackdrop = UBGlassStyle::blurredBackdrop(raw.copy(bodyPixels), qRound(backdropBlurRadius * dpr));
+    const qreal sx = backdrop.blurred.width() / qMax<qreal>(1.0, width());
+    const qreal sy = backdrop.blurred.height() / qMax<qreal>(1.0, height());
+    const QRect bodyInSmall = QRectF(body.left() * sx, body.top() * sy, body.width() * sx, body.height() * sy).toAlignedRect()
+            & backdrop.blurred.rect();
+    backdrop.luminance = UBGlassStyle::meanLuminance(backdrop.blurred.copy(bodyInSmall), &backdrop.coverage);
 
+    mBackdrop = backdrop;
     mBackdropAge.restart();
+
+    updateMaterial();
     update();
 }
 
@@ -525,13 +590,11 @@ bool UBFloatingPalette::event(QEvent *event)
     {
         case QEvent::ParentChange:
             watchSiblings();
-            mRawBackdrop = QImage();
-            mBlurredBackdrop = QImage();
-            setAttribute(Qt::WA_OpaquePaintEvent, backdropActive());
+            mBackdrop = UBGlassBackdrop();
             break;
 
         case QEvent::Show:
-            setAttribute(Qt::WA_OpaquePaintEvent, backdropActive());
+            publishGlassGeometry();
             UBGlassEffect::applyToPanel(this);
             // capture the backdrop before the first paint
             updateBackdrop();
@@ -539,6 +602,7 @@ bool UBFloatingPalette::event(QEvent *event)
 
         case QEvent::Resize:
             mShadow = QImage();
+            publishGlassGeometry();
             if (isVisible())
                 updateBackdrop();
             break;

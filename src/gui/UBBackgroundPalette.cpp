@@ -101,6 +101,7 @@ void UBBackgroundPalette::init()
     mLightDarkModeSwitch = createPaletteButton(UBApplication::mainWindow->actionLightDarkMode, this);
     mLightDarkModeSwitch->setFixedSize(64,32);
     mLightDarkModeSwitch->setCheckable(true);
+    mLightDarkModeSwitch->setObjectName("glassToggle"); // the switch icon shows the state
     mActions << UBApplication::mainWindow->actionLightDarkMode;
     UBApplication::mainWindow->actionLightDarkMode->setProperty("ungrouped", true); // don't add to action group
 

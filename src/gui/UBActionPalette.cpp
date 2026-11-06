@@ -29,6 +29,7 @@
 #include <QAction>
 
 #include "UBActionPalette.h"
+#include "UBGlassStyle.h"
 
 #include "core/memcheck.h"
 
@@ -232,9 +233,9 @@ int UBActionPalette::border()
 {
     // room for the drop shadow of the glass panel
     if (isClosable())
-        return 10;
+        return UBGlassStyle::shadowMargin;
     else
-        return 8;
+        return UBGlassStyle::shadowMargin - 2;
 }
 
 

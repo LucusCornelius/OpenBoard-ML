@@ -62,6 +62,7 @@ class UBMathPalette : public UBFloatingPalette
 
     protected:
         void onCloseButtonClicked() override;
+        int border() override;
         void mouseReleaseEvent(QMouseEvent* event) override;
         void showEvent(QShowEvent* event) override;
         void hideEvent(QHideEvent* event) override;

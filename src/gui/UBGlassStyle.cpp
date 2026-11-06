@@ -31,6 +31,8 @@
 #include <QStyle>
 #include <QSvgRenderer>
 #include <QToolBar>
+#include <QHash>
+#include <QWidget>
 
 #include <vector>
 
@@ -50,6 +52,173 @@ namespace
     {
         c.setAlphaF(alpha);
         return c;
+    }
+
+    /** material of the glass panel whose content is being painted, -1: none (theme colours) */
+    int sPaintMaterial = -1;
+
+    struct UBGlassIconTint
+    {
+        static QColor color(QIcon::Mode mode, QIcon::State state)
+        {
+            const int material = sPaintMaterial;
+            const bool onDark = material < 0 ? UBGlassStyle::isDark() : material == 1;
+            const QColor fg = UBGlassStyle::foreground(onDark);
+
+            if (mode == QIcon::Disabled)
+                return withAlpha(fg, 0.30);
+
+            if (state == QIcon::On)
+                return QColor(Qt::white);
+
+            return withAlpha(fg, 0.90);
+        }
+    };
+
+    /**
+     * Icon engine tinting a monochrome image (alpha mask) like the SVG icons.
+     */
+    class UBTintedImageIconEngine : public QIconEngine
+    {
+        public:
+            explicit UBTintedImageIconEngine(const QImage& mask)
+                : mMask(mask.convertToFormat(QImage::Format_ARGB32_Premultiplied))
+            {
+            }
+
+            void paint(QPainter* painter, const QRect& rect, QIcon::Mode mode, QIcon::State state) override
+            {
+                const qreal dpr = painter->device() ? painter->device()->devicePixelRatio() : 1.0;
+                QPixmap pm = pixmap(rect.size() * dpr, mode, state);
+                pm.setDevicePixelRatio(dpr);
+                painter->drawPixmap(rect, pm);
+            }
+
+            QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State state) override
+            {
+                if (size.isEmpty() || mMask.isNull())
+                    return QPixmap();
+
+                const QColor color = UBGlassIconTint::color(mode, state);
+                const QString key = QString("ubglassimg:%1:%2x%3:%4")
+                        .arg(mMask.cacheKey()).arg(size.width()).arg(size.height()).arg(color.rgba(), 0, 16);
+
+                QPixmap cached;
+                if (QPixmapCache::find(key, &cached))
+                    return cached;
+
+                QImage image(size, QImage::Format_ARGB32_Premultiplied);
+                image.fill(Qt::transparent);
+                {
+                    QPainter p(&image);
+                    p.setRenderHint(QPainter::SmoothPixmapTransform);
+                    QSizeF target = QSizeF(mMask.size());
+                    target.scale(QSizeF(size), Qt::KeepAspectRatio);
+                    p.drawImage(QRectF((size.width() - target.width()) / 2.0, (size.height() - target.height()) / 2.0,
+                                       target.width(), target.height()), mMask);
+                    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+                    p.fillRect(image.rect(), color);
+                }
+
+                cached = QPixmap::fromImage(image);
+                QPixmapCache::insert(key, cached);
+                return cached;
+            }
+
+            QIconEngine* clone() const override
+            {
+                return new UBTintedImageIconEngine(mMask);
+            }
+
+            QString key() const override
+            {
+                return QStringLiteral("UBTintedImageIconEngine");
+            }
+
+        private:
+            QImage mMask;
+    };
+
+    /**
+     * Application wide event filter: before a widget paints, remember the
+     * material of the glass panel it belongs to, so that the tinted icons
+     * use the right colour on light and on dark glass.
+     */
+    class UBGlassMaterialTracker : public QObject
+    {
+        public:
+            using QObject::QObject;
+
+            bool eventFilter(QObject* watched, QEvent* event) override
+            {
+                if (event->type() == QEvent::Paint && watched->isWidgetType())
+                {
+                    int material = -1;
+
+                    for (QWidget* w = static_cast<QWidget*>(watched); w; w = w->parentWidget())
+                    {
+                        const QVariant value = w->property("glassOnDark");
+
+                        if (value.isValid())
+                        {
+                            material = value.toBool() ? 1 : 0;
+                            break;
+                        }
+
+                        if (w->isWindow())
+                            break;
+                    }
+
+                    sPaintMaterial = material;
+                }
+
+                return false;
+            }
+    };
+
+    /** mask of the rim band of a glass body, opaque at the edge fading out inwards (cached) */
+    QImage rimMask(const QSize& pixelSize, qreal radius, qreal band, qreal dpr)
+    {
+        const QString key = QString("%1x%2:%3:%4:%5").arg(pixelSize.width()).arg(pixelSize.height())
+                .arg(radius).arg(band).arg(dpr);
+
+        static QHash<QString, QImage> cache;
+
+        auto it = cache.constFind(key);
+        if (it != cache.constEnd())
+            return it.value();
+
+        if (cache.size() > 24)
+            cache.clear();
+
+        const QRectF body(0, 0, pixelSize.width() / dpr, pixelSize.height() / dpr);
+
+        QImage mask(pixelSize, QImage::Format_ARGB32_Premultiplied);
+        mask.fill(Qt::transparent);
+
+        QImage inner(pixelSize, QImage::Format_ARGB32_Premultiplied);
+        inner.fill(Qt::transparent);
+        {
+            QPainter p(&inner);
+            p.setRenderHint(QPainter::Antialiasing);
+            p.scale(dpr, dpr);
+            const qreal inset = qMin(band, qMin(body.width(), body.height()) / 2.0 - 1.0);
+            p.fillPath(UBGlassStyle::roundedPath(body.adjusted(inset, inset, -inset, -inset), qMax(0.0, radius - inset)), Qt::black);
+        }
+        UBGlassStyle::blur(inner, qRound(band * 0.9 * dpr));
+
+        {
+            QPainter p(&mask);
+            p.setRenderHint(QPainter::Antialiasing);
+            p.scale(dpr, dpr);
+            p.fillPath(UBGlassStyle::roundedPath(body, radius), Qt::black);
+            p.resetTransform();
+            p.setCompositionMode(QPainter::CompositionMode_DestinationOut);
+            p.drawImage(0, 0, inner);
+        }
+
+        cache.insert(key, mask);
+        return mask;
     }
 
     /**
@@ -124,13 +293,7 @@ namespace
         private:
             static QColor tint(QIcon::Mode mode, QIcon::State state)
             {
-                if (mode == QIcon::Disabled)
-                    return withAlpha(UBGlassStyle::foreground(), 0.28);
-
-                if (state == QIcon::On)
-                    return QColor(Qt::white);
-
-                return withAlpha(UBGlassStyle::foreground(), 0.86);
+                return UBGlassIconTint::color(mode, state);
             }
 
             QString mPath;
@@ -225,7 +388,56 @@ QColor UBGlassStyle::accent()
 
 QColor UBGlassStyle::foreground()
 {
-    return isDark() ? QColor(242, 242, 247) : QColor(28, 28, 30);
+    return foreground(isDark());
+}
+
+
+QColor UBGlassStyle::foreground(bool onDarkMaterial)
+{
+    return onDarkMaterial ? QColor(255, 255, 255) : QColor(22, 22, 26);
+}
+
+
+void UBGlassStyle::setPanelMaterial(QWidget* panel, bool onDarkMaterial)
+{
+    if (!panel)
+        return;
+
+    const QVariant current = panel->property("glassOnDark");
+
+    if (current.isValid() && current.toBool() == onDarkMaterial)
+        return;
+
+    panel->setProperty("glassOnDark", onDarkMaterial);
+
+    // descendant selectors of the stylesheet depend on the property: polish again
+    QList<QWidget*> widgets = panel->findChildren<QWidget*>();
+    widgets.prepend(panel);
+
+    for (QWidget* widget : std::as_const(widgets))
+    {
+        widget->style()->unpolish(widget);
+        widget->style()->polish(widget);
+        widget->update();
+    }
+}
+
+
+void UBGlassStyle::installMaterialTracker()
+{
+    static bool installed = false;
+
+    if (installed || !qApp)
+        return;
+
+    installed = true;
+    qApp->installEventFilter(new UBGlassMaterialTracker(qApp));
+}
+
+
+int UBGlassStyle::currentPaintMaterial()
+{
+    return sPaintMaterial;
 }
 
 
@@ -238,80 +450,148 @@ QPainterPath UBGlassStyle::roundedPath(const QRectF& rect, qreal radius)
 }
 
 
-void UBGlassStyle::paintGlass(QPainter* painter, const QRectF& body, qreal radius, const QImage& backdrop)
+void UBGlassStyle::paintGlass(QPainter* painter, const QRectF& body, qreal radius)
+{
+    paintGlass(painter, body, radius, UBGlassBackdrop(), isDark());
+}
+
+
+void UBGlassStyle::paintGlass(QPainter* painter, const QRectF& body, qreal radius,
+                              const UBGlassBackdrop& backdrop, bool onDark)
 {
     if (body.isEmpty())
         return;
 
-    const bool dark = isDark();
-    const bool hasBackdrop = !backdrop.isNull();
-    const QPainterPath path = roundedPath(body, radius);
-    const qreal r = qMin(radius, qMin(body.width(), body.height()) / 2.0);
+    const qreal r = qMax<qreal>(0.0, qMin(radius, qMin(body.width(), body.height()) / 2.0));
+    const QPainterPath path = roundedPath(body, r);
+    const bool hasBackdrop = backdrop.isValid();
+    const qreal dpr = painter->device() ? painter->device()->devicePixelRatioF() : 1.0;
 
     painter->save();
     painter->setRenderHint(QPainter::Antialiasing);
     painter->setRenderHint(QPainter::SmoothPixmapTransform);
     painter->setPen(Qt::NoPen);
+    painter->setClipPath(path, Qt::IntersectClip);
 
-    // 1. the blurred content behind the panel
     if (hasBackdrop)
     {
-        painter->save();
-        painter->setClipPath(path);
-        painter->drawImage(body, backdrop);
-        painter->restore();
+        // 1. the blurred, slightly saturated content behind the panel
+        painter->drawImage(backdrop.rect, backdrop.blurred);
+
+        // 2. lensing: along the rim the glass bends the content, the rim shows
+        //    content from a little further outside, less blurred, like thick glass
+        if (!backdrop.lens.isNull())
+        {
+            const qreal band = qMin<qreal>(14.0, qMin(body.width(), body.height()) / 2.0);
+            const qreal displacement = qMin<qreal>(10.0, band * 0.75);
+            const QSize pixelSize = (body.size() * dpr).toSize();
+
+            if (!pixelSize.isEmpty())
+            {
+                QImage lens(pixelSize, QImage::Format_ARGB32_Premultiplied);
+                lens.fill(Qt::transparent);
+                {
+                    QPainter lp(&lens);
+                    lp.setRenderHint(QPainter::SmoothPixmapTransform);
+                    lp.scale(dpr, dpr);
+                    lp.translate(-body.topLeft());
+
+                    // shrink the backdrop around the centre of the body: a point on the
+                    // edge of the body shows the content 'displacement' pixels outside
+                    const QPointF c = body.center();
+                    const qreal sx = body.width() / (body.width() + 2.0 * displacement);
+                    const qreal sy = body.height() / (body.height() + 2.0 * displacement);
+                    const QRectF source = backdrop.rect;
+                    const QRectF target(c.x() + (source.left() - c.x()) * sx, c.y() + (source.top() - c.y()) * sy,
+                                        source.width() * sx, source.height() * sy);
+                    lp.drawImage(target, backdrop.lens);
+
+                    lp.resetTransform();
+                    lp.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+                    lp.drawImage(0, 0, rimMask(pixelSize, r, band, dpr));
+                }
+
+                painter->drawImage(body, lens);
+            }
+        }
     }
 
-    // 2. translucent tint with a subtle vertical gradient
+    // 3. luminosity: the light material brightens, the dark material darkens the content
     QLinearGradient tint(body.topLeft(), body.bottomLeft());
 
-    if (dark)
+    if (onDark)
     {
-        tint.setColorAt(0.0, QColor(60, 60, 66, hasBackdrop ? 175 : 228));
-        tint.setColorAt(1.0, QColor(34, 34, 40, hasBackdrop ? 195 : 238));
+        // a dark grey rather than black: over black content the glass still reads as a surface
+        const QColor base = hasBackdrop ? QColor(46, 46, 52) : QColor(30, 30, 34);
+        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.34 : 0.52));
+        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.40 : 0.62));
     }
     else
     {
-        tint.setColorAt(0.0, QColor(255, 255, 255, hasBackdrop ? 165 : 232));
-        tint.setColorAt(1.0, QColor(244, 246, 250, hasBackdrop ? 125 : 222));
+        const QColor base = hasBackdrop ? QColor(255, 255, 255) : QColor(250, 250, 252);
+        tint.setColorAt(0.0, withAlpha(base, hasBackdrop ? 0.38 : 0.62));
+        tint.setColorAt(1.0, withAlpha(base, hasBackdrop ? 0.28 : 0.54));
     }
 
     painter->fillPath(path, tint);
 
-    // 3. specular sheen on the upper part, like light caught by curved glass
-    const qreal sheenHeight = qMin(body.height() * 0.55, 34.0);
-    QLinearGradient sheen(body.topLeft(), body.topLeft() + QPointF(0, sheenHeight));
-    sheen.setColorAt(0.0, QColor(255, 255, 255, dark ? 30 : 110));
-    sheen.setColorAt(1.0, QColor(255, 255, 255, 0));
-    painter->fillPath(path, sheen);
+    // 4. specular highlight: light caught by the curved upper surface
+    const qreal specularHeight = qMax<qreal>(8.0, body.height() * 0.35);
+    QLinearGradient specular(body.topLeft(), body.topLeft() + QPointF(0, specularHeight));
+    specular.setColorAt(0.0, QColor(255, 255, 255, onDark ? 40 : 70));
+    specular.setColorAt(0.55, QColor(255, 255, 255, onDark ? 12 : 22));
+    specular.setColorAt(1.0, QColor(255, 255, 255, 0));
+    painter->fillRect(QRectF(body.left(), body.top(), body.width(), specularHeight), specular);
 
-    // 4. outer hairline
+    // small bright streak near the top left, where the light enters
+    {
+        const qreal streakWidth = qMin<qreal>(body.width() * 0.22, 90.0);
+        const qreal streakHeight = qMin<qreal>(body.height() * 0.16, 9.0);
+        const QPointF centre(body.left() + qMax<qreal>(r * 0.85, 14.0) + streakWidth * 0.35, body.top() + streakHeight * 0.55);
+
+        painter->save();
+        painter->translate(centre);
+        painter->scale(streakWidth, streakHeight);
+        QRadialGradient streak(QPointF(0, 0), 1.0);
+        streak.setColorAt(0.0, QColor(255, 255, 255, onDark ? 70 : 130));
+        streak.setColorAt(1.0, QColor(255, 255, 255, 0));
+        painter->setBrush(streak);
+        painter->drawEllipse(QPointF(0, 0), 1.0, 1.0);
+        painter->restore();
+    }
+
+    // 5. faint inner shadow along the lower edge
+    const qreal shadowHeight = qMin<qreal>(body.height() * 0.25, 16.0);
+    QLinearGradient innerShadow(body.bottomLeft(), body.bottomLeft() - QPointF(0, shadowHeight));
+    innerShadow.setColorAt(0.0, QColor(0, 0, 0, onDark ? 46 : 18));
+    innerShadow.setColorAt(1.0, QColor(0, 0, 0, 0));
+    painter->fillRect(QRectF(body.left(), body.bottom() - shadowHeight, body.width(), shadowHeight), innerShadow);
+
+    painter->restore();
+
+    // 6. contours: a darker outer line and a bright inner rim, brightest where the light comes from
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
     painter->setBrush(Qt::NoBrush);
-    painter->setPen(QPen(dark ? QColor(0, 0, 0, 120) : QColor(0, 0, 0, 30), 1.0));
-    painter->drawPath(roundedPath(body.adjusted(0.5, 0.5, -0.5, -0.5), r - 0.5));
 
-    // 5. inner refraction highlight: lighter top-left, darker bottom-right
+    painter->setPen(QPen(QColor(0, 0, 0, onDark ? 52 : 26), 1.0));
+    painter->drawPath(roundedPath(body.adjusted(0.5, 0.5, -0.5, -0.5), qMax(0.0, r - 0.5)));
+
+    const qreal hi = onDark ? 0.42 : 0.62;
+    const qreal lo = onDark ? 0.10 : 0.30;
     QLinearGradient rim(body.topLeft(), body.bottomRight());
-    if (dark)
-    {
-        rim.setColorAt(0.0, QColor(255, 255, 255, 95));
-        rim.setColorAt(0.45, QColor(255, 255, 255, 18));
-        rim.setColorAt(1.0, QColor(255, 255, 255, 40));
-    }
-    else
-    {
-        rim.setColorAt(0.0, QColor(255, 255, 255, 250));
-        rim.setColorAt(0.5, QColor(255, 255, 255, 120));
-        rim.setColorAt(1.0, QColor(0, 0, 0, 22));
-    }
-    painter->setPen(QPen(QBrush(rim), 1.2));
-    painter->drawPath(roundedPath(body.adjusted(1.4, 1.4, -1.4, -1.4), r - 1.4));
+    rim.setColorAt(0.0, QColor(255, 255, 255, qRound(255 * hi)));
+    rim.setColorAt(0.35, QColor(255, 255, 255, qRound(255 * lo)));
+    rim.setColorAt(0.7, QColor(255, 255, 255, qRound(255 * lo * 0.8)));
+    rim.setColorAt(1.0, QColor(255, 255, 255, qRound(255 * hi * 0.7)));
+    painter->setPen(QPen(QBrush(rim), 1.0));
+    painter->drawPath(roundedPath(body.adjusted(1.5, 1.5, -1.5, -1.5), qMax(0.0, r - 1.5)));
 
     painter->restore();
 }
 
 
-QImage UBGlassStyle::shadowImage(const QSize& outerSize, const QRectF& body, qreal radius, qreal dpr)
+QImage UBGlassStyle::shadowImage(const QSize& outerSize, const QRectF& body, qreal radius, qreal dpr, bool onDark)
 {
     QImage image(outerSize * dpr, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
@@ -319,35 +599,33 @@ QImage UBGlassStyle::shadowImage(const QSize& outerSize, const QRectF& body, qre
     if (body.isEmpty())
         return image;
 
-    const bool dark = isDark();
     const qreal margin = qMin(qMin(body.left(), body.top()),
                               qMin(outerSize.width() - body.right(), outerSize.height() - body.bottom()));
 
-    if (margin >= 2)
+    if (margin >= 4)
     {
-        // soft ambient shadow, slightly offset downwards
-        QImage soft(image.size(), QImage::Format_ARGB32_Premultiplied);
-        soft.fill(Qt::transparent);
-        {
-            QPainter p(&soft);
-            p.setRenderHint(QPainter::Antialiasing);
-            p.scale(dpr, dpr);
-            const qreal inset = margin * 0.35;
-            p.fillPath(roundedPath(body.adjusted(inset, inset + margin * 0.25, -inset, -inset + margin * 0.3), radius),
-                       QColor(0, 0, 0, dark ? 150 : 70));
-        }
-        blur(soft, qMax(1, qRound(margin * 0.45 * dpr)));
+        // soft depth shadow below the glass, slightly offset downwards
+        // the shadow must fade out inside the margin of the widget
+        const qreal offset = qMin<qreal>(4.0, margin * 0.25);
+        const qreal blurRadius = qMin<qreal>(18.0, (margin - offset) * 0.75);
 
-        QPainter p(&image);
-        p.drawImage(0, 0, soft);
-    }
-
-    {
-        // crisp contact shadow
         QPainter p(&image);
         p.setRenderHint(QPainter::Antialiasing);
         p.scale(dpr, dpr);
-        p.fillPath(roundedPath(body.adjusted(-0.5, 0.0, 0.5, 1.2), radius + 0.5), QColor(0, 0, 0, dark ? 70 : 22));
+        p.fillPath(roundedPath(body.translated(0, offset).adjusted(2, 2, -2, -1), radius),
+                   QColor(0, 0, 0, onDark ? 120 : 70));
+        p.end();
+
+        blur(image, qMax(1, qRound(blurRadius * dpr)));
+    }
+
+    {
+        QPainter p(&image);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.scale(dpr, dpr);
+
+        // crisp contact shadow
+        p.fillPath(roundedPath(body.adjusted(-0.5, 0.0, 0.5, 1.0), radius + 0.5), QColor(0, 0, 0, onDark ? 60 : 20));
 
         // no shadow under the translucent body itself
         p.setCompositionMode(QPainter::CompositionMode_DestinationOut);
@@ -378,21 +656,85 @@ void UBGlassStyle::blur(QImage& image, int radius)
 }
 
 
-QImage UBGlassStyle::blurredBackdrop(const QImage& source, int blurRadius)
+QImage UBGlassStyle::blurredBackdrop(const QImage& source, int blurRadius, int factor, qreal saturation)
 {
     if (source.isNull())
         return QImage();
 
-    // blur at a quarter of the resolution, the upscaling when painting smooths further
-    const int factor = 4;
+    factor = qMax(1, factor);
+
+    // blur at a reduced resolution, the smooth upscaling when painting softens further
     const QSize smallSize(qMax(1, source.width() / factor), qMax(1, source.height() / factor));
     QImage small = source.scaled(smallSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation)
             .convertToFormat(QImage::Format_ARGB32_Premultiplied);
     small.setDevicePixelRatio(1.0);
 
-    blur(small, qMax(1, blurRadius / factor * 2));
+    blur(small, qMax(1, qRound(2.0 * blurRadius / factor)));
+
+    if (!qFuzzyCompare(saturation, 1.0))
+    {
+        // boost the colours a little, like the glass material does
+        for (int y = 0; y < small.height(); ++y)
+        {
+            QRgb* row = reinterpret_cast<QRgb*>(small.scanLine(y));
+
+            for (int x = 0; x < small.width(); ++x)
+            {
+                const QRgb p = row[x];
+                const int a = qAlpha(p);
+
+                if (a == 0)
+                    continue;
+
+                const qreal grey = 0.2126 * qRed(p) + 0.7152 * qGreen(p) + 0.0722 * qBlue(p);
+                auto boost = [&](int c) {
+                    return qBound(0, qRound(grey + (c - grey) * saturation), a);
+                };
+
+                row[x] = qRgba(boost(qRed(p)), boost(qGreen(p)), boost(qBlue(p)), a);
+            }
+        }
+    }
 
     return small;
+}
+
+
+qreal UBGlassStyle::meanLuminance(const QImage& source, qreal* coverage)
+{
+    if (source.isNull())
+    {
+        if (coverage)
+            *coverage = 0.0;
+        return 0.5;
+    }
+
+    const QImage image = source.format() == QImage::Format_ARGB32_Premultiplied
+            ? source : source.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+
+    double lum = 0.0;
+    double alpha = 0.0;
+    const int step = qMax(1, qMin(image.width(), image.height()) / 24);
+
+    for (int y = 0; y < image.height(); y += step)
+    {
+        const QRgb* row = reinterpret_cast<const QRgb*>(image.constScanLine(y));
+
+        for (int x = 0; x < image.width(); x += step)
+        {
+            const QRgb p = row[x];
+            // premultiplied: the colour channels already include the alpha
+            lum += (0.2126 * qRed(p) + 0.7152 * qGreen(p) + 0.0722 * qBlue(p)) / 255.0;
+            alpha += qAlpha(p) / 255.0;
+        }
+    }
+
+    const int samples = ((image.height() + step - 1) / step) * ((image.width() + step - 1) / step);
+
+    if (coverage)
+        *coverage = samples > 0 ? alpha / samples : 0.0;
+
+    return alpha > 0.0 ? lum / alpha : 0.5;
 }
 
 
@@ -405,6 +747,12 @@ QIcon UBGlassStyle::icon(const QString& name)
 QIcon UBGlassStyle::tintedSvgIcon(const QString& path)
 {
     return QIcon(new UBTintedSvgIconEngine(path));
+}
+
+
+QIcon UBGlassStyle::tintedImageIcon(const QImage& mask)
+{
+    return QIcon(new UBTintedImageIconEngine(mask));
 }
 
 
@@ -644,19 +992,6 @@ QToolBar#documentToolBar QToolButton:disabled
     color: @FGDISABLED@;
 }
 
-/* macOS: the native vibrancy view of UBGlassEffect shows through the top bar */
-QMainWindow[ubGlassVibrancy="true"]
-{
-    background: transparent;
-}
-
-QMainWindow[ubGlassVibrancy="true"] QToolBar#boardToolBar,
-QMainWindow[ubGlassVibrancy="true"] QToolBar#webToolBar,
-QMainWindow[ubGlassVibrancy="true"] QToolBar#documentToolBar
-{
-    background: transparent;
-}
-
 QToolBar QToolButton#ubButtonMenu
 {
     padding-right: 14px;
@@ -670,184 +1005,13 @@ QToolBar QToolButton#ubButtonMenu::menu-indicator
     bottom: 6px;
 }
 
-/* ---------- floating glass palettes ---------- */
-
-UBActionPaletteButton,
-QToolButton#glassButton
-{
-    color: @FG@;
-    background: transparent;
-    border: none;
-    border-radius: 12px;
-    padding: 3px;
-    margin: 0px;
-    font-weight: 600;
-}
-
-UBActionPaletteButton:hover,
-QToolButton#glassButton:hover
-{
-    background: @HOVER@;
-}
-
-UBActionPaletteButton:pressed,
-QToolButton#glassButton:pressed
-{
-    background: @PRESSED@;
-}
-
-UBActionPaletteButton:checked,
-QToolButton#glassButton:checked
-{
-    background: @ACCENT@;
-    color: #ffffff;
-}
-
-UBActionPaletteButton:checked:pressed,
-QToolButton#glassButton:checked:pressed
-{
-    background: @ACCENTPRESSED@;
-}
-
-UBActionPaletteButton:disabled,
-QToolButton#glassButton:disabled
-{
-    color: @FGDISABLED@;
-    background: transparent;
-}
-
-UBFloatingPalette QStackedWidget,
-UBFloatingPalette QStackedWidget > QWidget,
-UBFloatingPalette QWidget#shapeToolWidget,
-UBFloatingPalette QSlider,
-UBFloatingPalette QAbstractScrollArea,
-UBFloatingPalette QAbstractScrollArea > QWidget#qt_scrollarea_viewport,
-UBFloatingPalette QAbstractScrollArea > QWidget#qt_scrollarea_viewport > QWidget,
-#BackgroundPaletteScrollArea,
-#BackgroundPaletteScrollArea QWidget
+/* glass palettes paint their own background */
+#DesktopPropertyPalette,
+#AddItemPalette,
+#BackgroundPalette,
+#MathPalette
 {
     background: transparent;
-    border: none;
-}
-
-UBFloatingPalette QSlider::groove:horizontal
-{
-    height: 4px;
-    margin: 0px;
-    border: none;
-    border-radius: 2px;
-    background: @TRACK@;
-}
-
-UBFloatingPalette QSlider::sub-page:horizontal
-{
-    border: none;
-    border-radius: 2px;
-    background: @ACCENT@;
-}
-
-UBFloatingPalette QSlider::add-page:horizontal
-{
-    border: none;
-    border-radius: 2px;
-    background: @TRACK@;
-}
-
-UBFloatingPalette QSlider::handle:horizontal
-{
-    width: 18px;
-    height: 18px;
-    margin: -7px 0px;
-    border-radius: 9px;
-    border: 1px solid @HAIR@;
-    background: #ffffff;
-}
-
-#BackgroundPaletteScrollArea UBActionPaletteButton:hover
-{
-    background: @HOVER@;
-}
-
-#BackgroundPaletteScrollArea UBActionPaletteButton:checked
-{
-    background: @ACCENT@;
-}
-
-#BackgroundPalette QLabel,
-#BackgroundPaletteLabel,
-UBFloatingPalette QLabel
-{
-    color: @FG@;
-    background: transparent;
-}
-
-UBFloatingPalette QToolButton#closeButton,
-#BackgroundPalette QToolButton#closeButton,
-#AddItemPalette QToolButton#closeButton,
-#UBStartupHintsPalette QToolButton#closeButton
-{
-    background: @HOVER@;
-    border: none;
-    border-radius: 11px;
-    padding: 0px;
-    margin: 0px;
-    min-width: 22px;
-    max-width: 22px;
-    min-height: 22px;
-    max-height: 22px;
-}
-
-UBFloatingPalette QToolButton#closeButton:hover,
-#BackgroundPalette QToolButton#closeButton:hover,
-#AddItemPalette QToolButton#closeButton:hover,
-#UBStartupHintsPalette QToolButton#closeButton:hover
-{
-    background: @PRESSED@;
-}
-
-/* ---------- pen panel and desktop property palettes ---------- */
-
-UBPenPanel QToolButton,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupLeft,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupCenter,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupRight
-{
-    color: @FG@;
-    background: transparent;
-    border: none;
-    border-radius: 17px;
-    padding: 0px;
-    margin: 0px;
-    min-width: 34px;
-    max-width: 34px;
-    min-height: 34px;
-    max-height: 34px;
-}
-
-UBPenPanel QToolButton:hover,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupLeft:hover,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupCenter:hover,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupRight:hover
-{
-    background: @HOVER@;
-    border: none;
-}
-
-UBPenPanel QToolButton:pressed,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupLeft:pressed,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupCenter:pressed,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupRight:pressed
-{
-    background: @PRESSED@;
-}
-
-UBPenPanel QToolButton:checked,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupLeft:checked,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupCenter:checked,
-UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupRight:checked
-{
-    background: @ACCENT@;
-    color: #ffffff;
     border: none;
 }
 
@@ -856,71 +1020,6 @@ UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupCenter,
 UBToolbarButtonGroup QToolButton#desktop-ubButtonGroupRight
 {
     qproperty-iconSize: 22px 22px;
-}
-
-UBPenPanel QToolButton[colorSwatch="true"]:checked,
-QToolButton#desktop-ubButtonGroupLeft[colorSwatch="true"]:checked,
-QToolButton#desktop-ubButtonGroupCenter[colorSwatch="true"]:checked,
-QToolButton#desktop-ubButtonGroupRight[colorSwatch="true"]:checked
-{
-    background: transparent;
-    border: 3px solid @ACCENT@;
-}
-
-UBPenPanel QToolButton[colorSwatch="true"]:checked:hover,
-QToolButton#desktop-ubButtonGroupLeft[colorSwatch="true"]:checked:hover,
-QToolButton#desktop-ubButtonGroupCenter[colorSwatch="true"]:checked:hover,
-QToolButton#desktop-ubButtonGroupRight[colorSwatch="true"]:checked:hover
-{
-    background: @HOVER@;
-}
-
-QToolButton#desktop-ubButtonGroupRight[colorPaletteConfigButton="true"],
-QToolButton#glass-ubButtonGroupRight[colorPaletteConfigButton="true"]
-{
-    background: transparent;
-    border: none;
-}
-
-QToolButton#desktop-ubButtonGroupRight[colorPaletteConfigButton="true"]:hover,
-QToolButton#glass-ubButtonGroupRight[colorPaletteConfigButton="true"]:hover
-{
-    background: @HOVER@;
-}
-
-QPushButton#zoomPaletteButton
-{
-    color: @FG@;
-    background: transparent;
-    border: none;
-    border-radius: 10px;
-    padding: 2px 6px;
-    font-size: 18px;
-    font-weight: 600;
-}
-
-QPushButton#zoomPaletteButton:hover
-{
-    background: @HOVER@;
-}
-
-/* glass palettes paint their own background */
-#DesktopPropertyPalette,
-#AddItemPalette,
-#BackgroundPalette
-{
-    background: transparent;
-    border: none;
-}
-
-UBPenPanel QFrame#glassDivider
-{
-    background: @HAIR@;
-    border: none;
-    min-width: 1px;
-    max-width: 1px;
-    margin-top: 7px;
-    margin-bottom: 7px;
 }
 
 /* ---------- popups, menus, dialogs ---------- */
@@ -1020,6 +1119,362 @@ QDialog#preferencesDialog QTabWidget::pane
     css.replace("@MENU@", rgba(menuBackground));
     css.replace("@TRACK@", rgba(withAlpha(fg, 0.18)));
     css.replace("@POPUP@", rgba(popupBackground));
+
+    // glass panels: glyphs, hover pills and fields follow the material of each panel
+    static const QString glassTemplate = QStringLiteral(R"CSS(
+/* ---------- floating glass palettes (per material, see UBGlassStyle::setPanelMaterial) ---------- */
+
+@P@ UBActionPaletteButton,
+@P@ QToolButton#glassButton,
+@P@ QToolButton#clusterButton
+{
+    color: @FG@;
+    background: transparent;
+    border: none;
+    border-radius: 20px;
+    padding: 4px;
+    margin: 0px;
+    font-weight: 600;
+}
+
+@P@ UBActionPaletteButton
+{
+    border-radius: 12px;
+}
+
+@S@ UBActionPaletteButton
+{
+    border-radius: 21px;
+}
+
+@P@ UBActionPaletteButton#glassToggle,
+@P@ UBActionPaletteButton#glassToggle:checked,
+@P@ UBActionPaletteButton#glassToggle:hover
+{
+    background: transparent;
+}
+
+@P@ QToolButton#clusterButton
+{
+    min-width: 40px;
+    min-height: 40px;
+}
+
+@P@[glassLabels="true"] QToolButton#clusterButton
+{
+    border-radius: 14px;
+    padding: 4px 4px 2px 4px;
+    min-width: 54px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+@P@ QToolButton#clusterButton::menu-indicator
+{
+    image: none;
+    width: 0px;
+}
+
+@P@ UBActionPaletteButton:hover,
+@P@ QToolButton#glassButton:hover,
+@P@ QToolButton#clusterButton:hover
+{
+    background: @HOVER@;
+}
+
+@P@ UBActionPaletteButton:pressed,
+@P@ QToolButton#glassButton:pressed,
+@P@ QToolButton#clusterButton:pressed
+{
+    background: @PRESSED@;
+}
+
+@P@ UBActionPaletteButton:checked,
+@P@ QToolButton#glassButton:checked,
+@P@ QToolButton#clusterButton:checked
+{
+    background: @ACCENT@;
+    color: #ffffff;
+}
+
+@P@ UBActionPaletteButton:checked:pressed,
+@P@ QToolButton#glassButton:checked:pressed,
+@P@ QToolButton#clusterButton:checked:pressed
+{
+    background: @ACCENTPRESSED@;
+}
+
+@P@ UBActionPaletteButton:disabled,
+@P@ QToolButton#glassButton:disabled,
+@P@ QToolButton#clusterButton:disabled
+{
+    color: @FGDISABLED@;
+    background: transparent;
+}
+
+@P@ QFrame#clusterSeparator
+{
+    background: @HAIR@;
+    border: none;
+    min-width: 1px;
+    max-width: 1px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+/* segmented capsule (maths palette tabs) */
+@P@ QFrame#glassSegmented
+{
+    background: @SEGMENT@;
+    border: none;
+    border-radius: 16px;
+}
+
+@P@ QToolButton#glassSegment
+{
+    color: @FG@;
+    background: transparent;
+    border: none;
+    border-radius: 13px;
+    padding: 4px 12px;
+    margin: 0px;
+    min-height: 18px;
+    font-weight: 600;
+}
+
+@P@ QToolButton#glassSegment:hover
+{
+    background: @HOVER@;
+}
+
+@P@ QToolButton#glassSegment:checked
+{
+    background: @SEGMENTON@;
+    color: @FG@;
+}
+
+@P@ QStackedWidget,
+@P@ QStackedWidget > QWidget,
+@P@ QWidget#shapeToolWidget,
+@P@ QSlider,
+@P@ QAbstractScrollArea,
+@P@ QAbstractScrollArea > QWidget#qt_scrollarea_viewport,
+@P@ QAbstractScrollArea > QWidget#qt_scrollarea_viewport > QWidget,
+@P@ #BackgroundPaletteScrollArea,
+@P@ #BackgroundPaletteScrollArea QWidget
+{
+    background: transparent;
+    border: none;
+}
+
+@P@ QSlider::groove:horizontal
+{
+    height: 4px;
+    margin: 0px;
+    border: none;
+    border-radius: 2px;
+    background: @TRACK@;
+}
+
+@P@ QSlider::sub-page:horizontal
+{
+    border: none;
+    border-radius: 2px;
+    background: @ACCENT@;
+}
+
+@P@ QSlider::add-page:horizontal
+{
+    border: none;
+    border-radius: 2px;
+    background: @TRACK@;
+}
+
+@P@ QSlider::handle:horizontal
+{
+    width: 18px;
+    height: 18px;
+    margin: -7px 0px;
+    border-radius: 9px;
+    border: 1px solid rgba(0, 0, 0, 40);
+    background: #ffffff;
+}
+
+@P@ QLineEdit
+{
+    color: @FG@;
+    background: @FIELD@;
+    border: 1px solid @HAIR@;
+    border-radius: 15px;
+    padding: 4px 10px;
+    min-height: 20px;
+    selection-background-color: @ACCENT@;
+    selection-color: #ffffff;
+}
+
+@P@ QLineEdit:focus
+{
+    border: 1px solid @ACCENT@;
+}
+
+@P@ QLabel,
+@P@ #BackgroundPalette QLabel,
+@P@ #BackgroundPaletteLabel,
+@P@ #UBStartupHintsPalette QCheckBox
+{
+    color: @FG@;
+    background: transparent;
+}
+
+@P@ QLabel#glassHint
+{
+    color: @FGSECONDARY@;
+    font-size: 11px;
+}
+
+@P@ QCheckBox
+{
+    color: @FG@;
+    background: transparent;
+}
+
+@P@ QToolButton#closeButton,
+@P@#BackgroundPalette QToolButton#closeButton,
+@P@#AddItemPalette QToolButton#closeButton,
+@P@#UBStartupHintsPalette QToolButton#closeButton
+{
+    background: @HOVER@;
+    border: none;
+    border-radius: 11px;
+    padding: 0px;
+    margin: 0px;
+    min-width: 22px;
+    max-width: 22px;
+    min-height: 22px;
+    max-height: 22px;
+}
+
+@P@ QToolButton#closeButton:hover,
+@P@#BackgroundPalette QToolButton#closeButton:hover,
+@P@#AddItemPalette QToolButton#closeButton:hover,
+@P@#UBStartupHintsPalette QToolButton#closeButton:hover
+{
+    background: @PRESSED@;
+}
+
+/* pen panel and desktop property palettes */
+
+@P@ UBToolbarButtonGroup QToolButton,
+@P@ QToolButton#glass-shapeFill
+{
+    color: @FG@;
+    background: transparent;
+    border: none;
+    border-radius: 18px;
+    padding: 0px;
+    margin: 0px;
+    min-width: 36px;
+    max-width: 36px;
+    min-height: 36px;
+    max-height: 36px;
+}
+
+@P@ UBToolbarButtonGroup QToolButton:hover,
+@P@ QToolButton#glass-shapeFill:hover
+{
+    background: @HOVER@;
+}
+
+@P@ UBToolbarButtonGroup QToolButton:pressed,
+@P@ QToolButton#glass-shapeFill:pressed
+{
+    background: @PRESSED@;
+}
+
+@P@ UBToolbarButtonGroup QToolButton:checked,
+@P@ QToolButton#glass-shapeFill:checked
+{
+    background: @ACCENT@;
+    color: #ffffff;
+}
+
+@P@ UBToolbarButtonGroup QToolButton[colorSwatch="true"]
+{
+    border: 2px solid transparent;
+    border-radius: 18px;
+}
+
+@P@ UBToolbarButtonGroup QToolButton[colorSwatch="true"]:checked
+{
+    background: transparent;
+    border: 2px solid @RING@;
+}
+
+@P@ UBToolbarButtonGroup QToolButton[colorSwatch="true"]:checked:hover
+{
+    background: @HOVER@;
+}
+
+@P@ UBToolbarButtonGroup QToolButton[colorPaletteConfigButton="true"]
+{
+    background: transparent;
+    border: none;
+}
+
+@P@ UBToolbarButtonGroup QToolButton[colorPaletteConfigButton="true"]:hover
+{
+    background: @HOVER@;
+}
+
+@P@ QFrame#glassDivider
+{
+    background: @HAIR@;
+    border: none;
+    min-width: 1px;
+    max-width: 1px;
+    margin-top: 9px;
+    margin-bottom: 9px;
+}
+
+@P@ QPushButton#zoomPaletteButton
+{
+    color: @FG@;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+@P@ QPushButton#zoomPaletteButton:hover
+{
+    background: @HOVER@;
+}
+
+)CSS");
+
+    for (const bool onDark : {false, true})
+    {
+        const QColor gfg = foreground(onDark);
+        QString block = glassTemplate;
+        block.replace("@S@", QString("UBStylusPalette[glassOnDark=\"%1\"]").arg(onDark ? "true" : "false"));
+        block.replace("@P@", QString("UBFloatingPalette[glassOnDark=\"%1\"]").arg(onDark ? "true" : "false"));
+        block.replace("@FGDISABLED@", rgba(withAlpha(gfg, 0.30)));
+        block.replace("@FGSECONDARY@", rgba(withAlpha(gfg, 0.62)));
+        block.replace("@FG@", rgba(gfg));
+        block.replace("@HOVER@", rgba(onDark ? QColor(255, 255, 255, 36) : QColor(0, 0, 0, 20)));
+        block.replace("@PRESSED@", rgba(onDark ? QColor(255, 255, 255, 62) : QColor(0, 0, 0, 40)));
+        block.replace("@HAIR@", rgba(onDark ? QColor(255, 255, 255, 46) : QColor(0, 0, 0, 34)));
+        block.replace("@TRACK@", rgba(onDark ? QColor(255, 255, 255, 60) : QColor(0, 0, 0, 40)));
+        block.replace("@FIELD@", rgba(onDark ? QColor(0, 0, 0, 56) : QColor(255, 255, 255, 140)));
+        block.replace("@SEGMENTON@", rgba(onDark ? QColor(255, 255, 255, 64) : QColor(255, 255, 255, 235)));
+        block.replace("@SEGMENT@", rgba(onDark ? QColor(0, 0, 0, 50) : QColor(0, 0, 0, 22)));
+        block.replace("@RING@", rgba(onDark ? QColor(255, 255, 255) : accentColor));
+        block.replace("@ACCENTPRESSED@", rgba(accentPressed));
+        block.replace("@ACCENT@", rgba(accentColor));
+        css += block;
+    }
 
     return css;
 }

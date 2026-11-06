@@ -31,13 +31,39 @@
 class QPainter;
 class QPainterPath;
 class QToolBar;
+class QWidget;
 class UBMainWindow;
 
 /**
- * Shared look of the "Liquid Glass" user interface: colours, glass panel
- * painting (tint, refraction highlight, shadow), a fast blur for the
- * backdrop of floating panels, theme-tinted monochrome SVG icons and the
- * application stylesheet layer for the glass controls.
+ * Images of the content behind a glass panel, in the coordinates of the
+ * panel (rect). blurred is the heavily blurred and slightly saturated
+ * backdrop (low resolution), lens a lightly blurred copy used for the
+ * refraction along the rim. luminance is the mean luminance (0..1) of the
+ * backdrop under the body, coverage the share of opaque content (0..1).
+ */
+struct UBGlassBackdrop
+{
+    QImage blurred;
+    QImage lens;
+    QRectF rect;
+    qreal luminance = 0.5;
+    qreal coverage = 0.0;
+
+    bool isValid() const { return !blurred.isNull() && !rect.isEmpty(); }
+};
+
+/**
+ * Shared look of the "Liquid Glass" user interface: colours, painted glass
+ * (blurred and saturated backdrop, adaptive light / dark material, lensing
+ * rim, specular highlight, contours and depth shadow), a fast blur, tinted
+ * monochrome SVG icons and the application stylesheet layer.
+ *
+ * Glass adapts to the content below it: over light content the light
+ * material (white tint, dark glyphs) is used, over dark content the dark
+ * material (black tint, white glyphs), independently of the application
+ * theme. A glass panel publishes the material it uses in the dynamic
+ * property "glassOnDark" (true: dark material, white glyphs); the stylesheet
+ * and the icon engines follow that property for everything inside the panel.
  */
 class UBGlassStyle
 {
@@ -47,37 +73,59 @@ class UBGlassStyle
         /** accent colour used for checked controls (system highlight) */
         static QColor accent();
 
-        /** colour of monochrome icons and text on glass */
+        /** colour of monochrome icons and text on glass of the application theme */
         static QColor foreground();
 
+        /** colour of monochrome icons and text on the given material */
+        static QColor foreground(bool onDarkMaterial);
+
         /** standard metrics */
-        static constexpr int panelRadius = 20;
-        static constexpr int buttonSize = 38;
+        static constexpr int panelRadius = 26;
+        static constexpr int buttonSize = 40;
+        static constexpr int iconSize = 22;
         static constexpr int spacing = 8;
+        /** room around a panel body for the drop shadow */
+        static constexpr int shadowMargin = 14;
 
         /**
-         * Paint a glass panel body. backdrop is the blurred content behind
-         * the body (may be null, then a more opaque tint is used).
+         * Paint a glass panel body. When backdrop is valid the blurred content
+         * is drawn with lensing along the rim, otherwise only a translucent tint
+         * (the content behind the widget shows through). onDarkMaterial selects
+         * the dark (true) or the light material.
          */
-        static void paintGlass(QPainter* painter, const QRectF& body, qreal radius, const QImage& backdrop);
+        static void paintGlass(QPainter* painter, const QRectF& body, qreal radius,
+                               const UBGlassBackdrop& backdrop, bool onDarkMaterial);
 
-        /** soft drop shadow image for a body of the given size placed with margin in an image of outer size */
-        static QImage shadowImage(const QSize& outerSize, const QRectF& body, qreal radius, qreal dpr);
+        /** compatibility helper: glass without backdrop in the material of the theme */
+        static void paintGlass(QPainter* painter, const QRectF& body, qreal radius);
 
-        /** blur an image in place (stack blur approximation, three box passes) */
+        /** soft drop shadow image for a body placed in an image of outer size */
+        static QImage shadowImage(const QSize& outerSize, const QRectF& body, qreal radius, qreal dpr, bool onDarkMaterial);
+
+        /** blur an image in place (gaussian approximation, three box passes) */
         static void blur(QImage& image, int radius);
 
-        /** reduced resolution blurred copy of an image (used for the backdrop) */
-        static QImage blurredBackdrop(const QImage& source, int blurRadius);
+        /**
+         * Blurred backdrop at reduced resolution: the source is scaled down by
+         * factor, blurred with blurRadius (in source pixels) and its saturation
+         * multiplied by saturation.
+         */
+        static QImage blurredBackdrop(const QImage& source, int blurRadius, int factor = 4, qreal saturation = 1.2);
+
+        /** mean luminance (0..1) of an image weighted by alpha, coverage receives the mean alpha */
+        static qreal meanLuminance(const QImage& image, qreal* coverage = nullptr);
 
         /** stylesheet layer for the glass controls */
         static QString styleSheet(bool dark);
 
-        /** monochrome SVG icon from :/images/glass/<name>.svg, tinted with the theme colours */
+        /** monochrome SVG icon from :/images/glass/<name>.svg, tinted with the colours of the glass below */
         static QIcon icon(const QString& name);
 
         /** tinted icon from any monochrome SVG resource path */
         static QIcon tintedSvgIcon(const QString& path);
+
+        /** tinted icon from a monochrome image (only its alpha channel is used) */
+        static QIcon tintedImageIcon(const QImage& mask);
 
         /** round colour swatch icon */
         static QIcon swatchIcon(const QColor& color);
@@ -89,6 +137,21 @@ class UBGlassStyle
 
         /** tell the stylesheet whether the buttons of a toolbar show their text under the icon */
         static void setToolBarTextMode(QToolBar* toolBar, bool textUnderIcon);
+
+        /**
+         * Publish the material of a glass panel (property "glassOnDark") and
+         * re-polish its content when it changes.
+         */
+        static void setPanelMaterial(QWidget* panel, bool onDarkMaterial);
+
+        /**
+         * Install the application wide paint tracker that lets the tinted icons
+         * follow the material of the glass panel they are painted on.
+         */
+        static void installMaterialTracker();
+
+        /** material of the widget currently being painted (-1 when not on glass) */
+        static int currentPaintMaterial();
 };
 
 #endif /* UBGLASSSTYLE_H_ */

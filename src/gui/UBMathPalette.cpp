@@ -20,6 +20,7 @@
 #include "UBMathPalette.h"
 
 #include <QButtonGroup>
+#include <QFrame>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -37,14 +38,15 @@
 #include "core/UBApplication.h"
 #include "core/UBSettings.h"
 #include "gui/UBInkWriter.h"
+#include "gui/UBGlassStyle.h"
 
 #include "core/memcheck.h"
 
 namespace
 {
     const int sColumns = 10;
-    const int sButtonSize = 44;
-    const int sIconSize = 40;
+    const int sButtonSize = 36;
+    const int sIconSize = 30;
 }
 
 UBMathPalette::UBMathPalette(QWidget* parent)
@@ -61,16 +63,23 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     connect(mWriter, &UBInkWriter::placementStarted, this, &UBMathPalette::placementStarted);
     connect(mWriter, &UBInkWriter::placementFinished, this, &UBMathPalette::placementFinished);
 
+    const int b = border();
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(sLayoutContentMargin, sLayoutContentMargin / 2 + 2,
-                                   sLayoutContentMargin, sLayoutContentMargin);
+    mainLayout->setContentsMargins(b + 12, b + 8, b + 12, b + 10);
     mainLayout->setSpacing(8);
 
-    // tab row, with room for the close button of the floating palette (top left corner)
-    QHBoxLayout* tabLayout = new QHBoxLayout();
-    tabLayout->setContentsMargins(0, 0, 0, 0);
-    tabLayout->setSpacing(4);
-    tabLayout->addSpacing(closeButtonMargin() + 28 - sLayoutContentMargin + 4);
+    // tab row: a segmented capsule, with room for the close button of the floating palette (top left corner)
+    QHBoxLayout* tabRow = new QHBoxLayout();
+    tabRow->setContentsMargins(0, 0, 0, 0);
+    tabRow->setSpacing(0);
+    tabRow->addSpacing(closeButtonMargin() + 22 + 8 - (b + 12));
+
+    QFrame* segmented = new QFrame(this);
+    segmented->setObjectName("glassSegmented");
+    QHBoxLayout* tabLayout = new QHBoxLayout(segmented);
+    tabLayout->setContentsMargins(3, 3, 3, 3);
+    tabLayout->setSpacing(2);
+    tabRow->addWidget(segmented);
 
     mPageButtons = new QButtonGroup(this);
     mPageButtons->setExclusive(true);
@@ -83,8 +92,8 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     {
         const MathPage& page = pages.at(p);
 
-        QToolButton* tab = new QToolButton(this);
-        tab->setObjectName("glassButton");
+        QToolButton* tab = new QToolButton(segmented);
+        tab->setObjectName("glassSegment");
         tab->setText(page.title);
         tab->setCheckable(true);
         tab->setFocusPolicy(Qt::NoFocus);
@@ -96,7 +105,7 @@ UBMathPalette::UBMathPalette(QWidget* parent)
         pageWidget->setFocusPolicy(Qt::NoFocus);
         QGridLayout* grid = new QGridLayout(pageWidget);
         grid->setContentsMargins(0, 0, 0, 0);
-        grid->setSpacing(4);
+        grid->setSpacing(2);
         grid->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 
         for (int i = 0; i < page.templates.size(); ++i)
@@ -107,8 +116,8 @@ UBMathPalette::UBMathPalette(QWidget* parent)
         mPages->addWidget(pageWidget);
     }
 
-    tabLayout->addStretch(1);
-    mainLayout->addLayout(tabLayout);
+    tabRow->addStretch(1);
+    mainLayout->addLayout(tabRow);
     mainLayout->addWidget(mPages);
 
     // bottom row: size and ink text
@@ -123,7 +132,7 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     mSizeSlider->setFocusPolicy(Qt::NoFocus);
     mSizeSlider->setRange(2, 12); // half centimetres: 1 to 6 cm
     mSizeSlider->setPageStep(2);
-    mSizeSlider->setFixedWidth(110);
+    mSizeSlider->setFixedWidth(100);
     mSizeSlider->setToolTip(tr("Height of capital letters and digits on the board"));
     bottomLayout->addWidget(mSizeSlider);
 
@@ -153,6 +162,7 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     mainLayout->addLayout(bottomLayout);
 
     mHint = new QLabel(this);
+    mHint->setObjectName("glassHint");
     mHint->setWordWrap(true);
     mainLayout->addWidget(mHint);
     showHint();
@@ -386,8 +396,9 @@ QToolButton* UBMathPalette::createTemplateButton(const MathTemplate& tmpl, QWidg
         qWarning() << "UBMathPalette: cannot lay out" << tmpl.source << error;
     }
 
-    const QColor color = button->palette().color(QPalette::ButtonText);
-    button->setIcon(QIcon(formulaPixmap(formula, QSize(sIconSize, sIconSize), color, devicePixelRatioF())));
+    // monochrome mask, tinted with the glyph colour of the glass material below the palette
+    const QImage mask = formulaPixmap(formula, QSize(sIconSize, sIconSize), Qt::black, qMax<qreal>(2.0, devicePixelRatioF())).toImage();
+    button->setIcon(UBGlassStyle::tintedImageIcon(mask));
     button->setIconSize(QSize(sIconSize, sIconSize));
 
     button->setProperty("formulaIndex", mFormulas.size());
@@ -396,6 +407,12 @@ QToolButton* UBMathPalette::createTemplateButton(const MathTemplate& tmpl, QWidg
     connect(button, &QToolButton::clicked, this, &UBMathPalette::templateButtonClicked);
 
     return button;
+}
+
+int UBMathPalette::border()
+{
+    // room for the drop shadow of the glass
+    return UBGlassStyle::shadowMargin;
 }
 
 void UBMathPalette::setPaletteVisible(bool visible)
