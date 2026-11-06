@@ -291,7 +291,8 @@ void UBSettings::init()
 
     appLastSessionDocumentUUID = new UBSetting(this, "App", "LastSessionDocumentUUID", "");
     appLastSessionPageIndex = new UBSetting(this, "App", "LastSessionPageIndex", 0);
-    appUseMultiscreen = new UBSetting(this, "App", "UseMultiscreenMode", true);
+    // off by default: a normal window on one screen; "Show on Second Screen" adds the projection
+    appUseMultiscreen = new UBSetting(this, "App", "UseMultiscreenMode", false);
     appScreenList = new UBSetting(this, "App", "ScreenList", QVariant());
 
     appStartupHintsEnabled = new UBSetting(this,"App","EnableStartupHints",false);

@@ -34,6 +34,8 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QScreen>
+#include <QTimer>
+#include <QWindow>
 
 class UBBlackoutWidget;
 class UBBoardView;
@@ -115,6 +117,10 @@ class UBDisplayManager : public QObject
         void positionScreens();
         void adjustScreens();
 
+        // window mode: let the control role (and with it the display and desktop screens)
+        // follow the screen the control window is on now
+        void followControlWindow();
+
         void setScreenLabelParent(QWidget* labelParent);
         QStringList availableScreenIndexes();
 
@@ -158,6 +164,11 @@ class UBDisplayManager : public QObject
 
         void initScreenIndexes();
         void createScreenLabels();
+        QList<QScreen*> orderedScreens() const;
+        QScreen* controlWindowScreen() const;
+        bool isDesktopModeActive() const;
+        static bool isShownOn(QWidget* widget, QScreen* screen);
+        void watchControlWindow();
         void positionControlWindow(QWidget* controlWidget);
         QRect defaultControlWindowGeometry() const;
         static bool isOnScreen(const QRect& geometry);
@@ -176,6 +187,8 @@ class UBDisplayManager : public QObject
 
         bool mControlFullScreen{false};
         bool mControlWindowInitialized{false};
+        QPointer<QWindow> mWatchedControlWindow;
+        QTimer mFollowControlWindowTimer;     // roles follow the control window once it settled on a screen
         QRect mWindowedGeometry;            // normal geometry in window mode before switching to full screen
         bool mWindowedMaximized{false};     // maximised state in window mode before switching to full screen
 };

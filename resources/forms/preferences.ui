@@ -683,20 +683,30 @@
             <item>
              <layout class="QGridLayout" name="gridLayout_2">
               <item row="0" column="0" colspan="2">
+               <widget class="QCheckBox" name="useMultiScreenCheckBox">
+                <property name="toolTip">
+                 <string>Off: OpenBoard is a normal window on one screen. On: the board is also shown full screen on the other screen or projector.</string>
+                </property>
+                <property name="text">
+                 <string>Show the board on a second screen or projector</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0" colspan="2">
                <widget class="QCheckBox" name="displayBrowserPageCheckBox">
                 <property name="text">
                  <string>Show internal web page content on secondary screen or projector</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="0">
+              <item row="2" column="0">
                <widget class="QLabel" name="screenList_label">
                 <property name="text">
                  <string>List of screens used for Control, Display and Previous pages</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="1">
+              <item row="2" column="1">
                <widget class="UBScreenListLineEdit" name="screenList">
                 <property name="clearButtonEnabled">
                  <bool>true</bool>

@@ -391,9 +391,13 @@ int UBApplication::exec(const QString& pFileToImport)
 
     toolBarPositionChanged(UBSettings::settings()->appToolBarPositionedAtTop->get());
 
+    // "Show on Second Screen": the projection (display) view on the other screen
     bool bUseMultiScreen = UBSettings::settings()->appUseMultiscreen->get().toBool();
     mainWindow->actionMultiScreen->setChecked(bUseMultiScreen);
     connect(mainWindow->actionMultiScreen, SIGNAL(triggered(bool)), applicationController, SLOT(useMultiScreen(bool)));
+    connect(UBSettings::settings()->appUseMultiscreen, &UBSetting::changed, mainWindow->actionMultiScreen, [](const QVariant& use) {
+        mainWindow->actionMultiScreen->setChecked(use.toBool());
+    });
     connect(mainWindow->actionWidePageSize, SIGNAL(triggered(bool)), boardController, SLOT(setWidePageSize(bool)));
     connect(mainWindow->actionRegularPageSize, SIGNAL(triggered(bool)), boardController, SLOT(setRegularPageSize(bool)));
 
