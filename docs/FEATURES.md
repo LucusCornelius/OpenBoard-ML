@@ -113,11 +113,11 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
     nothing can be captured, e.g. over the desktop in annotation mode). The panel publishes
     the material in the property `glassOnDark`; stylesheet colours and tinted icons follow it;
   * lensing rim: a 14 px band along the edge shows less blurred content from slightly
-    outside the panel, as if bent by thick glass; bright inner contour, darker outer contour;
-  * specular highlight on the upper part with a small bright streak top-left, faint inner
-    shadow at the bottom, soft depth shadow;
+    outside the panel, as if bent by thick glass;
+  * flat like Liquid Glass: one even tint, one thin light hairline edge, a soft shadow; no
+    bevel, gradients or specular highlights;
   * capsules for single-row panels, 26 px radius otherwise; 40 px buttons with 22 px
-    glyphs; round 24 px colour swatches with a 2 px ring; capsule sliders and fields; the
+    glyphs; flat round 24 px colour swatches (thin neutral hairline); capsule sliders and fields; the
     maths palette is compact (36 px glyphs, segmented tabs, size and ink text in one row).
 * **macOS** (`src/gui/UBGlassEffect_mac.mm`):
   * window: `Qt::ExpandedClientAreaHint` + `Qt::NoTitleBarBackgroundHint` (Qt 6.9+), no title,
@@ -130,13 +130,16 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
     window into one backing store, so a native view can never show *behind* a Qt widget.
     The panels therefore stay normal Qt widgets (layout, mouse, keyboard unchanged) with a
     graphics effect that paints nothing into the window and hands the rendered controls
-    (transparent background) to a native overlay above the board: material view, depth layer
-    (soft drop shadow outside the body, thin specular rim bright at the top), controls image;
-    transparent for the mouse. Frame, corner radius, visibility and stacking follow the panel.
-    Light theme: the plain light system glass, dark glyphs; dark theme: smoked glass (a black
-    gradient veil inside the glass, 36 % at the top to 52 % at the bottom), white glyphs. The
-    painted backdrop capture is skipped for these panels. The system glass is flatter and
-    greyer in a window that is not key; the own shadow and rim keep some depth there.
+    (transparent background) to a native overlay above the board: material view, a soft
+    shadow outside the body and a thin even light hairline (both flat, also visible when the
+    window is not key and the system flattens its glass), controls image; transparent for the
+    mouse. Frame, corner radius, visibility and stacking follow the panel.
+  * adaptive like the system glass of small controls: the luminance of the content below a
+    floating panel selects light glass with dark glyphs (over bright content, e.g. the white
+    board, also in the dark theme) or dark glass with white glyphs (over dark content, also in
+    the light theme). The dark glass gets one flat 30 % dark tint. Dock bodies and tabs keep
+    the material of the theme. `OPENBOARD_GLASS_ADAPTIVE=0` makes the floating panels follow
+    the theme instead (dark theme over a white board: a flat dark grey).
   * while a panel shows GPU composed content (a web view in the library) it paints itself
     (painted glass) and its overlay is hidden; panels in translucent windows (desktop
     annotation) always keep the painted glass.
@@ -150,7 +153,8 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
 * Backgrounds palette: compact rounded page swatches (60 x 46) with the ruling and an accent
   ring for the current background, also used in the preferences.
 * Monochrome SF Symbols like icons (`resources/images/glass/`, tinted per material) also for
-  the document toolbar, the web tools palette and the OpenBoard menu.
+  the pen, eraser and marker tools, the dock tabs, the document toolbar, the web tools
+  palette and the OpenBoard menu.
 * Dark/light theme (`App/ThemeMode`: 0 system, 1 light, 2 dark) applies to menus, dialogs,
   dock palettes and the web/document toolbars; painted glass panels adapt to the content below,
   native glass panels on macOS follow the theme.
