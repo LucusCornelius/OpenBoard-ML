@@ -18,7 +18,9 @@ REM ---------------------------------------------------------------------
 set SCRIPT_PATH=%~dp0
 set PROJECT_ROOT=%SCRIPT_PATH%\..\..
 
-set APPLICATION_NAME=OpenBoard
+set APPLICATION_NAME=OpenBoard-ML
+REM name of the project file (OpenBoard.pro) and of the installer script (OpenBoard.iss)
+set PROJECT_NAME=OpenBoard
 set QT_DIR=D:\qt\x64-windows
 set QT_BIN=%QT_DIR%\tools\Qt6\bin
 
@@ -44,7 +46,7 @@ set VERSION=%VERSION: =%
 
 echo "VERSION :  %VERSION%"
 
-call "%INNO_EXE%" "%SCRIPT_PATH%\%APPLICATION_NAME%.iss" /F"%APPLICATION_NAME%_Installer_%VERSION%"
+call "%INNO_EXE%" "%SCRIPT_PATH%\%PROJECT_NAME%.iss" /F"%APPLICATION_NAME%_Installer_%VERSION%"
 
 :EXIT_WITH_ERROR
 echo "Error found"

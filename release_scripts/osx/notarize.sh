@@ -18,7 +18,7 @@ SCRIPT_PATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$SCRIPT_PATH/../.."
 
 
-APPLICATION_NAME="OpenBoard"
+APPLICATION_NAME="OpenBoard-ML"
 BASE_QT_DIR=~/Qt/5.15.2/clang_64
 # Executables
 QMAKE=$BASE_QT_DIR/bin/qmake
@@ -80,7 +80,7 @@ notify "================================================"
 notify "Submitting $APPLICATION_NAME for notarization..."
 notify "================================================"
 
-echo $(2>&1 xcrun notarytool submit --wait --apple-id "$USER" --team-id "$TEAMID" OpenBoard.dmg)
+echo $(2>&1 xcrun notarytool submit --wait --apple-id "$USER" --team-id "$TEAMID" "$APPLICATION_NAME.dmg")
 
 exit 0
 

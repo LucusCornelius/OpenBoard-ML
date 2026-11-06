@@ -16,7 +16,9 @@
 
 initializeVariables()
 {
-  APPLICATION_NAME="OpenBoard"
+  APPLICATION_NAME="OpenBoard-ML"
+  # name of the project file (OpenBoard.pro)
+  PROJECT_NAME="OpenBoard"
   STANDARD_QT_USED=false
 
   # Root directory
@@ -130,7 +132,7 @@ rm -rf $BUILD_DIR
 
 # Generate translations
 notifyProgress "QT" "Internationalization"
-$LRELEASES ${APPLICATION_NAME}.pro
+$LRELEASES ${PROJECT_NAME}.pro
 cd $GUI_TRANSLATIONS_DIRECTORY_PATH
 $LRELEASES translations.pro
 cd -
@@ -138,9 +140,9 @@ cd -
 notifyProgress "${APPLICATION_NAME}" "Building ${APPLICATION_NAME}"
 
 if [ "$ARCHITECTURE" == "amd64" ] || [ "$ARCHITECTURE" == "x86_64" ]; then
-    $QMAKE_PATH ${APPLICATION_NAME}.pro -spec linux-g++-64
+    $QMAKE_PATH ${PROJECT_NAME}.pro -spec linux-g++-64
 else
-    $QMAKE_PATH ${APPLICATION_NAME}.pro -spec linux-g++
+    $QMAKE_PATH ${PROJECT_NAME}.pro -spec linux-g++
 fi
 
 
@@ -149,5 +151,5 @@ make -j4 release-install
 if [ ! -e "$PRODUCT_PATH/${APPLICATION_NAME}" ]; then
     notifyError "${APPLICATION_NAME} build failed"
 else
-    notifyProgress "Finished building OpenBoard. You may now run the packaging script."
+    notifyProgress "Finished building ${APPLICATION_NAME}. You may now run the packaging script."
 fi

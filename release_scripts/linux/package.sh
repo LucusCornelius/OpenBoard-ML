@@ -15,7 +15,7 @@
 # ---------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
-# Packaging script for OpenBoard, for Debian-compatible distributions. 
+# Packaging script for OpenBoard-ML, for Debian-compatible distributions. 
 #
 # This should be run after `build.sh`.
 #
@@ -28,18 +28,18 @@
 #    | postinst
 #    usr/
 #    | bin/
-#    | | openboard <-- actually a symlink to run.sh or OpenBoard
+#    | | openboard-ml <-- actually a symlink to run.sh or OpenBoard-ML
 #    | share/
 #    | | applications/
-#    | | | openboard.desktop
+#    | | | openboard-ml.desktop
 #    opt/
-#    | openboard/
+#    | openboard-ml/
 #    | | library/
 #    | | etc/
 #    | | qtlib/ (*)
 #    | | plugins/ (*)
-#    | | OpenBoard
-#    | | OpenBoard.png
+#    | | OpenBoard-ML
+#    | | OpenBoard-ML.png
 #    | | run.sh (*)
 #
 # (*) Only included if Qt libs and plugins are bundled. It is necessary to
@@ -64,8 +64,8 @@ initializeVariables()
   # package
   BASE_WORKING_DIR="debianPackage"
 
-  APPLICATION_NAME="OpenBoard"
-  APPLICATION_CODE="openboard"
+  APPLICATION_NAME="OpenBoard-ML"
+  APPLICATION_CODE="openboard-ml"
   APPLICATION_PATH="opt"
 
   PACKAGE_DIRECTORY=$BASE_WORKING_DIR/$APPLICATION_PATH/$APPLICATION_CODE
@@ -79,7 +79,7 @@ initializeVariables()
   DESKTOP_FILE_PATH="$BASE_WORKING_DIR/usr/share/applications"
   APPLICATION_SHORTCUT="$DESKTOP_FILE_PATH/${APPLICATION_CODE}.desktop"
 
-  DESCRIPTION="OpenBoard, an interactive white board application"
+  DESCRIPTION="OpenBoard-ML, an interactive white board application"
   VERSION=`cat $BUILD_DIR/version`
   ARCHITECTURE=`cat buildContext`
 
@@ -382,7 +382,7 @@ if $BUNDLE_QT; then
         for lib in `dpkg -S  $l | grep -v "libqt5" | grep -v "qt55" | awk -F":" '{ print $1 }'`; do
             presence=`echo ${tab[*]} | grep -c "$lib"`;
             if [ "$presence" == "0" ]; then
-		if [ "$lib" != "openboard" ]; then
+		if [ "$lib" != "$APPLICATION_CODE" ]; then
 			 echo "adding $lib to needed dependencies"
         	        tab[$count]=$lib;
         	        ((count++));
@@ -453,7 +453,7 @@ echo "Terminal=false" >> $APPLICATION_SHORTCUT
 echo "Type=Application" >> $APPLICATION_SHORTCUT
 echo "MimeType=application/ubz" >> $APPLICATION_SHORTCUT
 echo "Categories=Education;" >> $APPLICATION_SHORTCUT
-cp "resources/images/${APPLICATION_NAME}.png" "$PACKAGE_DIRECTORY/${APPLICATION_NAME}.png"
+cp "resources/images/OpenBoard.png" "$PACKAGE_DIRECTORY/${APPLICATION_NAME}.png"
 
 # ----------------------------------------------------------------------------
 # Building the package

@@ -75,7 +75,7 @@
 									<key>GID</key>
 									<integer>80</integer>
 									<key>Path</key>
-									<string>build/macx/release/product/OpenBoard.app</string>
+									<string>build/macx/release/product/OpenBoard-ML.app</string>
 									<key>Path Type</key>
 									<integer>2</integer>
 									<key>Privileges</key>
@@ -479,9 +479,9 @@
 						<key>IFPkgDescriptionDeleteWarning</key>
 						<string></string>
 						<key>IFPkgDescriptionDescription</key>
-						<string>OpenBoard is an hardware independent interactive whiteboard</string>
+						<string>OpenBoard-ML is a hardware independent interactive whiteboard</string>
 						<key>IFPkgDescriptionTitle</key>
-						<string>OpenBoard</string>
+						<string>OpenBoard-ML</string>
 						<key>IFPkgDescriptionVersion</key>
 						<string>1.40.b.00</string>
 					</dict>
@@ -495,9 +495,9 @@
 					<key>CFBundleIconFile Path Type</key>
 					<integer>2</integer>
 					<key>CFBundleIdentifier</key>
-					<string>org.OpenBoard.pkg.OpenBoard</string>
+					<string>org.openboard-ml.pkg.OpenBoard-ML</string>
 					<key>CFBundleName</key>
-					<string>OpenBoard</string>
+					<string>OpenBoard-ML</string>
 					<key>CFBundleShortVersionString</key>
 					<string>1.40.b.00</string>
 				</dict>
@@ -534,7 +534,7 @@
 		<key>IFPkgFlagPackageSelection</key>
 		<integer>0</integer>
 		<key>Name</key>
-		<string>OpenBoard</string>
+		<string>OpenBoard-ML</string>
 		<key>Status</key>
 		<integer>1</integer>
 		<key>Type</key>
