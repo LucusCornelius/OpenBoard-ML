@@ -481,9 +481,12 @@ bool UBFloatingPalette::hasNativeGlass() const
 
 bool UBFloatingPalette::backdropActive() const
 {
-    // native glass of the platform renders (and adapts) the backdrop itself, the glyphs follow the theme
+    // also with native glass: the luminance of the content below selects the light or dark material
+    // (glass appearance and glyphs), like the system glass does for small controls
     // the modern style has no backdrop: the material follows the theme
-    return UBUiStyle::isGlass() && mGlassBackdropEnabled && parentWidget() && !isWindow() && !hasNativeGlass();
+    return UBUiStyle::isGlass() && mGlassBackdropEnabled && parentWidget() && !isWindow()
+            && (!hasNativeGlass() || !qEnvironmentVariableIsSet("OPENBOARD_GLASS_ADAPTIVE")
+                || qEnvironmentVariableIntValue("OPENBOARD_GLASS_ADAPTIVE") != 0);
 }
 
 

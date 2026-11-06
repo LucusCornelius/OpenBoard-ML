@@ -176,20 +176,28 @@
 @end
 
 /**
- * Depth of a glass panel that the system material does not draw in a
- * non-key window and hardly over a plain white board: a soft drop shadow
- * around the body (never under it, where it would darken the glass) and a
- * thin specular rim, bright at the top and fading towards the bottom.
+ * Edge and shadow of one glass panel (colours with alpha).
+ */
+struct OBGlassLook
+{
+    CGFloat shadow;      // opacity of the soft shadow below the panel
+    NSColor* hairline;   // thin, even edge of the glass
+};
+
+/**
+ * What the system glass hardly shows over a plain white board, and not at
+ * all in a window that is not key: a soft, subtle drop shadow around the
+ * body (never under it, where the glass would pick it up) and a thin, even
+ * hairline along the edge. Flat, no gradients: these layers look the same
+ * whether the window is key or not.
  */
 @interface OBGlassDecorView : NSView
 {
     CALayer* mShadow;
     CAShapeLayer* mShadowMask;
-    CAGradientLayer* mRim;
-    CAShapeLayer* mRimMask;
+    CAShapeLayer* mHairline;
 }
-- (void)setBody:(NSRect)body radius:(CGFloat)radius shadowOpacity:(CGFloat)shadowOpacity
-     rimTop:(CGFloat)rimTop rimBottom:(CGFloat)rimBottom rimColor:(NSColor*)rimColor;
+- (void)setBody:(NSRect)body radius:(CGFloat)radius look:(const OBGlassLook&)look;
 @end
 
 @implementation OBGlassDecorView
@@ -209,14 +217,11 @@
         [mShadow setMask:mShadowMask];
         [mShadow setShadowColor:[[NSColor blackColor] CGColor]];
 
-        mRim = [[NSClassFromString(@"CAGradientLayer") alloc] init];
-        mRimMask = [[NSClassFromString(@"CAShapeLayer") alloc] init];
-        [mRimMask setFillColor:nil];
-        [mRimMask setStrokeColor:[[NSColor blackColor] CGColor]];
-        [mRim setMask:mRimMask];
+        mHairline = [[NSClassFromString(@"CAShapeLayer") alloc] init];
+        [mHairline setFillColor:nil];
 
         [[self layer] addSublayer:mShadow];
-        [[self layer] addSublayer:mRim];
+        [[self layer] addSublayer:mHairline];
     }
 
     return self;
@@ -227,8 +232,7 @@
 #if !__has_feature(objc_arc)
     [mShadow release];
     [mShadowMask release];
-    [mRim release];
-    [mRimMask release];
+    [mHairline release];
     [super dealloc];
 #endif
 }
@@ -244,53 +248,42 @@
     return nil;
 }
 
-- (void)setBody:(NSRect)body radius:(CGFloat)radius shadowOpacity:(CGFloat)shadowOpacity
-     rimTop:(CGFloat)rimTop rimBottom:(CGFloat)rimBottom rimColor:(NSColor*)rimColor
+- (void)setBody:(NSRect)body radius:(CGFloat)radius look:(const OBGlassLook&)look
 {
     [NSClassFromString(@"CATransaction") begin];
     [NSClassFromString(@"CATransaction") setDisableActions:YES];
 
     const CGFloat r = qMin<CGFloat>(radius, qMin(NSWidth(body), NSHeight(body)) / 2.0);
-    const bool flipped = [[self layer] isGeometryFlipped] != [self isFlipped];
+    // the top of the body is at y = 0 when the layer geometry is flipped
+    const bool topAtZero = [[self layer] isGeometryFlipped] || [self isFlipped];
 
     // shadow: path of the body, masked to the outside of the body
     const NSRect bounds = [self bounds];
-    [mShadow setFrame:bounds];
     CGPathRef bodyPath = CGPathCreateWithRoundedRect(body, r, r, NULL);
+    [mShadow setFrame:bounds];
     [mShadow setShadowPath:bodyPath];
-    [mShadow setShadowOpacity:shadowOpacity];
-    [mShadow setShadowRadius:14.0];
-    [mShadow setShadowOffset:CGSizeMake(0, flipped ? 5.0 : -5.0)];
+    [mShadow setShadowOpacity:look.shadow];
+    [mShadow setShadowRadius:16.0];
+    [mShadow setShadowOffset:CGSizeMake(0, topAtZero ? -6.0 : 6.0)];
 
     CGMutablePathRef outside = CGPathCreateMutable();
-    CGPathAddRect(outside, NULL, NSInsetRect(bounds, -60, -60));
+    CGPathAddRect(outside, NULL, NSInsetRect(bounds, -80, -80));
     CGPathAddPath(outside, NULL, bodyPath);
     [mShadowMask setFrame:bounds];
     [mShadowMask setPath:outside];
     CGPathRelease(outside);
     CGPathRelease(bodyPath);
 
-    // rim: a gradient seen through a stroked outline of the body
-    [mRim setFrame:body];
+    // hairline: one even stroke just inside the edge
     const CGFloat lineWidth = 1.0;
-    const NSRect local = NSInsetRect(NSMakeRect(0, 0, NSWidth(body), NSHeight(body)), lineWidth / 2.0, lineWidth / 2.0);
+    const NSRect inner = NSInsetRect(body, lineWidth / 2.0, lineWidth / 2.0);
     const CGFloat rr = qMax<CGFloat>(0.0, r - lineWidth / 2.0);
-    CGPathRef rimPath = CGPathCreateWithRoundedRect(local, rr, rr, NULL);
-    [mRimMask setFrame:NSMakeRect(0, 0, NSWidth(body), NSHeight(body))];
-    [mRimMask setPath:rimPath];
-    [mRimMask setLineWidth:lineWidth];
-    CGPathRelease(rimPath);
-
-    NSColor* color = rimColor ? rimColor : [NSColor whiteColor];
-    id top = (__bridge id)[[color colorWithAlphaComponent:rimTop] CGColor];
-    id middle = (__bridge id)[[color colorWithAlphaComponent:rimBottom * 0.4] CGColor];
-    id bottom = (__bridge id)[[color colorWithAlphaComponent:rimBottom] CGColor];
-    [mRim setColors:@[top, middle, bottom]];
-    [mRim setLocations:@[@0.0, @0.55, @1.0]];
-    // the top of the body is at y = 0 in a flipped layer
-    const bool topAtZero = [[self layer] isGeometryFlipped] || [self isFlipped];
-    [mRim setStartPoint:CGPointMake(0.5, topAtZero ? 0.0 : 1.0)];
-    [mRim setEndPoint:CGPointMake(0.5, topAtZero ? 1.0 : 0.0)];
+    CGPathRef edge = CGPathCreateWithRoundedRect(inner, rr, rr, NULL);
+    [mHairline setFrame:bounds];
+    [mHairline setPath:edge];
+    [mHairline setLineWidth:lineWidth];
+    [mHairline setStrokeColor:[(look.hairline ? look.hairline : [NSColor clearColor]) CGColor]];
+    CGPathRelease(edge);
 
     [NSClassFromString(@"CATransaction") commit];
 }
@@ -348,18 +341,27 @@ namespace
     }
 
     /**
-     * Flat veil of the NSVisualEffectView fallback in the dark theme. The
-     * system glass gets a gradient veil instead (smoked glass, see sync()):
-     * over the (usually white) board the plain dark glass is a mid grey, too
-     * light for white glyphs.
+     * One flat, even tint in the glass of the dark theme. Over the (usually
+     * white) board the plain dark system glass is a light grey, too light for
+     * white glyphs; a moderate dark tint keeps it a clean dark glass.
      */
     NSColor* glassVeil(bool dark, PanelMaterial material)
     {
-        // the system glass gets the gradient veil instead (see sync())
-        if (!dark || material == PanelMaterial::Glass)
+        if (!dark)
             return nil;
 
-        return [NSColor colorWithWhite:0.0 alpha:0.3];
+        return [NSColor colorWithWhite:0.0 alpha:(material == PanelMaterial::Glass ? 0.30 : 0.25)];
+    }
+
+    NSColor* white(CGFloat alpha) { return [NSColor colorWithWhite:1.0 alpha:qBound<CGFloat>(0, alpha, 1)]; }
+
+    /** edge and shadow of the glass panels in the light and the dark theme */
+    OBGlassLook glassLook(bool dark)
+    {
+        OBGlassLook look;
+        look.shadow = dark ? 0.32 : 0.14;
+        look.hairline = white(dark ? 0.22 : 0.85);
+        return look;
     }
 
     /** the content view of the window holding the widget, nil when not created */
@@ -725,7 +727,6 @@ namespace
                 }
 #if !__has_feature(objc_arc)
                 [mDecor release];
-                [mVeilGradient release];
                 [mVeil release];
                 [mContent release];
                 [mMaterialView release];
@@ -1005,7 +1006,9 @@ namespace
                         [mMaterialView setFrame:bodyFrame];
 
                     const CGFloat radius = qMax(0.0, mPanel->property("ubGlassRadius").toReal());
-                    const bool dark = UBThemeManager::instance()->isDarkMode();
+                    // the material of the panel: adapts to the content below (UBFloatingPalette), else the theme
+                    const QVariant onDark = mPanel->property("glassOnDark");
+                    const bool dark = onDark.isValid() ? onDark.toBool() : UBThemeManager::instance()->isDarkMode();
 
 #if defined(__MAC_26_0)
                     if (@available(macOS 26.0, *))
@@ -1028,30 +1031,7 @@ namespace
 
                     if (mVeil)
                     {
-                        // the veil: a vertical gradient, a faint sheen at the top, the material below
-                        if (!mVeilGradient)
-                        {
-                            mVeilGradient = [[NSClassFromString(@"CAGradientLayer") alloc] init];
-                            [[mVeil layer] addSublayer:mVeilGradient];
-                        }
-
-                        [NSClassFromString(@"CATransaction") begin];
-                        [NSClassFromString(@"CATransaction") setDisableActions:YES];
-                        [mVeilGradient setFrame:[mVeil bounds]];
-                        [mVeilGradient setCornerRadius:radius];
-                        [mVeilGradient setMasksToBounds:YES];
-                        const bool topAtZero = [[mVeil layer] isGeometryFlipped] || [mVeil isFlipped];
-                        [mVeilGradient setStartPoint:CGPointMake(0.5, topAtZero ? 0.0 : 1.0)];
-                        [mVeilGradient setEndPoint:CGPointMake(0.5, topAtZero ? 1.0 : 0.0)];
-                        // dark theme: smoked glass, a little lighter at the top; light theme: the plain system glass
-                        const bool smoked = dark && mMaterial == PanelMaterial::Glass;
-                        [mVeilGradient setColors:@[(__bridge id)[[NSColor colorWithWhite:0.0 alpha:(smoked ? 0.36 : 0.0)] CGColor],
-                                                   (__bridge id)[[NSColor colorWithWhite:0.0 alpha:(smoked ? 0.44 : 0.0)] CGColor],
-                                                   (__bridge id)[[NSColor colorWithWhite:0.0 alpha:(smoked ? 0.52 : 0.0)] CGColor]]];
-                        [mVeilGradient setLocations:@[@0.0, @0.45, @1.0]];
-                        [NSClassFromString(@"CATransaction") commit];
-
-                        NSColor* veil = glassVeil(UBThemeManager::instance()->isDarkMode(), mMaterial);
+                        NSColor* veil = glassVeil(dark, mMaterial);
                         [[mVeil layer] setBackgroundColor:veil ? [veil CGColor] : nil];
                         [[mVeil layer] setCornerRadius:radius];
                     }
@@ -1061,15 +1041,11 @@ namespace
                         if (!NSEqualRects([mDecor frame], [mHost bounds]))
                             [mDecor setFrame:[mHost bounds]];
 
-                        [mDecor setBody:bodyFrame radius:radius
-                          shadowOpacity:(dark ? 0.35 : 0.16)
-                                 rimTop:(dark ? 0.55 : 0.9)
-                              rimBottom:(dark ? 0.15 : 0.35)
-                               rimColor:nil];
+                        [mDecor setBody:bodyFrame radius:radius look:glassLook(dark)];
                     }
 
-                    // light glass in the light theme, dark glass in the dark theme
-                    NSAppearance* appearance = themeAppearance();
+                    // light glass with dark glyphs, or dark glass with white glyphs
+                    NSAppearance* appearance = [NSAppearance appearanceNamed:(dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua)];
 
                     if (appearance && ![[[mHost appearance] name] isEqualToString:[appearance name]])
                         [mHost setAppearance:appearance];
@@ -1090,7 +1066,6 @@ namespace
             NSView* mMaterialView;
             NSView* mVeil = nil;
             OBGlassDecorView* mDecor = nil;
-            CAGradientLayer* mVeilGradient = nil;
             OBGlassPanelContentView* mContent;
             QPointer<UBGlassMirrorEffect> mEffect;
             qint64 mImageKey;
