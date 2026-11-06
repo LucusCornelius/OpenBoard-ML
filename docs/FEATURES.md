@@ -124,23 +124,33 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
     no separator: the board runs under the transparent title bar, the clusters sit below the
     traffic lights, the web and document toolbars start to the right of them (unified title
     bar). The window `NSAppearance` follows the app theme, also when it changes at runtime.
-  * panels: real system material behind every floating panel and the dock tabs:
+  * panels: real system material behind every floating panel, the dock tabs and the open
+    dock bodies (pages, library: a floating glass sidebar with frosted cards inside):
     `NSGlassEffectView` on macOS 26+, `NSVisualEffectView` before. Qt paints all widgets of a
     window into one backing store, so a native view can never show *behind* a Qt widget.
     The panels therefore stay normal Qt widgets (layout, mouse, keyboard unchanged) with a
     graphics effect that paints nothing into the window and hands the rendered controls
-    (transparent background) to a native overlay above the board: material view below,
-    controls image above, transparent for the mouse. Frame, corner radius, visibility and
-    stacking follow the panel. Light theme: light glass, dark glyphs; dark theme: the glass
-    gets a dark veil, white glyphs. The painted backdrop capture is skipped for these panels.
-  * not used for panels in translucent windows (desktop annotation) and panels holding GPU
-    composed content (web views); those keep the painted glass.
+    (transparent background) to a native overlay above the board: material view, depth layer
+    (soft drop shadow outside the body, thin specular rim bright at the top), controls image;
+    transparent for the mouse. Frame, corner radius, visibility and stacking follow the panel.
+    Light theme: the plain light system glass, dark glyphs; dark theme: smoked glass (a black
+    gradient veil inside the glass, 36 % at the top to 52 % at the bottom), white glyphs. The
+    painted backdrop capture is skipped for these panels. The system glass is flatter and
+    greyer in a window that is not key; the own shadow and rim keep some depth there.
+  * while a panel shows GPU composed content (a web view in the library) it paints itself
+    (painted glass) and its overlay is hidden; panels in translucent windows (desktop
+    annotation) always keep the painted glass.
+  * the OpenBoard (⋯) menu and its sub menus: translucent Qt menus on the native menu
+    material (`NSVisualEffectView`, menu material, rounded corners, system shadow), in the
+    appearance of the app theme.
   * environment switches: `OPENBOARD_PANEL_GLASS=glass|vibrancy|painted` forces a panel
     material (`OPENBOARD_NATIVE_PANEL_GLASS=0` = painted); `OPENBOARD_NO_NATIVE_GLASS=1`
     disables all native chrome (normal title bar, painted glass); `OPENBOARD_THEME=light|dark|auto`
     overrides the theme without touching the saved setting.
 * Backgrounds palette: compact rounded page swatches (60 x 46) with the ruling and an accent
   ring for the current background, also used in the preferences.
+* Monochrome SF Symbols like icons (`resources/images/glass/`, tinted per material) also for
+  the document toolbar, the web tools palette and the OpenBoard menu.
 * Dark/light theme (`App/ThemeMode`: 0 system, 1 light, 2 dark) applies to menus, dialogs,
   dock palettes and the web/document toolbars; painted glass panels adapt to the content below,
   native glass panels on macOS follow the theme.
