@@ -76,6 +76,16 @@ UBThemeManager* UBThemeManager::instance()
 void UBThemeManager::applyUserThemePreference()
 {
     int themeMode = UBSettings::settings()->appThemeMode->get().toInt();
+
+    // testing override that leaves the saved preference alone: OPENBOARD_THEME=light|dark|auto
+    const QString themeOverride = qEnvironmentVariable("OPENBOARD_THEME").toLower();
+
+    if (themeOverride == "auto")
+        themeMode = 0;
+    else if (themeOverride == "light")
+        themeMode = 1;
+    else if (themeOverride == "dark")
+        themeMode = 2;
     
     bool isDarkMode = false;
     
