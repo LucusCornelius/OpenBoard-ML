@@ -455,8 +455,8 @@ void UBSettings::init()
     boardShowMathPalette = new UBSetting(this, "Board", "ShowMathPalette", false);
     boardMathPalettePosition = new UBSetting(this, "Board", "MathPalettePosition", QVariant());
     boardMathPaletteTab = new UBSetting(this, "Board", "MathPaletteTab", 0);
-    boardMathInkSizeCm = new UBSetting(this, "Board", "MathInkSizeCm", 2.0);
-    boardMathInkJitter = new UBSetting(this, "Board", "MathInkJitter", 1.0);
+    boardMathFontSize = new UBSetting(this, "Board", "MathFontSize", 28);
+    boardMathDisplayStyle = new UBSetting(this, "Board", "MathDisplayStyle", false);
     magnifierDrawingMode = new UBSetting(this, "Board", "MagnifierDrawingMode", "0");
     autoSaveInterval = new UBSetting(this, "Board", "AutoSaveIntervalInMinutes", "3");
 
@@ -1625,5 +1625,10 @@ void UBSettings::checkNewSettings()
 
     // CrossedBackground changed in 1.4 (no longer a bool but an enum; can be crossed or ruled)
     removeSetting("Board/CrossedBackground");
+
+    // the maths palette writes typeset maths with a font size (Board/MathFontSize) instead of
+    // handwriting with a capital height in cm; the old default was far too large, start afresh
+    removeSetting("Board/MathInkSizeCm");
+    removeSetting("Board/MathInkJitter");
 
 }

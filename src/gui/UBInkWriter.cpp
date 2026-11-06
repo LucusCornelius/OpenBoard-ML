@@ -39,25 +39,13 @@
 
 namespace
 {
-    // the size slider gives the height of capitals and digits
-    const qreal sCapHeight = 0.66;
+    const qreal sPointsPerCentimetre = 72.0 / 2.54;
 
-    QRectF inkBounds(const QList<QPolygonF>& ink, const UBMathInkLayout::Formula& formula)
-    {
-        QRectF rect;
-
-        for (const QPolygonF& stroke : ink)
-        {
-            rect = rect.isNull() ? stroke.boundingRect() : rect.united(stroke.boundingRect());
-        }
-
-        for (const QRectF& placeholder : formula.placeholders)
-        {
-            rect = rect.isNull() ? placeholder : rect.united(placeholder);
-        }
-
-        return rect;
-    }
+    /**
+     * Curves are flattened this many times finer than one scene unit, so that the glyphs stay
+     * smooth when the board is zoomed in.
+     */
+    const qreal sFlatteningScale = 4.0;
 }
 
 /** Transparent overlay on the board viewport showing where the formula will be written. */
@@ -75,9 +63,11 @@ class UBInkGhost : public QWidget
 
         void setPaths(const QPainterPath& ink, const QPainterPath& placeholders)
         {
+            // only the changed area, the whole viewport may be large
+            const QRect before = (mInk.boundingRect() | mPlaceholders.boundingRect()).toAlignedRect().adjusted(-2, -2, 2, 2);
             mInk = ink;
             mPlaceholders = placeholders;
-            update();
+            update(before | (mInk.boundingRect() | mPlaceholders.boundingRect()).toAlignedRect().adjusted(-2, -2, 2, 2));
         }
 
     protected:
@@ -90,8 +80,8 @@ class UBInkGhost : public QWidget
             painter.setPen(placeholderPen);
             painter.drawPath(mPlaceholders);
 
-            QPen inkPen(QColor(110, 110, 110, 170), 2.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-            painter.setPen(inkPen);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(110, 110, 110, 170));
             painter.drawPath(mInk);
         }
 
@@ -117,6 +107,13 @@ UBInkWriter::~UBInkWriter()
     delete mGhost;
 }
 
+int UBInkWriter::fontSize()
+{
+    bool ok = false;
+    const int size = UBSettings::settings()->boardMathFontSize->get().toInt(&ok);
+    return ok ? qBound(minimumFontSize, size, maximumFontSize) : defaultFontSize;
+}
+
 qreal UBInkWriter::emSizeInScene()
 {
     qreal centimetre = 28;
@@ -126,21 +123,7 @@ qreal UBInkWriter::emSizeInScene()
         centimetre = qMax(4, UBApplication::boardController->activeScene()->backgroundGridSize());
     }
 
-    const qreal sizeCm = qBound(1.0, UBSettings::settings()->boardMathInkSizeCm->get().toDouble(), 6.0);
-    return sizeCm * centimetre / sCapHeight;
-}
-
-QList<QPolygonF> UBInkWriter::inkStrokes(const UBMathInkLayout::Formula& formula)
-{
-    bool ok = false;
-    qreal jitter = UBSettings::settings()->boardMathInkJitter->get().toDouble(&ok);
-
-    if (!ok)
-    {
-        jitter = 1.0;
-    }
-
-    return UBMathInkLayout::humanize(formula, jitter);
+    return fontSize() / sPointsPerCentimetre * centimetre;
 }
 
 bool UBInkWriter::write(const UBMathInkLayout::Formula& formula, const QPointF& scenePos)
@@ -153,46 +136,27 @@ bool UBInkWriter::write(const UBMathInkLayout::Formula& formula, const QPointF& 
     }
 
     std::shared_ptr<UBGraphicsScene> scene = controller->activeScene();
-    const QList<QPolygonF> ink = inkStrokes(formula);
-    const QPointF center = inkBounds(ink, formula).center();
+    const QPointF center = formula.bounds().center();
     const qreal em = emSizeInScene();
 
-    QList<QPolygonF> sceneStrokes;
+    // em units to scene units, the formula centred on the position
+    QTransform toScene;
+    toScene.translate(scenePos.x(), scenePos.y());
+    toScene.scale(em, em);
+    toScene.translate(-center.x(), -center.y());
 
-    for (const QPolygonF& stroke : ink)
+    const QTransform fine = toScene * QTransform::fromScale(sFlatteningScale, sFlatteningScale);
+    const QTransform back = QTransform::fromScale(1.0 / sFlatteningScale, 1.0 / sFlatteningScale);
+    QList<QPolygonF> shapes;
+
+    for (const QPainterPath& shape : formula.shapes)
     {
-        QPolygonF mapped;
-
-        for (int i = 0; i < stroke.size(); ++i)
-        {
-            const QPointF q = scenePos + (stroke.at(i) - center) * em;
-
-            // drop points that are too close to each other, but keep the end point
-            if (mapped.isEmpty() || QLineF(mapped.last(), q).length() > 0.6)
-            {
-                mapped << q;
-            }
-            else if (i == stroke.size() - 1 && mapped.size() > 1)
-            {
-                mapped.last() = q;
-            }
-        }
-
-        if (mapped.size() == 1)
-        {
-            mapped << mapped.first() + QPointF(0.5, 0);
-        }
-
-        sceneStrokes << mapped;
+        // all contours of a glyph in one polygon (with zero width bridges between them)
+        shapes << back.map(shape.toFillPolygon(fine));
     }
 
-    // the pen width, as for a stroke drawn with the pen at the current zoom
-    qreal width = UBSettings::settings()->currentPenWidth();
-    width /= controller->systemScaleFactor();
-    width /= controller->currentZoom();
-
-    return scene->addInkStrokes(sceneStrokes, width, controller->penColorOnLightBackground(),
-                                controller->penColorOnDarkBackground()) != nullptr;
+    return scene->addInkShapes(shapes, controller->penColorOnLightBackground(),
+                               controller->penColorOnDarkBackground()) != nullptr;
 }
 
 QWidget* UBInkWriter::boardViewport() const
@@ -224,8 +188,8 @@ void UBInkWriter::beginPlacement(const UBMathInkLayout::Formula& formula)
             this, &UBInkWriter::cancelPlacement, Qt::UniqueConnection);
 
     mFormula = formula;
-    mInk = inkStrokes(formula);
-    mInkBounds = inkBounds(mInk, formula);
+    mInk = formula.path();
+    mInkBounds = formula.bounds();
     mPlacing = true;
     mSwallowRelease = false;
 
@@ -313,34 +277,20 @@ void UBInkWriter::updateGhost(const QPoint& viewportPos)
 
     const QTransform viewportTransform = view->viewportTransform();
 
-    auto toView = [&](const QPointF& p) {
-        return viewportTransform.map(scenePos + (p - center) * em);
-    };
-
-    QPainterPath ink;
-
-    for (const QPolygonF& stroke : mInk)
-    {
-        for (int i = 0; i < stroke.size(); ++i)
-        {
-            if (i == 0)
-            {
-                ink.moveTo(toView(stroke.at(i)));
-            }
-            else
-            {
-                ink.lineTo(toView(stroke.at(i)));
-            }
-        }
-    }
+    QTransform toView;
+    toView.scale(em, em);
+    toView.translate(-center.x(), -center.y());
+    toView *= QTransform::fromTranslate(scenePos.x(), scenePos.y()) * viewportTransform;
 
     QPainterPath placeholders;
 
     for (const QRectF& rect : mFormula.placeholders)
     {
-        placeholders.addPolygon(QPolygonF({toView(rect.topLeft()), toView(rect.topRight()),
-                                           toView(rect.bottomRight()), toView(rect.bottomLeft()), toView(rect.topLeft())}));
+        placeholders.addPolygon(toView.map(QPolygonF(rect)));
+        placeholders.closeSubpath();
     }
+
+    const QPainterPath ink = toView.map(mInk);
 
     if (mGhost->geometry() != mViewport->rect())
     {

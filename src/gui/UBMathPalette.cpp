@@ -47,6 +47,24 @@ namespace
     const int sColumns = 10;
     const int sButtonSize = 36;
     const int sIconSize = 30;
+
+    /** The font sizes offered by the size slider, in points (the usual steps of type sizes). */
+    const QList<int> sFontSizes = {12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 96};
+
+    int fontSizeIndex(int points)
+    {
+        int best = 0;
+
+        for (int i = 0; i < sFontSizes.size(); ++i)
+        {
+            if (qAbs(sFontSizes.at(i) - points) < qAbs(sFontSizes.at(best) - points))
+            {
+                best = i;
+            }
+        }
+
+        return best;
+    }
 }
 
 UBMathPalette::UBMathPalette(QWidget* parent)
@@ -117,6 +135,19 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     }
 
     tabRow->addStretch(1);
+
+    // TeX display style: full size fractions, limits above and below sums, larger operators
+    QToolButton* displayButton = new QToolButton(this);
+    displayButton->setObjectName("glassButton");
+    displayButton->setFocusPolicy(Qt::NoFocus);
+    displayButton->setCheckable(true);
+    displayButton->setText(tr("Display"));
+    displayButton->setToolTip(tr("Display style: fractions at full size, limits above and below sums,\n"
+                                 "larger integrals and sums (as a formula on its own line in LaTeX).\n"
+                                 "Off: text style, compact like maths in a line of text."));
+    displayButton->setChecked(displayStyle());
+    connect(displayButton, &QToolButton::toggled, this, &UBMathPalette::displayStyleToggled);
+    tabRow->addWidget(displayButton);
     mainLayout->addLayout(tabRow);
     mainLayout->addWidget(mPages);
 
@@ -130,14 +161,15 @@ UBMathPalette::UBMathPalette(QWidget* parent)
 
     mSizeSlider = new QSlider(Qt::Horizontal, this);
     mSizeSlider->setFocusPolicy(Qt::NoFocus);
-    mSizeSlider->setRange(2, 12); // half centimetres: 1 to 6 cm
-    mSizeSlider->setPageStep(2);
+    mSizeSlider->setRange(0, sFontSizes.size() - 1);
+    mSizeSlider->setPageStep(1);
     mSizeSlider->setFixedWidth(100);
-    mSizeSlider->setToolTip(tr("Height of capital letters and digits on the board"));
+    mSizeSlider->setToolTip(tr("Font size of the maths. At 28 pt one em is about 1 cm (the page grid):\n"
+                               "a formula is about as high as one ruled line, like handwriting."));
     bottomLayout->addWidget(mSizeSlider);
 
     mSizeLabel = new QLabel(this);
-    mSizeLabel->setMinimumWidth(QFontMetrics(mSizeLabel->font()).horizontalAdvance(tr("%1 cm").arg(QLocale().toString(5.5, 'f', 1))) + 4);
+    mSizeLabel->setMinimumWidth(QFontMetrics(mSizeLabel->font()).horizontalAdvance(tr("%1 pt").arg(96)) + 4);
     bottomLayout->addWidget(mSizeLabel);
     bottomLayout->addSpacing(8);
 
@@ -145,9 +177,10 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     mInkText->setFocusPolicy(Qt::ClickFocus);
     mInkText->setClearButtonEnabled(true);
     mInkText->setPlaceholderText(tr("Ink text, e.g. f(x) = x^2 + 1/(x-1)"));
-    mInkText->setToolTip(tr("Type a formula and press Enter, then tap the board to write it by hand.\n"
+    mInkText->setToolTip(tr("Type a formula and press Enter, then tap the board to write it there.\n"
                             "x^2 superscript, x_1 subscript, a/b fraction, sqrt(x), int_a^b, sum_(n=1)^inf,\n"
-                            "lim_(x->0), vec(v), pi, alpha, ..., -> => <= >= != +-, # leaves an empty box"));
+                            "lim_(x->0), vec(v), pi, alpha, ..., -> => <= >= != +-, f' prime, dx,\n"
+                            "two spaces leave a wide space, # leaves an empty box"));
     connect(mInkText, &QLineEdit::returnPressed, this, &UBMathPalette::inkTextEntered);
     bottomLayout->addWidget(mInkText, 1);
 
@@ -167,9 +200,8 @@ UBMathPalette::UBMathPalette(QWidget* parent)
     mainLayout->addWidget(mHint);
     showHint();
 
-    const qreal sizeCm = qBound(1.0, UBSettings::settings()->boardMathInkSizeCm->get().toDouble(), 6.0);
-    mSizeSlider->setValue(qRound(sizeCm * 2));
-    sizeChanged(mSizeSlider->value());
+    mSizeSlider->setValue(fontSizeIndex(UBInkWriter::fontSize()));
+    mSizeLabel->setText(tr("%1 pt").arg(sFontSizes.at(mSizeSlider->value())));
     connect(mSizeSlider, &QSlider::valueChanged, this, &UBMathPalette::sizeChanged);
 
     connect(mPageButtons, &QButtonGroup::idClicked, this, &UBMathPalette::pageSelected);
@@ -328,28 +360,17 @@ QPixmap UBMathPalette::formulaPixmap(const UBMathInkLayout::Formula& formula, co
     pixmap.setDevicePixelRatio(devicePixelRatio);
     pixmap.fill(Qt::transparent);
 
-    const QList<QPolygonF> ink = UBInkWriter::inkStrokes(formula);
-    QRectF bounds;
+    const QRectF bounds = formula.bounds();
 
-    for (const QPolygonF& stroke : ink)
-    {
-        bounds = bounds.isNull() ? stroke.boundingRect() : bounds.united(stroke.boundingRect());
-    }
-
-    for (const QRectF& rect : formula.placeholders)
-    {
-        bounds = bounds.isNull() ? rect : bounds.united(rect);
-    }
-
-    if (bounds.isEmpty() && bounds.isNull())
+    if (bounds.isEmpty())
     {
         return pixmap;
     }
 
     const qreal margin = 1;
     const qreal available = qMin(size.width(), size.height()) - 2 * margin;
-    // single small symbols are not blown up: at most 44 px per em
-    const qreal scale = qMin(44.0, available / qMax(qMax(bounds.width(), bounds.height()), 0.01));
+    // single small symbols are not blown up: at most 40 px per em
+    const qreal scale = qMin(40.0, available / qMax(qMax(bounds.width(), bounds.height()), 0.01));
 
     QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
@@ -368,13 +389,9 @@ QPixmap UBMathPalette::formulaPixmap(const UBMathInkLayout::Formula& formula, co
         painter.drawRect(rect.adjusted(0.03, 0.03, -0.03, -0.03));
     }
 
-    QPen inkPen(color, 2.0 / scale, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-    painter.setPen(inkPen);
-
-    for (const QPolygonF& stroke : ink)
-    {
-        painter.drawPolyline(stroke);
-    }
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(color);
+    painter.drawPath(formula.path());
 
     return pixmap;
 }
@@ -388,25 +405,48 @@ QToolButton* UBMathPalette::createTemplateButton(const MathTemplate& tmpl, QWidg
     button->setCheckable(true);
     button->setToolTip(tmpl.toolTip);
 
-    QString error;
-    const UBMathInkLayout::Formula formula = UBMathInkLayout::layout(tmpl.source, &error);
-
-    if (!error.isEmpty())
-    {
-        qWarning() << "UBMathPalette: cannot lay out" << tmpl.source << error;
-    }
-
-    // monochrome mask, tinted with the glyph colour of the glass material below the palette
-    const QImage mask = formulaPixmap(formula, QSize(sIconSize, sIconSize), Qt::black, qMax<qreal>(2.0, devicePixelRatioF())).toImage();
-    button->setIcon(UBGlassStyle::tintedImageIcon(mask));
     button->setIconSize(QSize(sIconSize, sIconSize));
-
     button->setProperty("formulaIndex", mFormulas.size());
-    mFormulas << formula;
+    mTemplateButtons << button;
+    mTemplateSources << tmpl.source;
+    mFormulas << UBMathInkLayout::Formula();
+    updateTemplateButton(mFormulas.size() - 1);
 
     connect(button, &QToolButton::clicked, this, &UBMathPalette::templateButtonClicked);
 
     return button;
+}
+
+void UBMathPalette::updateTemplateButton(int index)
+{
+    QString error;
+    const UBMathInkLayout::Formula formula = UBMathInkLayout::layout(mTemplateSources.at(index), &error, displayStyle());
+
+    if (!error.isEmpty())
+    {
+        qWarning() << "UBMathPalette: cannot lay out" << mTemplateSources.at(index) << error;
+    }
+
+    // monochrome mask of the typeset symbol, tinted with the glyph colour of the glass material below the palette
+    const QImage mask = formulaPixmap(formula, QSize(sIconSize, sIconSize), Qt::black, qMax<qreal>(2.0, devicePixelRatioF())).toImage();
+    mTemplateButtons.at(index)->setIcon(UBGlassStyle::tintedImageIcon(mask));
+    mFormulas[index] = formula;
+}
+
+bool UBMathPalette::displayStyle()
+{
+    return UBSettings::settings()->boardMathDisplayStyle->get().toBool();
+}
+
+void UBMathPalette::displayStyleToggled(bool display)
+{
+    mWriter->cancelPlacement();
+    UBSettings::settings()->boardMathDisplayStyle->set(display);
+
+    for (int i = 0; i < mTemplateButtons.size(); ++i)
+    {
+        updateTemplateButton(i);
+    }
 }
 
 int UBMathPalette::border()
@@ -582,7 +622,7 @@ void UBMathPalette::inkTextEntered()
     }
 
     QString error;
-    const UBMathInkLayout::Formula formula = UBMathInkLayout::layout(text, &error);
+    const UBMathInkLayout::Formula formula = UBMathInkLayout::layout(text, &error, displayStyle());
 
     if (!error.isEmpty() || formula.isEmpty())
     {
@@ -602,11 +642,11 @@ void UBMathPalette::inkTextEntered()
     mWriter->beginPlacement(formula);
 }
 
-void UBMathPalette::sizeChanged(int halfCentimetres)
+void UBMathPalette::sizeChanged(int index)
 {
-    const qreal sizeCm = halfCentimetres / 2.0;
-    mSizeLabel->setText(tr("%1 cm").arg(QLocale().toString(sizeCm, 'f', halfCentimetres % 2 ? 1 : 0)));
-    UBSettings::settings()->boardMathInkSizeCm->set(sizeCm);
+    const int points = sFontSizes.value(index, UBInkWriter::defaultFontSize);
+    mSizeLabel->setText(tr("%1 pt").arg(points));
+    UBSettings::settings()->boardMathFontSize->set(points);
 }
 
 void UBMathPalette::placementStarted()

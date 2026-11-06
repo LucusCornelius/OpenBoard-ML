@@ -475,6 +475,6 @@
         <file alias="medion-p82030.json">etc/shortcutProfiles/medion-p82030.json</file>
     </qresource>
     <qresource prefix="/math">
-        <file alias="inkGlyphs.json">math/inkGlyphs.json</file>
+        <file alias="latinmodern-math.otf">math/latinmodern-math.otf</file>
     </qresource>
 </RCC>
