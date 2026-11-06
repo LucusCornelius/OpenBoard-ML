@@ -43,8 +43,9 @@ class UBGlassEffect
         /**
          * Apply a native glass material behind a floating panel, when available.
          * The panel then has the property "ubNativeGlass" and must paint only its
-         * controls (no glass body); it may publish "ubGlassBody" (QRect) and
-         * "ubGlassRadius" (qreal) for the shape of the material.
+         * controls (no glass body); it may publish "ubGlassBody" (QRect), or
+         * "ubGlassInset" (int or QMargins, the body inset from its edges, follows
+         * resizes at once), and "ubGlassRadius" (qreal) for the shape of the material.
          */
         static void applyToPanel(QWidget* panel);
 

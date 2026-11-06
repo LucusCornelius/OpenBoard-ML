@@ -64,6 +64,10 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
 , mResized(false)
 , mCollapseWidth(150)
 , mLastWidth(-1)
+, mMousePressGlobalX(0)
+, mMousePressWidth(0)
+, mWasCollapsed(false)
+, mTopInset(-1)
 , mHTab(0)
 , mpStackWidget(NULL)
 , mpLayout(NULL)
@@ -78,6 +82,7 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
 
     mpStackWidget = new QStackedWidget(this);
     mpLayout->addWidget(mpStackWidget);
+    mBaseMargins = mpLayout->contentsMargins();
 
     // clear the tab widgets
     mTabWidgets.clear();
@@ -101,6 +106,9 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
     // This is the only way to set the background as transparent!
     setStyleSheet("QWidget {background-color: transparent}");
 
+    // the open dock starts below the title bar of the window
+    watchWindow();
+
     // Set the position of the tab
     onToolbarPosUpdated();
     connect(UBSettings::settings()->appToolBarPositionedAtTop, SIGNAL(changed(QVariant)), this, SLOT(onToolbarPosUpdated()));
@@ -115,6 +123,12 @@ UBDockPalette::UBDockPalette(eUBDockPaletteType paletteType, QWidget *parent, co
     // native glass of the platform behind the dock body, when available
     if (UBUiStyle::isGlass())
     {
+        // a floating glass sidebar, inset from the edges (and below the title bar, see
+        // updateTopInset); given as an inset, the glass follows every resize of the dock
+        // at once (drag, collapse, expand)
+        updateTopInset();
+        setProperty("ubGlassRadius", 18.0);
+
         UBGlassEffect::applyToPanel(this);
 
         if (property("ubNativeGlass").toBool())
@@ -196,6 +210,22 @@ void UBDockPalette::resizeEvent(QResizeEvent *event)
 {
     Q_UNUSED(event);
     updateMaxWidth();
+
+    updateTopInset();
+
+    // remember the open width: a collapse (tab click or drag) and the next expand use it
+    if (width() >= mCollapseWidth)
+        mLastWidth = width();
+
+    // the arrow of the tab shows the collapsed state
+    const bool collapsed = isCollapsed();
+
+    if (collapsed != mWasCollapsed)
+    {
+        mWasCollapsed = collapsed;
+        mTabPalette->update();
+    }
+
     if(parentWidget())
     {
         setMinimumHeight(parentWidget()->height());
@@ -261,28 +291,84 @@ void UBDockPalette::paintEvent(QPaintEvent *event)
 
     // native glass (UBGlassEffect): a floating glass sidebar, inset from the edges, the content is painted on it
     if (property("ubNativeGlass").toBool())
-    {
-        const int inset = 6;
-        setProperty("ubGlassBody", rect().adjusted(inset, inset, -inset, -inset));
-        setProperty("ubGlassRadius", 18.0);
         return;
-    }
 
     int nbTabs = mTabWidgets.size();
     if(0 < nbTabs)
     {
         // First draw the BIG RECTANGLE (I write it big because the rectangle is big...)
+        const int top = qMax(0, mTopInset);
+
         if(mOrientation == eUBDockOrientation_Left)
         {
-            path.addRect(0.0, 0.0, width(), height());
+            path.addRect(0.0, top, width(), height() - top);
         }
         else if(mOrientation == eUBDockOrientation_Right)
         {
-            path.addRect(0.0, 0.0, width(), height());
+            path.addRect(0.0, top, width(), height() - top);
         }
 
         painter.drawPath(path);
     }
+}
+
+/**
+ * \brief Keep the open dock below the title bar of the window
+ *
+ * On macOS the board extends below the transparent title bar: the traffic lights
+ * would cover the top of the open dock (glass and thumbnails). The dock keeps
+ * its full height (the tab position is unchanged), its glass body and content
+ * start below the title bar. Elsewhere the inset is 0.
+ */
+void UBDockPalette::updateTopInset()
+{
+    const int top = UBGlassEffect::topInset(this);
+
+    if (top == mTopInset)
+        return;
+
+    mTopInset = top;
+
+    const int inset = 6;
+    setProperty("ubGlassInset", QVariant::fromValue(QMargins(inset, inset + top, inset, inset)));
+    mpLayout->setContentsMargins(mBaseMargins + QMargins(0, top, 0, 0));
+    update();
+}
+
+/**
+ * \brief Watch the window of the dock for changes of its title bar height
+ */
+void UBDockPalette::watchWindow()
+{
+    if (mWatchedWindow)
+        mWatchedWindow->removeEventFilter(this);
+
+    mWatchedWindow = window() != this ? window() : nullptr;
+
+    if (mWatchedWindow)
+        mWatchedWindow->installEventFilter(this);
+
+    updateTopInset();
+}
+
+bool UBDockPalette::eventFilter(QObject *watched, QEvent *event)
+{
+    // the native window chrome publishes the height of its title bar on the window (UBGlassEffect)
+    if (watched == mWatchedWindow && event->type() == QEvent::DynamicPropertyChange
+            && static_cast<QDynamicPropertyChangeEvent*>(event)->propertyName() == "ubGlassTitleBarHeight")
+    {
+        updateTopInset();
+    }
+
+    return QWidget::eventFilter(watched, event);
+}
+
+/**
+ * \brief Collapsed: the dock is closed, only its tabs are shown
+ */
+bool UBDockPalette::isCollapsed() const
+{
+    return width() < mCollapseWidth;
 }
 
 /**
@@ -373,12 +459,17 @@ void UBDockPalette::showTabWidget(int tabIndex)
  */
 void UBDockPalette::toggleCollapseExpand()
 {
-    if(width() < mCollapseWidth)
-        resize(mLastWidth,height());
-    else{
+    if (isCollapsed())
+    {
+        // back at the last open width (it may not be known yet, e.g. never opened)
+        const int defaultWidth = 270;
+        const int openWidth = mLastWidth >= mCollapseWidth ? mLastWidth : defaultWidth;
+        resize(qMin(openWidth, maximumWidth()), height());
+    }
+    else
+    {
         mLastWidth = width();
-        update();
-        resize(0,height());
+        resize(0, height());
     }
 }
 
@@ -604,6 +695,7 @@ void UBDockPalette::assignParent(QWidget *widget)
 {
     setParent(widget);
     mTabPalette->setParent(widget);
+    watchWindow();
     
     // Update size constraints from new parent to avoid an issue in dark mode where the library dock palette would no longer be correctly sized
     if (widget)
@@ -670,11 +762,24 @@ static QPixmap glassTabIcon(UBDockPaletteWidget* widget)
     return widget->tabIcon();
 }
 
+/**
+ * \brief Horizontal mouse position on the screen
+ */
+static int globalX(QMouseEvent* event)
+{
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    return qRound(event->globalPosition().x());
+#else
+    return event->globalPos().x();
+#endif
+}
+
 UBTabDockPalette::UBTabDockPalette(UBDockPalette *dockPalette, QWidget *parent) :
             QWidget(parent)
 , dock(dockPalette)
 , mVerticalOffset(0)
 , mFlotable(false)
+, mIgnoreRelease(false)
 {
     int numTabs = dock->mTabWidgets.size();
     resize(2 * dock->border(), (numTabs * TABSIZE) + qMax(numTabs - 1, 0) * dock->tabSpacing());
@@ -822,6 +927,8 @@ void UBTabDockPalette::mousePressEvent(QMouseEvent *event)
     // It is only possible to resize it if the border is selected
     QPoint p = event->pos();
     dock->mMousePressPos = p;
+    dock->mMousePressGlobalX = globalX(event);
+    dock->mMousePressWidth = dock->width();
     dock->mResized = false;
 
     switch(dock->mOrientation) {
@@ -845,10 +952,16 @@ void UBTabDockPalette::mouseMoveEvent(QMouseEvent *event)
 {
     QPoint p = event->pos();
 
-    if(dock->mCanResize && ((dock->mMousePressPos - p).manhattanLength() > QApplication::startDragDistance()))
+    // the tab moves with the dock edge: follow the distance the mouse moved sideways since the
+    // press (global coordinates), not its position on the tab, so the edge neither jumps nor
+    // stops following once the tab has caught up with the mouse; a click that wobbles a little
+    // stays a click
+    const int dx = globalX(event) - dock->mMousePressGlobalX;
+    const bool dragging = dock->mResized || qAbs(dx) > QApplication::startDragDistance();
+
+    if(dock->mCanResize && dragging)
     {
         if (qAbs(dock->mMousePressPos.y() - p.y()) > 10 && mFlotable) {
-            qDebug() << "y differences" << dock->mMousePressPos.y() << p.y();
             mVerticalOffset += p.y() - dock->mMousePressPos.y();
             move(this->pos().x(),  p.y());
         }
@@ -856,30 +969,23 @@ void UBTabDockPalette::mouseMoveEvent(QMouseEvent *event)
         switch(dock->mOrientation) {
 
         case eUBDockOrientation_Left:
-            p.setX(p.x() + dock->width());
-            if(p.x() < dock->collapseWidth() && p.x() >= dock->minimumWidth()) {
-                dock->update();
-                dock->resize(0, dock->height());
-                //dock->mLastWidth = dock->collapseWidth() + 1;
-                dock->mResized = true;
-            } else if (p.x() <= dock->maximumWidth() && p.x() >= dock->minimumWidth()) {
-                dock->resize(p.x(), dock->height());
-                dock->mResized = true;
-            }
-            break;
-
         case eUBDockOrientation_Right:
-            p.setX(p.x() - 2 * dock->border());
-            if((dock->x() + p.x() > dock->parentWidget()->width() - dock->collapseWidth()) && (dock->x() + p.x() < dock->parentWidget()->width())) {
-                dock->update();
-                dock->resize(0, dock->height());
-                //dock->mLastWidth = dock->collapseWidth() + 1;
-                dock->mResized = true;
-            } else if((dock->x() + p.x() >= dock->parentWidget()->width() - dock->maximumWidth()) && (dock->x() + p.x() <= dock->parentWidget()->width() - dock->minimumWidth())) {
-                dock->resize(dock->parentWidget()->width() - (dock->x() + p.x()), dock->height());
-                dock->mResized = true;
-            }
+        {
+            const int width = dock->mMousePressWidth + (dock->mOrientation == eUBDockOrientation_Left ? dx : -dx);
+
+            // narrower than the collapse width: collapse, else follow the mouse up to the maximum
+            const int newWidth = width < dock->collapseWidth() ? 0 : qMin(width, dock->maximumWidth());
+
+            // collapsed by dragging an open dock: it opens again at the width it had before the drag
+            if (newWidth == 0 && dock->mMousePressWidth >= dock->collapseWidth())
+                dock->mLastWidth = dock->mMousePressWidth;
+
+            if (newWidth != dock->width())
+                dock->resize(newWidth, dock->height());
+
+            dock->mResized = true;
             break;
+        }
 
         case eUBDockOrientation_Top:
         case eUBDockOrientation_Bottom:
@@ -895,9 +1001,27 @@ void UBTabDockPalette::mouseMoveEvent(QMouseEvent *event)
     }
 }
 
+/**
+ * \brief The first click of a double click has toggled the dock already: the second
+ * press and its release are ignored, a double click acts like one click
+ */
+void UBTabDockPalette::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    mIgnoreRelease = true;
+    dock->mCanResize = false;
+    event->accept();
+}
+
 void UBTabDockPalette::mouseReleaseEvent(QMouseEvent *event)
 {
     Q_UNUSED(event);
+
+    if (mIgnoreRelease)
+    {
+        mIgnoreRelease = false;
+        dock->mCanResize = false;
+        return;
+    }
     if(!dock->mResized && dock->mClickTime.elapsed() < CLICKTIME) {
         int nbTabs = dock->mTabWidgets.size();
         int clickedTab = 0;
@@ -930,7 +1054,18 @@ void UBTabDockPalette::tabletEvent(QTabletEvent *event)
 #else
         QMouseEvent mouseEvent(QEvent::MouseButtonPress, event->posF(), event->button(), event->buttons(), event->modifiers());
 #endif
-        mousePressEvent(&mouseEvent);
+        // tablets have no double click event: a second tap within the double click interval is one
+        if (mLastTabletPress.isValid() && mLastTabletPress.elapsed() < QApplication::doubleClickInterval())
+        {
+            mLastTabletPress.invalidate();
+            mouseDoubleClickEvent(&mouseEvent);
+        }
+        else
+        {
+            mLastTabletPress.start();
+            mousePressEvent(&mouseEvent);
+        }
+
         event->accept();
     }
     else if (event->type() == QEvent::TabletMove)
