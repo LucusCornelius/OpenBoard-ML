@@ -29,8 +29,8 @@ class QWidget;
  *
  * On macOS (UBGlassEffect_mac.mm) the main window gets a transparent title bar
  * with a full size content view, so that the board extends under the title
- * bar. On macOS 26 and later floating panels may get a native
- * NSGlassEffectView behind them (opt-in, see the .mm file).
+ * bar. Floating panels get the native system material (NSGlassEffectView on
+ * macOS 26 and later, NSVisualEffectView before), see the .mm file.
  * On all other platforms these functions do nothing: the Qt painted glass
  * (UBFloatingPalette / UBGlassStyle) is the complete look.
  */
@@ -40,7 +40,12 @@ class UBGlassEffect
         /** apply the native window chrome (transparent title bar, full size content) */
         static void applyToWindow(QWidget* window);
 
-        /** apply a native glass material behind a floating panel, when available */
+        /**
+         * Apply a native glass material behind a floating panel, when available.
+         * The panel then has the property "ubNativeGlass" and must paint only its
+         * controls (no glass body); it may publish "ubGlassBody" (QRect) and
+         * "ubGlassRadius" (qreal) for the shape of the material.
+         */
         static void applyToPanel(QWidget* panel);
 
         /**

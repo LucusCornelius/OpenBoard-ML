@@ -33,6 +33,7 @@
 
 #include "UBDockPalette.h"
 #include "UBGlassStyle.h"
+#include "UBGlassEffect.h"
 
 #include "frameworks/UBPlatformUtils.h"
 
@@ -614,6 +615,9 @@ UBTabDockPalette::UBTabDockPalette(UBDockPalette *dockPalette, QWidget *parent) 
     resize(2 * dock->border(), (numTabs * TABSIZE) + qMax(numTabs - 1, 0) * dock->tabSpacing());
 
     setAttribute(Qt::WA_TranslucentBackground);
+
+    // native glass of the platform behind the tabs, when available
+    UBGlassEffect::applyToPanel(this);
 }
 
 void UBTabDockPalette::paintEvent(QPaintEvent *)
@@ -628,6 +632,10 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
     painter.setBrush(dock->mBackgroundBrush);
+
+    // with native glass (UBGlassEffect) only the icons are painted, on the glass of all tabs
+    const bool nativeGlass = property("ubNativeGlass").toBool();
+    QRectF glassBody;
 
     int yFrom = 0;
     for (int i = 0; i < nTabs; i++) {
@@ -681,13 +689,18 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
             tabRect.moveLeft(-overlap);
         }
 
-        if (dock->mCurrentTab != i)
-        {
-            painter.setOpacity(0.8);
-        }
+        glassBody |= tabRect;
 
-        UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
-        painter.setOpacity(1.0);
+        if (!nativeGlass)
+        {
+            if (dock->mCurrentTab != i)
+            {
+                painter.setOpacity(0.8);
+            }
+
+            UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
+            painter.setOpacity(1.0);
+        }
 
         // Optional tab icon
         if (!tabIcon.isNull()) {
@@ -722,6 +735,9 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
         yFrom += (TABSIZE + dock->tabSpacing());
         painter.restore();
     }
+
+    setProperty("ubGlassBody", glassBody.toAlignedRect());
+    setProperty("ubGlassRadius", 10.0);
 }
 UBTabDockPalette::~UBTabDockPalette()
 {

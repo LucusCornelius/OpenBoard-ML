@@ -455,8 +455,8 @@ bool UBFloatingPalette::hasNativeGlass() const
 
 bool UBFloatingPalette::backdropActive() const
 {
-    // with native glass the backdrop is still captured: its luminance selects the glyph colours
-    return mGlassBackdropEnabled && parentWidget() && !isWindow();
+    // native glass of the platform renders (and adapts) the backdrop itself, the glyphs follow the theme
+    return mGlassBackdropEnabled && parentWidget() && !isWindow() && !hasNativeGlass();
 }
 
 
