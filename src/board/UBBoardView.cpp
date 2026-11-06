@@ -55,6 +55,7 @@
 #include "gui/UBResources.h"
 #include "gui/UBMainWindow.h"
 #include "gui/UBSnapIndicator.h"
+#include "gui/UBLineAngleIndicator.h"
 #include "gui/UBDocumentThumbnailsView.h"
 
 #include "board/UBBoardController.h"
@@ -430,12 +431,16 @@ void UBBoardView::tabletEvent (QTabletEvent * event)
     case QEvent::TabletPress: {
         mTabletStylusIsPressed = true;
         scene()->inputDevicePress (scenePos, pressure, event->modifiers());
+        updateLineAngleIndicator();
 
         break;
     }
     case QEvent::TabletMove: {
         if (mTabletStylusIsPressed)
+        {
             scene ()->inputDeviceMove (scenePos, pressure, event->modifiers());
+            updateLineAngleIndicator();
+        }
 
         acceptEvent = false; // rerouted to mouse move
 
@@ -448,6 +453,7 @@ void UBBoardView::tabletEvent (QTabletEvent * event)
         setToolCursor (currentTool);
 
         scene ()->inputDeviceRelease (currentTool, event->modifiers());
+        updateLineAngleIndicator();
 
         mPendingStylusReleaseEvent = false;
 
@@ -1023,6 +1029,30 @@ void UBBoardView::updateSnapIndicator(Qt::Corner corner, QPointF snapPoint, doub
     mSnapIndicator->appear(corner, snapPoint, angle);
 }
 
+void UBBoardView::updateLineAngleIndicator()
+{
+    std::shared_ptr<UBGraphicsScene> currentScene = scene();
+    QLineF line;
+
+    if (!currentScene || !currentScene->lineAngleFeedback(line))
+    {
+        if (mLineAngleIndicator)
+            mLineAngleIndicator->hide();
+
+        return;
+    }
+
+    if (!mLineAngleIndicator)
+        mLineAngleIndicator = new UBLineAngleIndicator(this);
+
+    // sub-pixel view positions, in the coordinates of this widget (the indicator's parent)
+    const QTransform toView = viewportTransform();
+    const QPointF viewportOffset = viewport()->pos();
+
+    mLineAngleIndicator->showLine(line, toView.map(line.p1()) + viewportOffset, toView.map(line.p2()) + viewportOffset,
+                                  currentScene->isDarkBackground());
+}
+
 void UBBoardView::setBoxing(const QMargins& margins)
 {
     mMargins = margins;
@@ -1163,6 +1193,7 @@ void UBBoardView::mousePressEvent (QMouseEvent *event)
                 }
                 // keep the sub-pixel position (Retina screens, tablets in mouse mode)
                 scene()->inputDevicePress(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), 1., event->modifiers());
+                updateLineAngleIndicator();
             }
             event->accept ();
         }
@@ -1330,6 +1361,7 @@ void UBBoardView::mouseMoveEvent (QMouseEvent *event)
             const QPointF eventPosition = event->localPos();
 #endif
             scene()->inputDeviceMove(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), mMouseButtonIsPressed, event->modifiers());
+            updateLineAngleIndicator();
         }
         event->accept ();
     }
@@ -1357,6 +1389,8 @@ void UBBoardView::mouseReleaseEvent (QMouseEvent *event)
     // first/ propagate device release to the scene
     if (scene())
         scene()->inputDeviceRelease(currentTool, event->modifiers());
+
+    updateLineAngleIndicator();
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     QPointF eventPosition = event->position();
@@ -1636,6 +1670,7 @@ void UBBoardView::forcedTabletRelease ()
         qWarning () << "forcing device release";
 
         scene ()->inputDeviceRelease ();
+        updateLineAngleIndicator();
 
         mMouseButtonIsPressed = false;
         mTabletStylusIsPressed = false;

@@ -515,6 +515,8 @@ void UBSettings::init()
     swapControlAndDisplayScreens = new UBSetting(this, "App", "SwapControlAndDisplayScreens", false);
 
     rotationAngleStep = new UBSetting(this, "App", "RotationAngleStep", 5.);
+    boardLineAngleGrip = new UBSetting(this, "Board", "LineAngleGrip", true);
+    boardLineAngleGripTolerance = new UBSetting(this, "Board", "LineAngleGripTolerance", 2.);
     historyLimit = new UBSetting(this, "Web", "HistoryLimit", 15);
 
     libIconSize = new UBSetting(this, "Library", "LibIconSize", defaultLibraryIconSize);

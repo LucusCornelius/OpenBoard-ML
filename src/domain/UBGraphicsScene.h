@@ -269,6 +269,26 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         QPointF snap(const QRectF& rect, Qt::Corner* corner = nullptr) const;
         static QRectF itemRect(const QGraphicsItem* item);
 
+        /**
+         * Grip a line to exactly 0, 90, 180 or 270 degrees when its direction is within
+         * toleranceDegrees of it: the start point and the length are kept, only end changes,
+         * and then has exactly the same y (or x) as start. Returns true when gripped.
+         */
+        static bool gripLineToAxis(const QPointF& start, QPointF& end, qreal toleranceDegrees);
+
+        /**
+         * The straight line being drawn with the Line tool or the Shapes tool (line, arrow),
+         * in scene coordinates, for the angle readout of the view. False when none.
+         */
+        bool lineAngleFeedback(QLineF& line) const
+        {
+            if (!mLineFeedbackActive)
+                return false;
+
+            line = mLineFeedback;
+            return true;
+        }
+
         class SceneViewState
         {
             public:
@@ -528,6 +548,13 @@ signals:
 
         UBGraphicsShapeItem* mCurrentShape{nullptr};
         QPointF mShapeStartPoint;
+
+        // line being drawn, see lineAngleFeedback()
+        // grip end to an axis when enabled in the settings; snapLength: then snap the end point
+        // to the grid along the axis. True when the line was gripped.
+        bool gripLineEnd(const QPointF& start, QPointF& end, bool snapLength) const;
+        bool mLineFeedbackActive{false};
+        QLineF mLineFeedback;
 };
 
 

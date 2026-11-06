@@ -473,6 +473,10 @@ bool UBGraphicsScene::inputDevicePress(const QPointF& scenePos, const qreal& pre
                 drawLineTo(pos, width, isLine);
 
                 mCurrentStroke->addPoint(pos, width);
+
+                // angle readout of the view while the line is drawn
+                mLineFeedbackActive = isLine;
+                mLineFeedback = QLineF(pos, pos);
             }
             accepted = true;
         }
@@ -599,7 +603,10 @@ bool UBGraphicsScene::inputDeviceMove(const QPointF& scenePos, const qreal& pres
             }
 
             else if (currentTool == UBStylusTool::Line) {
-                if (isSnapping())
+                // grip to exactly horizontal / vertical, independently of the grid snap (with
+                // the snap on, the length then snaps to the grid along the axis);
+                // the angle is shown by the view (lineAngleFeedback), next to the pen tip
+                if (!gripLineEnd(mPreviousPoint, position, isSnapping()) && isSnapping())
                 {
                     // compute two proposals and compare the angle
                     QPointF gridSnapPoint;
@@ -615,16 +622,12 @@ bool UBGraphicsScene::inputDeviceMove(const QPointF& scenePos, const qreal& pres
                             position = gridSnapPoint;
                         }
                     }
+
+                    gripLineEnd(mPreviousPoint, position, false);
                 }
 
-                QLineF radius(mPreviousPoint, position);
-                auto angle = radius.angle();
-                QLineF viewRadius{UBApplication::boardController->controlView()->mapFromScene(radius.p1()),
-                        UBApplication::boardController->controlView()->mapFromScene(radius.p2())};
-                QPoint offset = - viewRadius.p2().toPoint();
-                viewRadius.setLength(viewRadius.length() + 30);
-                offset += viewRadius.p2().toPoint();
-                UBApplication::boardController->setCursorFromAngle(angle, offset);
+                mLineFeedbackActive = true;
+                mLineFeedback = QLineF(mPreviousPoint, position);
 
                 drawLineTo(position, width, true);
             }
@@ -703,6 +706,8 @@ bool UBGraphicsScene::inputDeviceMove(const QPointF& scenePos, const qreal& pres
 bool UBGraphicsScene::inputDeviceRelease(int tool, Qt::KeyboardModifiers modifiers)
 {
     bool accepted = false;
+
+    mLineFeedbackActive = false;
 
     if (mPointer)
     {
@@ -2542,6 +2547,70 @@ bool UBGraphicsScene::isSnapping() const
     return UBApplication::mainWindow->actionSnap->isChecked();
 }
 
+bool UBGraphicsScene::gripLineToAxis(const QPointF& start, QPointF& end, qreal toleranceDegrees)
+{
+    const qreal length = QLineF(start, end).length();
+
+    if (length <= 0. || toleranceDegrees < 0.)
+        return false;
+
+    if (start.x() == end.x() || start.y() == end.y())
+        return true; // already exact
+
+    // 0..360, counter-clockwise on the screen (scene y points down)
+    const qreal angle = QLineF(start, end).angle();
+    const int quadrant = qRound(angle / 90.);
+
+    if (qAbs(angle - quadrant * 90.) > toleranceDegrees)
+        return false;
+
+    // set the coordinates directly: QLineF::setAngle() leaves rounding errors (cos 90° != 0)
+    switch (quadrant % 4)
+    {
+    case 0:
+        end = QPointF(start.x() + length, start.y());
+        break;
+    case 1:
+        end = QPointF(start.x(), start.y() - length);
+        break;
+    case 2:
+        end = QPointF(start.x() - length, start.y());
+        break;
+    default:
+        end = QPointF(start.x(), start.y() + length);
+        break;
+    }
+
+    return true;
+}
+
+bool UBGraphicsScene::gripLineEnd(const QPointF& start, QPointF& end, bool snapLength) const
+{
+    UBSettings* settings = UBSettings::settings();
+
+    if (!settings->boardLineAngleGrip->get().toBool())
+        return false;
+
+    QPointF gripped = end;
+
+    if (!gripLineToAxis(start, gripped, qBound(0., settings->boardLineAngleGripTolerance->get().toDouble(), 45.)))
+        return false;
+
+    if (snapLength && gripped != start)
+    {
+        // move the end point to the grid along the axis only: the line stays exactly straight
+        const QPointF gridded = gripped + snap(gripped);
+
+        if (gripped.y() == start.y())
+            gripped.setX(gridded.x());
+        else
+            gripped.setY(gridded.y());
+    }
+
+    end = gripped;
+    return true;
+}
+
 QPointF UBGraphicsScene::snap(const QPointF& point, double* force, std::optional<QPointF> proposedPoint, QPointF* gridSnapPoint) const
 {
     if (!mBackground)
@@ -3211,6 +3280,9 @@ bool UBGraphicsScene::shapeToolPress(const QPointF& scenePos)
     addItem(shape);
     mCurrentShape = shape;
 
+    mLineFeedbackActive = shape->isLinear();
+    mLineFeedback = QLineF(pos, pos);
+
     return true;
 }
 
@@ -3223,19 +3295,22 @@ void UBGraphicsScene::shapeToolMove(const QPointF& scenePos, Qt::KeyboardModifie
 
     QPointF pos = scenePos;
 
-    if (isSnapping())
-    {
-        pos += snap(scenePos);
-    }
-
     if (modifiers & Qt::ShiftModifier)
     {
+        if (isSnapping())
+        {
+            pos += snap(scenePos);
+        }
+
         if (mCurrentShape->isLinear())
         {
             // constrain the angle to multiples of 45 degrees
             QLineF line(mShapeStartPoint, pos);
             line.setAngle(qRound(line.angle() / 45.) * 45.);
             pos = line.p2();
+
+            // horizontal / vertical: remove the rounding errors of setAngle()
+            gripLineToAxis(mShapeStartPoint, pos, 1e-6);
         }
         else
         {
@@ -3244,6 +3319,25 @@ void UBGraphicsScene::shapeToolMove(const QPointF& scenePos, Qt::KeyboardModifie
             const qreal side = qMax(qAbs(delta.x()), qAbs(delta.y()));
             pos = mShapeStartPoint + QPointF(delta.x() < 0 ? -side : side, delta.y() < 0 ? -side : side);
         }
+    }
+    else if (!mCurrentShape->isLinear() || !gripLineEnd(mShapeStartPoint, pos, isSnapping()))
+    {
+        // lines and arrows within the grip tolerance were made horizontal / vertical above
+        if (isSnapping())
+        {
+            pos += snap(scenePos);
+        }
+
+        if (mCurrentShape->isLinear())
+        {
+            gripLineEnd(mShapeStartPoint, pos, false);
+        }
+    }
+
+    if (mCurrentShape->isLinear())
+    {
+        mLineFeedbackActive = true;
+        mLineFeedback = QLineF(mShapeStartPoint, pos);
     }
 
     mCurrentShape->setGeometryFromPoints(mShapeStartPoint, pos);

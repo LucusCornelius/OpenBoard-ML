@@ -51,6 +51,7 @@ HEADERS +=  \
     src/gui/UBPreferredBackgroundWidget.h \
     src/gui/UBBoardThumbnailsView.h \
     src/gui/UBSnapIndicator.h \
+    src/gui/UBLineAngleIndicator.h \
     src/gui/UBMathPalette.h \
     src/gui/UBColorPickerPopup.h \
     src/gui/UBColorPaletteDialog.h \
@@ -116,6 +117,7 @@ SOURCES +=  \
     src/gui/UBPreferredBackgroundWidget.cpp \
     src/gui/UBBoardThumbnailsView.cpp \
     src/gui/UBSnapIndicator.cpp \
+    src/gui/UBLineAngleIndicator.cpp \
     src/gui/UBMathPalette.cpp \
     src/gui/UBColorPickerPopup.cpp \
     src/gui/UBColorPaletteDialog.cpp \

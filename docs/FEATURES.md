@@ -11,6 +11,7 @@ with the normal upstream build instructions (CMake or qmake); no new dependencie
 | Page backgrounds in real centimetres (blank, lined, 1 cm, 0.5 cm, black) | Backgrounds button; Preferences → Grid | [docs/BACKGROUNDS.md](BACKGROUNDS.md) |
 | Maths notation palette, typeset like LaTeX (√, ∫, Σ, lim, brackets, Greek, …) | "Maths" toolbar button (show/hide) | [Maths](#maths-notation-palette), [docs/MATHS.md](MATHS.md) |
 | Shapes tool and text boxes (Freeform-like) | Stylus palette, after the Line tool; text item title bar | [Shapes](#shapes-and-text-boxes) |
+| Line angle readout and horizontal/vertical grip | Line tool, Shapes tool line/arrow; Preferences → Grid | [Line angle](#line-angle) |
 
 ## Colours and palettes
 
@@ -107,6 +108,25 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
   none → border → border + background → background. Also in the item menu.
   Stored as `ub:boxBorder` / `ub:boxFill`.
 * Settings: `Board/ShapeKind`, `Board/ShapeFill`.
+
+### Line angle
+
+* While a straight line is drawn (Line tool, Shapes tool line and arrow; pen or mouse) a
+  small flat glass capsule next to the end point shows its angle in whole degrees, on the
+  side away from the start point so the pen and hand do not cover it. Convention: 0° points
+  to the right, counter-clockwise positive, range −179°..180° (up 90°, left 180°, down −90°).
+  A line that is close to an axis but not exactly on it shows one decimal (e.g. `0.4°`).
+  The capsule turns into a solid accent capsule with bolder text when the line is exactly
+  horizontal or vertical, and disappears on release. It is a child widget of the board view:
+  never saved, not in thumbnails, PDF export or the projection view.
+* **Grip to horizontal/vertical**, independent of the grid Snap: within the tolerance
+  (default ±2°) of 0°/90°/180°/270° the line becomes exactly straight (same y or x as the
+  start point in the page data); the start point and the length are kept, the end point is
+  not moved to the grid. With Snap on, a gripped line keeps its axis and only its length
+  snaps to the grid; other lines keep the grid + 5° step behaviour. Shift in the Shapes tool
+  still constrains to 45°.
+* Preferences → Grid: *Grip lines to horizontal/vertical* (`Board/LineAngleGrip`, on) and
+  *Tolerance* (`Board/LineAngleGripTolerance`, 2°).
 
 ## User interface (Liquid Glass)
 

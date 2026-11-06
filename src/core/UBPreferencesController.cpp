@@ -33,6 +33,10 @@
 #include "UBApplication.h"
 #include <QPainter>
 #include <QScreen>
+#include <QCheckBox>
+#include <QDoubleSpinBox>
+#include <QHBoxLayout>
+#include <QLabel>
 
 #include "gui/UBCircleFrame.h"
 #include "gui/UBColorPaletteDialog.h"
@@ -401,6 +405,39 @@ void UBPreferencesController::wire()
     // screen calibration for real size grids
     mPreferencesUI->gridLayout_17->addWidget(new UBScreenCalibrationWidget{mPreferencesUI->gridTab}, 2, 0);
 
+    // Line tool and Shapes tool line/arrow: grip to horizontal/vertical, independent of the grid snap
+    {
+        QFrame* lineGripFrame = new QFrame(mPreferencesUI->gridFrame);
+        lineGripFrame->setFrameShape(QFrame::NoFrame);
+        QHBoxLayout* lineGripLayout = new QHBoxLayout(lineGripFrame);
+
+        mLineAngleGripCheckBox = new QCheckBox(tr("Grip lines to horizontal/vertical"), lineGripFrame);
+        mLineAngleGripCheckBox->setToolTip(tr("The Line tool and the shape lines become exactly horizontal or vertical "
+                                              "when they are drawn within the tolerance of it. The end point is not moved to the grid."));
+
+        QLabel* toleranceLabel = new QLabel(tr("Tolerance"), lineGripFrame);
+
+        mLineAngleGripToleranceSpinBox = new QDoubleSpinBox(lineGripFrame);
+        mLineAngleGripToleranceSpinBox->setRange(0.5, 10.);
+        mLineAngleGripToleranceSpinBox->setSingleStep(0.5);
+        mLineAngleGripToleranceSpinBox->setDecimals(1);
+        mLineAngleGripToleranceSpinBox->setPrefix(QStringLiteral("\u00B1 "));
+        mLineAngleGripToleranceSpinBox->setSuffix(QStringLiteral("\u00B0"));
+        toleranceLabel->setBuddy(mLineAngleGripToleranceSpinBox);
+
+        lineGripLayout->addWidget(mLineAngleGripCheckBox);
+        lineGripLayout->addStretch();
+        lineGripLayout->addWidget(toleranceLabel);
+        lineGripLayout->addWidget(mLineAngleGripToleranceSpinBox);
+
+        mPreferencesUI->gridLayout_11->addWidget(lineGripFrame, 6, 0);
+
+        connect(mLineAngleGripCheckBox, &QCheckBox::toggled, settings->boardLineAngleGrip, &UBSetting::setBool);
+        connect(mLineAngleGripCheckBox, &QCheckBox::toggled, mLineAngleGripToleranceSpinBox, &QWidget::setEnabled);
+        connect(mLineAngleGripToleranceSpinBox, qOverload<double>(&QDoubleSpinBox::valueChanged), settings->boardLineAngleGripTolerance,
+                [settings](double value) { settings->boardLineAngleGripTolerance->set(value); });
+    }
+
     // pen
     mPenProperties = new UBBrushPropertiesFrame(mPreferencesUI->penFrame);
 
@@ -508,6 +545,11 @@ void UBPreferencesController::init()
     }
 
     mPreferencesUI->boardFollowsDarkModeCheckBox->setChecked(settings->boardFollowsDarkMode->get().toBool());
+
+    mLineAngleGripCheckBox->setChecked(settings->boardLineAngleGrip->get().toBool());
+    mLineAngleGripToleranceSpinBox->setValue(settings->boardLineAngleGripTolerance->get().toDouble());
+    mLineAngleGripToleranceSpinBox->setEnabled(mLineAngleGripCheckBox->isChecked());
+
     mPreferencesUI->useMultiScreenCheckBox->setChecked(settings->appUseMultiscreen->get().toBool());
 
     mPreferencesUI->useExternalBrowserCheckBox->setChecked(settings->webUseExternalBrowser->get().toBool());
@@ -649,6 +691,8 @@ void UBPreferencesController::defaultSettings()
         mPreferencesUI->lightBackgroundOpacitySlider->setValue(lightBackgroundOpacity);
         lightBackgroundCrossOpacityValueChanged(lightBackgroundOpacity);
 
+        mLineAngleGripCheckBox->setChecked(settings->boardLineAngleGrip->reset().toBool());
+        mLineAngleGripToleranceSpinBox->setValue(settings->boardLineAngleGripTolerance->reset().toDouble());
     }
     else if(mPreferencesUI->mainTabWidget->currentWidget() == mPreferencesUI->shortcutTab)
     {

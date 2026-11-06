@@ -452,6 +452,10 @@ class UBSettings : public QObject
         UBSetting* swapControlAndDisplayScreens;
 
         UBSetting* rotationAngleStep;
+
+        // the Line tool and the Shapes tool line/arrow grip to 0/90/180/270 degrees within the tolerance (degrees)
+        UBSetting* boardLineAngleGrip;
+        UBSetting* boardLineAngleGripTolerance;
         UBSetting* historyLimit;
 
         UBSetting* libIconSize;

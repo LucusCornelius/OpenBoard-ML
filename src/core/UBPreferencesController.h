@@ -35,6 +35,8 @@
 #include <QLineEdit>
 
 class UBColorPicker;
+class QCheckBox;
+class QDoubleSpinBox;
 class UBApplication;
 class UBSettings;
 class UBPreferencesController;
@@ -88,6 +90,8 @@ class UBPreferencesController : public QObject
         UBBrushPropertiesFrame* mMarkerProperties;
         UBColorPicker* mDarkBackgroundGridColorPicker;
         UBColorPicker* mLightBackgroundGridColorPicker;
+        QCheckBox* mLineAngleGripCheckBox{nullptr};
+        QDoubleSpinBox* mLineAngleGripToleranceSpinBox{nullptr};
         QString mScreenConfigurationPath;
         QStringList mScreenList;
 
