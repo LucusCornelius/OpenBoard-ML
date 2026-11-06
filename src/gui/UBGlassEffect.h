@@ -25,22 +25,30 @@
 class QWidget;
 
 /**
- * Hook for native "glass" materials.
+ * Hook for native "Liquid Glass" materials.
  *
- * On macOS (UBGlassEffect_mac.mm) the main window gets a transparent title bar,
- * a full size content view and a vibrant NSVisualEffectView behind the top
- * toolbar; on macOS 26 and later floating panels get an NSGlassEffectView.
+ * On macOS (UBGlassEffect_mac.mm) the main window gets a transparent title bar
+ * with a full size content view, so that the board extends under the title
+ * bar. On macOS 26 and later floating panels may get a native
+ * NSGlassEffectView behind them (opt-in, see the .mm file).
  * On all other platforms these functions do nothing: the Qt painted glass
- * (UBFloatingPalette / UBGlassStyle) is always drawn and is the complete look.
+ * (UBFloatingPalette / UBGlassStyle) is the complete look.
  */
 class UBGlassEffect
 {
     public:
-        /** apply the native window chrome (title bar, vibrancy behind the toolbar) */
+        /** apply the native window chrome (transparent title bar, full size content) */
         static void applyToWindow(QWidget* window);
 
         /** apply a native glass material behind a floating panel, when available */
         static void applyToPanel(QWidget* panel);
+
+        /**
+         * Height of the window title bar overlapping the top of the given
+         * widget (full size content windows on macOS), 0 elsewhere. Controls
+         * anchored at the top edge stay below it (traffic lights).
+         */
+        static int topInset(QWidget* widget);
 };
 
 #endif /* UBGLASSEFFECT_H_ */

@@ -529,6 +529,15 @@ void UBDockPalette::moveTabs()
 
     mTabPalette->move(x,y + mTabPalette->mVerticalOffset);
 }
+void UBDockPalette::setTabVerticalOffset(int offset)
+{
+    if (mTabPalette->mVerticalOffset != offset)
+    {
+        mTabPalette->mVerticalOffset = offset;
+        moveTabs();
+    }
+}
+
 void UBDockPalette::resizeTabs()
 {
     int numTabs = mTabWidgets.size();
@@ -677,7 +686,7 @@ void UBTabDockPalette::paintEvent(QPaintEvent *)
             painter.setOpacity(0.8);
         }
 
-        UBGlassStyle::paintGlass(&painter, tabRect, 10.0, QImage());
+        UBGlassStyle::paintGlass(&painter, tabRect, 10.0);
         painter.setOpacity(1.0);
 
         // Optional tab icon

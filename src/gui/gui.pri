@@ -58,7 +58,8 @@ HEADERS +=  \
     src/gui/UBInkWriter.h \
     src/gui/UBGlassStyle.h \
     src/gui/UBGlassEffect.h \
-    src/gui/UBPenPanel.h
+    src/gui/UBPenPanel.h \
+    src/gui/UBToolClusterPalette.h
 SOURCES +=  \
     src/gui/UBThumbnail.cpp \
     src/gui/UBThumbnailArranger.cpp \
@@ -118,7 +119,8 @@ SOURCES +=  \
     src/gui/UBScreenCalibration.cpp \
     src/gui/UBInkWriter.cpp \
     src/gui/UBGlassStyle.cpp \
-    src/gui/UBPenPanel.cpp
+    src/gui/UBPenPanel.cpp \
+    src/gui/UBToolClusterPalette.cpp
 
 win32:SOURCES += src/gui/UBKeyboardPalette_win.cpp
 macx:OBJECTIVE_SOURCES += src/gui/UBKeyboardPalette_mac.mm

@@ -269,7 +269,7 @@ void UBSettings::init()
     documentSizes.insert(DocumentSizeRatio::Ratio16_9, QSize((960 / 9 * 16), 960)); // 1.77
 
     appToolBarPositionedAtTop = new UBSetting(this, "App", "ToolBarPositionedAtTop", true);
-    appToolBarDisplayText = new UBSetting(this, "App", "ToolBarDisplayText", true);
+    appToolBarDisplayText = new UBSetting(this, "App", "ToolBarDisplayText", false);
     appToolBarOrientationVertical = new UBSetting(this, "App", "ToolBarOrientationVertical", false);
     appPreferredLanguage = new UBSetting(this,"App","PreferredLanguage", "");
     appThemeMode = new UBSetting(this, "App", "ThemeMode", 0);

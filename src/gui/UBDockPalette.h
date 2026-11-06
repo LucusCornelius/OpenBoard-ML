@@ -143,6 +143,8 @@ public:
     void setTabFlotable(bool newFlotable) {mTabPalette->mFlotable = newFlotable;}
     int getAdditionalVOffset() const {return mTabPalette->mVerticalOffset;}
     void setAdditionalVOffset(int newOffset) {mTabPalette->mVerticalOffset = newOffset;}
+    /** move the tabs by a vertical offset, e.g. to keep them clear of the floating tool clusters */
+    void setTabVerticalOffset(int offset);
 
     eUBDockPaletteType paletteType(){return mPaletteType;}
 

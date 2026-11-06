@@ -83,6 +83,7 @@
 #include "gui/UBToolWidget.h"
 #include "gui/UBToolbarButtonGroup.h"
 #include "gui/UBPenPanel.h"
+#include "gui/UBToolClusterPalette.h"
 #include "gui/UBGlassStyle.h"
 #include "gui/UBGlassEffect.h"
 
@@ -1889,6 +1890,13 @@ void UBBoardController::setDisabled(bool disable)
 {
     mMainWindow->boardToolBar->setDisabled(disable);
     mControlView->setDisabled(disable);
+
+    // the board toolbar actions float in the glass tool clusters
+    if (mPaletteManager && mPaletteManager->leftCluster())
+        mPaletteManager->leftCluster()->setDisabled(disable);
+
+    if (mPaletteManager && mPaletteManager->rightCluster())
+        mPaletteManager->rightCluster()->setDisabled(disable);
 
     // the pen options moved from the toolbar to the pen panel
     if (mPaletteManager && mPaletteManager->penPanel())

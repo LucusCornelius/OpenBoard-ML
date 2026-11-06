@@ -341,7 +341,9 @@ void UBApplicationController::showBoard()
 {
     mMainWindow->webToolBar->hide();
     mMainWindow->documentToolBar->hide();
-    mMainWindow->boardToolBar->show();
+    // the board actions float in glass clusters over the board (UBToolClusterPalette),
+    // the board toolbar only keeps the actions
+    mMainWindow->boardToolBar->hide();
 
     if (mMainMode == Document)
     {

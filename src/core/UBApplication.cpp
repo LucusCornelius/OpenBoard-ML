@@ -518,9 +518,13 @@ void UBApplication::toolBarPositionChanged(QVariant topOrBottom)
     else
         area = Qt::BottomToolBarArea;
 
-    mainWindow->addToolBar(area, mainWindow->boardToolBar);
-    mainWindow->addToolBar(area, mainWindow->webToolBar);
-    mainWindow->addToolBar(area, mainWindow->documentToolBar);
+    // moving a toolbar may show it again: keep the visibility of each toolbar
+    for (QToolBar* toolBar : {mainWindow->boardToolBar, mainWindow->webToolBar, mainWindow->documentToolBar})
+    {
+        const bool hidden = toolBar->isHidden();
+        mainWindow->addToolBar(area, toolBar);
+        toolBar->setHidden(hidden);
+    }
 
     webController->showTabAtTop(topOrBottom.toBool());
 
@@ -600,7 +604,9 @@ void UBApplication::decorateActionMenu(QAction* action)
 
         if (tb && !tb->menu())
         {
-            tb->setObjectName("ubButtonMenu");
+            // the buttons of the glass tool clusters keep their own style
+            if (tb->objectName() != QLatin1String("clusterButton"))
+                tb->setObjectName("ubButtonMenu");
             tb->setPopupMode(QToolButton::InstantPopup);
             QMenu* menu = new QMenu(mainWindow);
 

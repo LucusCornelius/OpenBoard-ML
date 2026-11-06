@@ -117,6 +117,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBGlassEffect.h
     UBPenPanel.cpp
     UBPenPanel.h
+    UBToolClusterPalette.cpp
+    UBToolClusterPalette.h
 )
 
 if(CMAKE_SYSTEM_NAME STREQUAL Linux)

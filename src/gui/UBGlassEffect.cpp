@@ -37,3 +37,10 @@ void UBGlassEffect::applyToPanel(QWidget* panel)
 {
     Q_UNUSED(panel);
 }
+
+
+int UBGlassEffect::topInset(QWidget* widget)
+{
+    Q_UNUSED(widget);
+    return 0;
+}

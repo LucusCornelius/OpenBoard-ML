@@ -26,15 +26,12 @@
 #include <QMouseEvent>
 
 #include "core/UBSettings.h"
+#include "gui/UBGlassStyle.h"
 #include "gui/UBStylusPalette.h"
+#include "gui/UBToolClusterPalette.h"
+#include "gui/UBGlassEffect.h"
 
 #include "core/memcheck.h"
-
-namespace
-{
-    // distance between the glass body and the top edge of the board
-    constexpr int anchorGap = 0;
-}
 
 UBPenPanel::UBPenPanel(QWidget* parent)
     : UBFloatingPalette(Qt::TopLeftCorner, parent)
@@ -45,7 +42,7 @@ UBPenPanel::UBPenPanel(QWidget* parent)
 
     mLayout = new QHBoxLayout(this);
     const int b = border();
-    mLayout->setContentsMargins(b + 10, b + 7, b + 10, b + 7);
+    mLayout->setContentsMargins(b + 8, b + 6, b + 8, b + 6);
     mLayout->setSpacing(6);
     mLayout->setSizeConstraint(QLayout::SetFixedSize);
 
@@ -105,34 +102,58 @@ void UBPenPanel::reposition()
 
     int x = pos().x();
     int y = pos().y();
+    const int b = border();
 
     if (!mCustomPosition)
     {
+        // centred between the tool clusters, on the same row; on narrow boards
+        // where it would touch a cluster, it moves next to the stylus palette
+        const QList<QRect> clusters = UBToolClusterPalette::clusterBodies(parent);
+        const int gap = UBToolClusterPalette::edgeGap;
+        const bool atTop = UBSettings::settings()->appToolBarPositionedAtTop->get().toBool();
+
         x = (parent->width() - width()) / 2;
+        y = atTop ? UBGlassEffect::topInset(parent) + gap - b : parent->height() - height() - gap + b;
 
-        if (UBSettings::settings()->appToolBarPositionedAtTop->get().toBool())
+        const QRect body = QRect(x, y, width(), height()).adjusted(b, b, -b, -b);
+        bool collides = false;
+
+        for (const QRect& cluster : clusters)
+            collides = collides || cluster.adjusted(-gap, 0, gap, 0).intersects(body);
+
+        if (collides)
         {
-            // just below the top bar
-            y = anchorGap;
-        }
-        else
-        {
-            // just inside the bottom edge, above the stylus palette when it is there
-            y = parent->height() - height();
-
-            UBStylusPalette* stylusPalette = parent->findChild<UBStylusPalette*>(QString(), Qt::FindDirectChildrenOnly);
-
-            if (stylusPalette && stylusPalette->isVisible()
-                    && !UBSettings::settings()->appToolBarOrientationVertical->get().toBool())
+            if (atTop)
             {
-                y = qMin(y, stylusPalette->y() - height() + border());
+                int bottom = 0;
+
+                for (const QRect& cluster : clusters)
+                    bottom = qMax(bottom, cluster.bottom());
+
+                y = bottom + gap - b;
+            }
+            else
+            {
+                UBStylusPalette* stylusPalette = parent->findChild<UBStylusPalette*>(QString(), Qt::FindDirectChildrenOnly);
+                int top = parent->height();
+
+                for (const QRect& cluster : clusters)
+                    top = qMin(top, cluster.top());
+
+                if (stylusPalette && stylusPalette->isVisible()
+                        && !UBSettings::settings()->appToolBarOrientationVertical->get().toBool())
+                {
+                    top = qMin(top, stylusPalette->y() + static_cast<UBFloatingPalette*>(stylusPalette)->border());
+                }
+
+                y = top - gap - height() + b;
             }
         }
     }
 
-    // keep the panel inside the board
-    x = qBound(0, x, qMax(0, parent->width() - width()));
-    y = qBound(0, y, qMax(0, parent->height() - height()));
+    // keep the panel inside the board, the shadow margin may leave it
+    x = qBound(-b, x, qMax(-b, parent->width() - width() + b));
+    y = qBound(-b, y, qMax(-b, parent->height() - height() + b));
 
     if (QPoint(x, y) != pos())
         move(x, y);
@@ -189,12 +210,12 @@ void UBPenPanel::mouseDoubleClickEvent(QMouseEvent* event)
 int UBPenPanel::border()
 {
     // room for the drop shadow
-    return 10;
+    return UBGlassStyle::shadowMargin;
 }
 
 
 int UBPenPanel::radius()
 {
     // capsule
-    return 24;
+    return 1000;
 }

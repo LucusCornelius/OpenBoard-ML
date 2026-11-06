@@ -43,6 +43,11 @@
 #include "gui/UBMainWindow.h"
 #include "gui/UBStylusPalette.h"
 #include "gui/UBPenPanel.h"
+#include "gui/UBToolClusterPalette.h"
+#include "gui/UBGlassEffect.h"
+#include "gui/UBGlassStyle.h"
+
+#include <QTimer>
 #include "gui/UBKeyboardPalette.h"
 #include "gui/UBToolWidget.h"
 #include "gui/UBZoomPalette.h"
@@ -251,6 +256,55 @@ void UBBoardPaletteManager::setupPalettes()
     // its content is added by UBBoardController::setupToolbar
     mPenPanel = new UBPenPanel(mContainer);
     mPenPanel->show();
+
+    // Freeform style top bar: the board toolbar is hidden in board mode, its actions
+    // float in two glass clusters at the top corners of the board
+    UBMainWindow* mainWindow = UBApplication::mainWindow;
+
+    mLeftCluster = new UBToolClusterPalette(Qt::TopLeftCorner, mContainer);
+    mLeftCluster->addGroup({mainWindow->actionUndo, mainWindow->actionRedo});
+    mLeftCluster->addGroup({mainWindow->actionBackgrounds, mainWindow->actionMathPalette});
+    mLeftCluster->addGroup({mainWindow->actionPages, mainWindow->actionBack, mainWindow->actionForward, mainWindow->actionErase});
+
+    mRightCluster = new UBToolClusterPalette(Qt::TopRightCorner, mContainer);
+    mRightCluster->addGroup({mainWindow->actionBoard, mainWindow->actionWeb, mainWindow->actionDocument, mainWindow->actionDesktop});
+    mRightCluster->addGroup({mainWindow->actionMenu});
+
+    auto updateClusterLabels = [this](const QVariant& display) {
+        mLeftCluster->setTextUnderIcon(display.toBool());
+        mRightCluster->setTextUnderIcon(display.toBool());
+    };
+
+    updateClusterLabels(UBSettings::settings()->appToolBarDisplayText->get());
+    connect(UBSettings::settings()->appToolBarDisplayText, &UBSetting::changed, this, updateClusterLabels);
+    connect(UBSettings::settings()->appToolBarPositionedAtTop, &UBSetting::changed, this, [this]() {
+        // after the clusters moved to the other edge
+        QTimer::singleShot(0, this, &UBBoardPaletteManager::containerResized);
+    });
+
+    // the other palettes keep clear of the clusters
+    for (UBToolClusterPalette* cluster : {mLeftCluster, mRightCluster})
+    {
+        connect(cluster, &UBToolClusterPalette::repositioned, this, [this]() {
+            if (mStylusPalette)
+            {
+                mStylusPalette->adjustSizeAndPosition();
+                mStylusPalette->initPosition();
+            }
+
+            if (mPenPanel)
+                mPenPanel->reposition();
+
+            updateDockTabOffsets();
+        });
+    }
+
+    // the docks place their tabs again when they are resized
+    for (QWidget* dock : {static_cast<QWidget*>(mLeftPalette), static_cast<QWidget*>(mRightPalette)})
+        dock->installEventFilter(this);
+
+    mLeftCluster->show();
+    mRightCluster->show();
 
     // Only create the hints palette when its web page is installed; otherwise the
     // web view would show an error page ("Your file couldn't be accessed").
@@ -517,6 +571,13 @@ void UBBoardPaletteManager::containerResized()
     int userTop = innerMargin;
     int userHeight = mContainer->height() - (2 * innerMargin);
 
+    // the clusters first: the stylus palette and the pen panel keep clear of them
+    if (mLeftCluster)
+        mLeftCluster->reposition();
+
+    if (mRightCluster)
+        mRightCluster->reposition();
+
     if(mStylusPalette)
     {
         mStylusPalette->move(userLeft, userTop);
@@ -528,6 +589,8 @@ void UBBoardPaletteManager::containerResized()
     {
         mPenPanel->reposition();
     }
+
+    updateDockTabOffsets();
 
     if(mZoomPalette)
     {
@@ -543,6 +606,56 @@ void UBBoardPaletteManager::containerResized()
         mKeyboardPalette->move(userLeft + (userWidth - mKeyboardPalette->width())/2,
                                userTop + (userHeight - mKeyboardPalette->height())/2);
         mKeyboardPalette->adjustSizeAndPosition();
+    }
+}
+
+
+bool UBBoardPaletteManager::eventFilter(QObject* watched, QEvent* event)
+{
+    if ((watched == mLeftPalette || watched == mRightPalette)
+            && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
+    {
+        QTimer::singleShot(0, this, &UBBoardPaletteManager::updateDockTabOffsets);
+    }
+
+    return QObject::eventFilter(watched, event);
+}
+
+
+void UBBoardPaletteManager::updateDockTabOffsets()
+{
+    if (!mLeftCluster || !mLeftPalette || !mRightPalette)
+        return;
+
+    const bool boardMode = mLeftPalette->parentWidget() == mContainer;
+    const bool atTop = UBSettings::settings()->appToolBarPositionedAtTop->get().toBool();
+
+    for (UBDockPalette* dock : {static_cast<UBDockPalette*>(mLeftPalette), static_cast<UBDockPalette*>(mRightPalette)})
+    {
+        UBToolClusterPalette* cluster = (dock == mLeftPalette) ? mLeftCluster : mRightCluster;
+        int offset = 0;
+
+        if (boardMode && cluster->isVisible())
+        {
+            const QRect tabs = dock->getTabPaletteRect();
+            const int baseTop = tabs.top() - dock->getAdditionalVOffset();
+            const int shadow = UBGlassStyle::shadowMargin;
+
+            if (atTop)
+            {
+                // tabs just below the cluster
+                const int clusterBottom = cluster->geometry().bottom() - shadow;
+                offset = qMax(0, clusterBottom + 10 - baseTop);
+            }
+            else
+            {
+                // tabs just above the cluster
+                const int clusterTop = cluster->geometry().top() + shadow;
+                offset = qMin(0, clusterTop - 10 - (baseTop + tabs.height()));
+            }
+        }
+
+        dock->setTabVerticalOffset(offset);
     }
 }
 
@@ -711,6 +824,8 @@ void UBBoardPaletteManager::changeMode(eUBDockPaletteWidgetMode newMode, bool is
 
         case eUBDockPaletteWidget_DESKTOP:
             {
+                mLeftPalette->setTabVerticalOffset(0);
+                mRightPalette->setTabVerticalOffset(0);
                 mAddItemPalette->setParent((QWidget*)UBApplication::applicationController->uninotesController()->drawingView());
                 mLeftPalette->assignParent((QWidget*)UBApplication::applicationController->uninotesController()->drawingView());
                 mRightPalette->assignParent((QWidget*)UBApplication::applicationController->uninotesController()->drawingView());
@@ -787,6 +902,9 @@ void UBBoardPaletteManager::changeMode(eUBDockPaletteWidgetMode newMode, bool is
 
         case eUBDockPaletteWidget_DOCUMENT:
             {
+                // the tool clusters only exist on the board
+                mLeftPalette->setTabVerticalOffset(0);
+                mRightPalette->setTabVerticalOffset(0);
                 mLeftPalette->setVisible(leftPaletteVisible);
                 mRightPalette->setVisible(rightPaletteVisible);
                 mLeftPalette->assignParent(UBApplication::documentController->controlView());

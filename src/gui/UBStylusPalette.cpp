@@ -32,6 +32,7 @@
 #include <QtGui>
 
 #include "UBMainWindow.h"
+#include "UBToolClusterPalette.h"
 
 #include "core/UBApplication.h"
 #include "core/UBSettings.h"
@@ -77,8 +78,15 @@ UBStylusPalette::UBStylusPalette(QWidget *parent, Qt::Orientation orient)
     UBApplication::mainWindow->actionSnap->setProperty("ungrouped", true);
 
     setActions(actions);
-    setButtonIconSize(QSize(32, 32));
+    // Liquid Glass metrics: 42 px buttons with 24 px glyphs on a capsule
+    setButtonIconSize(QSize(24, 24));
     groupActions();
+
+    for (UBActionPaletteButton* button : std::as_const(mButtons))
+        button->setFixedSize(42, 42);
+
+    if (layout())
+        layout()->setSpacing(2);
 
     // the id of an action is its index in the palette. Keep the ids equal to the
     // UBStylusTool values for tools which are not in the order of the enum.
@@ -119,6 +127,19 @@ void UBStylusPalette::initPosition()
     else {
         int posX = (parentWidth / 2) - (width() / 2);
         int posY = parentHeight - border() - height();
+
+        if (!UBSettings::settings()->appToolBarPositionedAtTop->get().toBool())
+        {
+            // the tool clusters are at the bottom edge: the stylus palette floats above them
+            int top = parentHeight;
+
+            for (const QRect& cluster : UBToolClusterPalette::clusterBodies(pParentW))
+                top = qMin(top, cluster.top());
+
+            if (top < parentHeight)
+                posY = top - UBToolClusterPalette::edgeGap - height() + border();
+        }
+
         pos.setX(posX);
         pos.setY(posY);
     }

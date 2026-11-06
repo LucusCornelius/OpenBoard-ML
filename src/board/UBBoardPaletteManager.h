@@ -43,6 +43,7 @@
 class UBWebToolsPalette;
 class UBStylusPalette;
 class UBPenPanel;
+class UBToolClusterPalette;
 class UBClockPalette;
 class UBPageNumberPalette;
 class UBZoomPalette;
@@ -70,6 +71,11 @@ class UBBoardPaletteManager : public QObject
         UBRightPalette* rightPalette(){return mRightPalette;}
         UBStylusPalette* stylusPalette(){return mStylusPalette;}
         UBPenPanel* penPanel(){return mPenPanel;}
+        /** floating glass clusters replacing the board toolbar (top left: edit and page actions, top right: modes) */
+        UBToolClusterPalette* leftCluster(){return mLeftCluster;}
+        UBToolClusterPalette* rightCluster(){return mRightCluster;}
+        /** keep the dock palette tabs clear of the tool clusters */
+        void updateDockTabOffsets();
         UBActionPalette *addItemPalette() {return mAddItemPalette;}
         UBFeaturesWidget *featuresWidget() { return mpFeaturesWidget; }
         UBStartupHintsPalette *tipsPalette() { return mTipPalette; }
@@ -99,6 +105,9 @@ class UBBoardPaletteManager : public QObject
 
         void toggleErasePalette(bool ckecked);
 
+    protected:
+        bool eventFilter(QObject* watched, QEvent* event) override;
+
     private:
 
         void setupPalettes();
@@ -125,6 +134,8 @@ class UBBoardPaletteManager : public QObject
         UBActionPalette* mPagePalette;
         UBMathPalette* mMathPalette{nullptr};
         UBPenPanel* mPenPanel{nullptr};
+        UBToolClusterPalette* mLeftCluster{nullptr};
+        UBToolClusterPalette* mRightCluster{nullptr};
 
         QUrl mItemUrl;
         QPixmap mPixmap;
