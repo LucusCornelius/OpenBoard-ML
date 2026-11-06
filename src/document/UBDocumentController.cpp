@@ -1764,7 +1764,11 @@ bool UBDocumentTreeView::viewportEvent(QEvent *event)
 
         if (event->type() != QEvent::HoverLeave)
         {
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
             hover = indexAt(static_cast<QHoverEvent*>(event)->position().toPoint()).siblingAtColumn(0);
+#else
+            hover = indexAt(static_cast<QHoverEvent*>(event)->pos()).siblingAtColumn(0);
+#endif
         }
 
         if (hover != QModelIndex(mHoverIndex))
