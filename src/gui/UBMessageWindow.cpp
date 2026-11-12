@@ -71,7 +71,8 @@ void UBMessageWindow::showMessage(const QString& message, bool showSpinningWheel
     QColor fadedColor = mBackgroundBrush.color();
     fadedColor.setAlpha(mOriginalAlpha);
     mBackgroundBrush = QBrush(fadedColor);
-    mFadingStep = 25;
+    // 50 ms per step: a long message stays long enough to be read
+    mFadingStep = qMax(25, int(message.length()));
 
     if (showSpinningWheel)
     {
