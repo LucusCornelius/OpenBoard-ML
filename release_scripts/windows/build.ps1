@@ -481,6 +481,8 @@ function Invoke-ApplicationPhase {
     }
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'resources\windows\xpdfrc') -Destination $tree
     foreach ($f in 'LICENSE', 'COPYRIGHT') { Copy-Item -LiteralPath (Join-Path $RepoRoot $f) -Destination (Join-Path $tree "$f.txt") }
+    # licence of the Latin Modern Math font that is embedded in the program
+    foreach ($f in 'GUST-FONT-LICENSE.txt', 'README-Latin-Modern-Math.txt') { Copy-Item -LiteralPath (Join-Path $RepoRoot "resources\math\$f") -Destination $tree }
     $i18n = Join-Path $tree 'i18n'
     New-Item -ItemType Directory -Force -Path $i18n | Out-Null
     $lrelease = Join-Path $qtBin 'lrelease.exe'
@@ -512,6 +514,13 @@ function Invoke-ApplicationPhase {
     $multimedia = @(Get-ChildItem -LiteralPath (Join-Path $tree 'multimedia') -Filter '*.dll' -ErrorAction SilentlyContinue)
     if ($multimedia.Count -eq 0) { throw 'No Qt Multimedia backend plugin in multimedia\' }
     Write-Host "multimedia backends: $(($multimedia | ForEach-Object Name) -join ', ')"
+    # the modern look asks for the "windows11" style and silently falls back to Fusion without it
+    if (-not (Test-Path -LiteralPath (Join-Path $tree 'styles\qmodernwindowsstyle.dll'))) {
+        Write-Warn 'styles\qmodernwindowsstyle.dll was not deployed; the program will use the Fusion style'
+    }
+    foreach ($plugin in 'iconengines\qsvgicon.dll') {
+        if (-not (Test-Path -LiteralPath (Join-Path $tree $plugin))) { Write-Warn "$plugin was not deployed" }
+    }
     $treeFiles = @(Get-ChildItem -LiteralPath $tree -Recurse -File)
     $treeMB = [math]::Round(($treeFiles | Measure-Object -Property Length -Sum).Sum / 1MB)
     Write-Host "Deployed tree: $($treeFiles.Count) files, $treeMB MB"
