@@ -13,6 +13,8 @@
 #   macos-16.svg, -32.svg   pixel-aligned macOS 16 and 32 px versions
 #   full-16/20/24/32.svg    pixel-aligned versions with the body filling the
 #                           canvas, for the Windows .ico
+#   mark-512.svg            the mark alone (no body, dim grey board, gap cut
+#                           out), for the blackout screen logo
 #   ../images/org.openboard-ml.OpenBoard-ML.svg
 #                           the same full-canvas artwork at 512 px: Linux icon
 #                           and source of the larger .ico sizes
@@ -20,7 +22,8 @@
 #   ../macx/OpenBoard.icns  16, 32, 128, 256, 512 at 1x and 2x
 #   ../win/OpenBoard.ico    16, 20, 24, 32, 40, 48, 64, 128, 256
 #   ../images/OpenBoard.png      64 px window icon (full-canvas artwork)
-#   ../images/bigOpenBoard.png   512 px logo (macOS-grid artwork, with margin)
+#   ../images/bigOpenBoard.png   512 px blackout screen logo (mark-512.svg,
+#                                transparent background, kept dim on black)
 #
 # icontool.cpp is a small helper (SVG -> PNG with Qt SVG, PNGs -> .ico);
 # it is built in a temporary folder and removed afterwards.
@@ -99,5 +102,5 @@ echo "wrote resources/win/OpenBoard.ico"
 
 # images used inside the application (resources/OpenBoard.qrc)
 render "$FULL" "$RES/images/OpenBoard.png" 64
-render "$MAC"  "$RES/images/bigOpenBoard.png" 512
+render "$SRC/mark-512.svg" "$RES/images/bigOpenBoard.png" 512
 echo "wrote resources/images/OpenBoard.png and bigOpenBoard.png"
