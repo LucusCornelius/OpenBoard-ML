@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny" width="20" height="20" viewBox="0 0 20 20">
+  <!-- body: rounded square with continuous corners -->
+  <path fill="#ffffff" d="M 7.18 0 L 12.82 0 C 15.33 0 16.59 0 17.55 0.49 C 18.39 0.92 19.08 1.61 19.51 2.45 C 20 3.41 20 4.67 20 7.18 L 20 12.82 C 20 15.33 20 16.59 19.51 17.55 C 19.08 18.39 18.39 19.08 17.55 19.51 C 16.59 20 15.33 20 12.82 20 L 7.18 20 C 4.67 20 3.41 20 2.45 19.51 C 1.61 19.08 0.92 18.39 0.49 17.55 C 0 16.59 0 15.33 0 12.82 L 0 7.18 C 0 4.67 0 3.41 0.49 2.45 C 0.92 1.61 1.61 0.92 2.45 0.49 C 3.41 0 4.67 0 7.18 0 Z"/>
+  <!-- board -->
+  <path fill="none" stroke="#454b4d" stroke-width="2" stroke-linejoin="round" d="M 6.5 7 L 13.5 7 C 14.33 7 15 7.67 15 8.5 L 15 11.5 C 15 12.33 14.33 13 13.5 13 L 6.5 13 C 5.67 13 5 12.33 5 11.5 L 5 8.5 C 5 7.67 5.67 7 6.5 7 Z"/>
+  <!-- speech-bubble tail -->
+  <path fill="#454b4d" d="M 7 13 L 10 13 L 7 17 Z"/>
+  <!-- gap between pen and board, in the body colour -->
+  <path fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" d="M 9 11.5 L 10.12 8.38 L 13.5 5 C 14.05 4.45 14.95 4.45 15.5 5 C 16.05 5.55 16.05 6.45 15.5 7 L 12.12 10.38 Z"/>
+  <!-- pen -->
+  <path fill="#f48c4f" d="M 9 11.5 L 10.12 8.38 L 13.5 5 C 14.05 4.45 14.95 4.45 15.5 5 C 16.05 5.55 16.05 6.45 15.5 7 L 12.12 10.38 Z"/>
+</svg>
