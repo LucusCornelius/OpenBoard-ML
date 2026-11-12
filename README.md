@@ -53,10 +53,17 @@ Ready-made builds are published on the [Releases](../../releases) page of this r
 
 ### Windows
 
-A Windows installer will be attached to a release once the Windows build of this fork has been
-tested. Until then, build from source (below) or use the upstream
-[OpenBoard installer](https://github.com/OpenBoard-org/OpenBoard/wiki/Downloads) without the
-additions.
+1. Download `OpenBoard-ML-1.0.0-Windows-x64-Setup.exe` from the latest release (64-bit Windows 10
+   version 1809 or newer, or Windows 11).
+2. Run it. The installer is not signed with a code-signing certificate, so Windows SmartScreen shows
+   **Windows protected your PC**: click **More info**, then **Run anyway**.
+3. Start OpenBoard-ML from the Start menu. Nothing else has to be installed: Qt, Qt WebEngine, the
+   PDF and zip libraries and the Microsoft C++ runtime are all included.
+
+`OpenBoard-ML-1.0.0-Windows-x64-Portable.zip` contains the same program without an installer: unpack
+it anywhere and start `OpenBoard-ML.exe` (Windows may ask the same SmartScreen question). The program
+installs next to an existing OpenBoard instead of replacing it; documents and settings stay where
+OpenBoard keeps them in your user profile, so both see the same documents.
 
 ### Linux
 
@@ -93,22 +100,69 @@ Qt WebEngine helper process), signs the bundle ad hoc and writes `OpenBoard-ML-<
 
 ### Windows
 
-Requires Visual Studio 2022 (Desktop development with C++), Qt 6 (MSVC, with *Qt WebEngine*,
-*Qt Multimedia* and *Qt 5 Compatibility*) and the third-party libraries of the upstream wiki
-(poppler, QuaZip, OpenSSL, FFmpeg). In a *x64 Native Tools* prompt:
+`release_scripts\windows\build.ps1` does the whole build and packaging, the same way the release
+build on GitHub Actions does it. It needs:
 
-```bat
+* Visual Studio 2022 or the *Build Tools for Visual Studio 2022*, workload *Desktop development
+  with C++*
+* Git and Python 3 (Python only to download Qt with [aqtinstall](https://github.com/miurahr/aqtinstall))
+* [vcpkg](https://github.com/microsoft/vcpkg): `git clone https://github.com/microsoft/vcpkg` and
+  `.\vcpkg\bootstrap-vcpkg.bat`
+* [Inno Setup](https://jrsoftware.org/isinfo.php) 6.3 or newer for the installer
+  (`winget install JRSoftware.InnoSetup`); without it, pass `-NoInstaller`
+
+```powershell
 git clone https://github.com/<your-user>/OpenBoard-ML.git
 cd OpenBoard-ML
-C:\Qt\6.9.3\msvc2022_64\bin\qmake.exe OpenBoard.pro CONFIG+=release
-nmake release
+pwsh -File release_scripts\windows\build.ps1 -VcpkgRoot C:\path\to\vcpkg
 ```
 
-The program is `build\win32\release\product\OpenBoard-ML.exe`.
+The script:
+
+1. loads the Visual Studio x64 environment (no *Native Tools* prompt needed);
+2. installs the official Qt 6.10 MSVC 2022 x64 binaries with Qt WebEngine, Qt Multimedia,
+   Qt Positioning, Qt WebChannel and Qt 5 Compatibility into `build\win32-deps\Qt` (or uses
+   `-QtDir C:\Qt\6.10.3\msvc2022_64` from the Qt Online Installer);
+3. builds poppler (with its private headers), OpenSSL and zlib with vcpkg from
+   `release_scripts\windows\vcpkg.json` (pinned baseline, release DLLs; the first run takes a while,
+   later runs reuse vcpkg's binary cache);
+4. downloads the QuaZip sources, which `OpenBoard.pro` compiles into the program;
+5. runs `qmake` and `nmake` (or `jom` when it is on `PATH`) in `build\win32-msvc`;
+6. deploys everything into `install\win32\OpenBoard-ML\`: `windeployqt` (Qt, Qt WebEngine with
+   `QtWebEngineProcess.exe`, its resources and locales), the vcpkg DLLs, the Microsoft C++ runtime
+   DLLs, the compiled translations and OpenBoard's data folders; then checks with
+   `dumpbin /dependents` that every DLL any file in there imports is either in the folder or part
+   of Windows;
+7. writes `install\win32\OpenBoard-ML-<version>-Windows-x64-Setup.exe`,
+   `OpenBoard-ML-<version>-Windows-x64-Portable.zip` and `SHA256SUMS.txt`.
+
+`-Phase Dependencies` or `-Phase Application` runs one half, `-Clean` starts the compile from scratch;
+see `Get-Help release_scripts\windows\build.ps1 -Detailed`.
+
+Without the script, `OpenBoard.pro` takes the libraries from any prefix with `include\`, `lib\` and
+`bin\` plus a QuaZip source folder: `qmake OpenBoard.pro WIN_LIB_PREFIX=C:/deps/x64-windows
+QUAZIP_SRC=C:/deps/quazip-1.7.2/quazip`. Without `WIN_LIB_PREFIX` it uses upstream's
+[OpenBoard-ThirdParty](https://github.com/OpenBoard-org/OpenBoard-ThirdParty) layout, by default in
+`..\OpenBoard-ThirdParty` (override with `THIRD_PARTY_PATH=...`), as upstream's
+`release.win7.vc9.bat` and `OpenBoard.iss` expect.
 
 The modern style uses the Windows 11 Qt style when available and sets a dark title bar through
-`DwmSetWindowAttribute` (`-lDwmapi`). This fork has not been compiled on Windows yet; please open
-an issue with the output if the build fails.
+`DwmSetWindowAttribute` (`-lDwmapi`).
+
+#### How the Windows release is made
+
+`.github/workflows/windows.yml` runs `build.ps1` on a GitHub-hosted Windows runner:
+
+* every push to `ml-features` (except changes that only touch `docs/` or Markdown files) and
+  *Run workflow* on the Actions tab build the installer and the zip; they are attached to the run as
+  artifacts (Actions → the run → *Artifacts*) for 30 days;
+* pushing a tag `v<version>` (for example `git tag v1.0.0 && git push origin v1.0.0`) builds the same
+  and attaches both files to the GitHub Release of that tag, creating the release if needed. The
+  file names come from `version.txt`, so update it before tagging.
+
+GitHub disables workflows in a fork until the owner enables them once: open the **Actions** tab of
+the fork and confirm. If a build fails, the run's summary shows the first errors and the last lines
+of the log, and the artifact *windows-build-logs* has the complete logs.
 
 ### Linux (Debian 12 / Ubuntu)
 

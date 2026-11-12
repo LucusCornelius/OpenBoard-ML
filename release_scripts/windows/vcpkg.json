@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "openboard-ml-windows-deps",
+  "version-string": "1.0.0",
+  "description": "Third-party libraries of the Windows build of OpenBoard-ML. Qt comes from the official binaries and QuaZip is compiled into the program (see build.ps1), so nothing here may depend on qtbase.",
+  "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
+  "dependencies": [
+    {
+      "name": "poppler",
+      "features": [
+        "private-api"
+      ]
+    },
+    "openssl",
+    "zlib"
+  ]
+}
