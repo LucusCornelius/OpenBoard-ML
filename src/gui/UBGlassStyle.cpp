@@ -892,7 +892,9 @@ QString UBGlassStyle::styleSheet(bool dark)
     const QString barBackground = QString("qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 %1, stop:1 %2)")
             .arg(rgba(barTop), rgba(barBottom));
 
-    QString css = QStringLiteral(R"CSS(
+    // the raw style sheets are not passed through a macro (QStringLiteral): the traditional
+    // preprocessor of MSVC breaks on raw string literals containing quotes in macro arguments
+    QString css = QString::fromUtf8(R"CSS(
 /* ---------- Liquid Glass layer (UBGlassStyle) ---------- */
 
 QToolBar#boardToolBar,
@@ -1099,7 +1101,7 @@ QDialog#preferencesDialog QTabWidget::pane
     css.replace("@POPUP@", rgba(popupBackground));
 
     // glass panels: glyphs, hover pills and fields follow the material of each panel
-    static const QString glassTemplate = QStringLiteral(R"CSS(
+    static const QString glassTemplate = QString::fromUtf8(R"CSS(
 /* ---------- floating glass palettes (per material, see UBGlassStyle::setPanelMaterial) ---------- */
 
 @P@ UBActionPaletteButton,
@@ -1534,7 +1536,7 @@ QString UBGlassStyle::documentModeStyleSheet(bool dark)
 {
     const DocumentModeColors c = documentModeColors(dark);
 
-    QString css = QStringLiteral(R"CSS(
+    QString css = QString::fromUtf8(R"CSS(
 /* ---------- document mode (UBGlassStyle::documentModeStyleSheet) ---------- */
 
 QToolBar#documentToolBar
