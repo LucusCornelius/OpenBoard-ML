@@ -117,6 +117,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBGlassStyle.h
     UBGlassEffect.cpp
     UBGlassEffect.h
+    UBWindowDragStrip.cpp
+    UBWindowDragStrip.h
     UBPenPanel.cpp
     UBPenPanel.h
     UBPaletteSwitchButton.cpp

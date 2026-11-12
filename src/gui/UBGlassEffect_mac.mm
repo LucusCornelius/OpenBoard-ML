@@ -1267,3 +1267,35 @@ void UBGlassEffect::applyToPanel(QWidget* panel)
         panel->setProperty("ubNativeGlassFailed", true);
     }
 }
+
+
+void UBGlassEffect::titleBarDoubleClick(QWidget* widget)
+{
+    NSWindow* window = nativeWindow(widget);
+
+    if (!window)
+        return;
+
+    @try
+    {
+        // "Double-click a window's title bar to" in the system settings (global user defaults)
+        NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+        NSString* action = [defaults stringForKey:@"AppleActionOnDoubleClick"];
+
+        // before macOS 10.11 a single switch for minimising
+        if (!action && [defaults boolForKey:@"AppleMiniaturizeOnDoubleClick"])
+            action = @"Minimize";
+
+        if ([action isEqualToString:@"None"])
+            return;
+
+        if ([action isEqualToString:@"Minimize"])
+            [window miniaturize:nil];
+        else
+            [window zoom:nil]; // "Maximize" (zoom, the default); "Fill" has no public API, zoom is closest
+    }
+    @catch (NSException* exception)
+    {
+        qWarning("UBGlassEffect: title bar double click failed: %s", [[exception reason] UTF8String]);
+    }
+}

@@ -22,6 +22,7 @@
 #include "UBGlassEffect.h"
 
 #include <QtGlobal>
+#include <QWidget>
 
 #include "core/memcheck.h"
 
@@ -49,4 +50,18 @@ int UBGlassEffect::topInset(QWidget* widget)
 {
     Q_UNUSED(widget);
     return 0;
+}
+
+
+void UBGlassEffect::titleBarDoubleClick(QWidget* widget)
+{
+    QWidget* top = widget ? widget->window() : nullptr;
+
+    if (!top)
+        return;
+
+    if (top->isMaximized())
+        top->showNormal();
+    else
+        top->showMaximized();
 }

@@ -61,6 +61,14 @@ class UBGlassEffect
          * anchored at the top edge stay below it (traffic lights).
          */
         static int topInset(QWidget* widget);
+
+        /**
+         * A double click on the title bar of the window of the widget, made on
+         * a strip that stands in for the title bar (UBWindowDragStrip): on
+         * macOS the action chosen in the system settings (zoom, minimise or
+         * nothing), elsewhere maximise / restore.
+         */
+        static void titleBarDoubleClick(QWidget* widget);
 };
 
 #endif /* UBGLASSEFFECT_H_ */

@@ -36,6 +36,7 @@
 #include "UBDownloadWidget.h"
 
 class QStackedLayout;
+class UBWindowDragStrip;
 
 #include "ui_mainWindow.h"
 
@@ -90,6 +91,8 @@ class UBMainWindow : public QMainWindow, public Ui::MainWindow
 
 private:
         UBDownloadWidget* mpDownloadWidget;
+        // title bar zone of the web and documents pages when no toolbar is in it
+        UBWindowDragStrip* mTitleBarStrip;
 };
 
 #endif /* UBMAINWINDOW_H_ */
