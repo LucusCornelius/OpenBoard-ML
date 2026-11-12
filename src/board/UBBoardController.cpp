@@ -88,6 +88,7 @@
 #include "gui/UBToolClusterPalette.h"
 #include "gui/UBGlassStyle.h"
 #include "gui/UBGlassEffect.h"
+#include "gui/UBWindowDragStrip.h"
 
 #include "podcast/UBPodcastController.h"
 
@@ -284,6 +285,11 @@ void UBBoardController::setupViews()
     mControlView->setTransformationAnchor(QGraphicsView::NoAnchor);
 
     mControlLayout->addWidget(mControlView);
+
+    // the title bar zone over the board moves the window (macOS full size content window);
+    // created right after the view: above the board, below all panels
+    new UBWindowDragStrip(mControlContainer, UBWindowDragStrip::Placement::Overlay);
+
     mControlContainer->setObjectName("ubBoardControlContainer");
     mMainWindow->addBoardWidget(mControlContainer);
 

@@ -37,6 +37,7 @@
 #include "board/UBBoardController.h"
 #include "core/UBDisplayManager.h"
 #include "core/UBShortcutManager.h"
+#include "gui/UBWindowDragStrip.h"
 
 // work around for handling tablet events on MAC OS with Qt 4.8.0 and above
 #if defined(Q_OS_OSX)
@@ -51,6 +52,7 @@ UBMainWindow::UBMainWindow(QWidget *parent, Qt::WindowFlags flags)
     , mWebWidget(0)
     , mDocumentsWidget(0)
     , mpDownloadWidget(NULL)
+    , mTitleBarStrip(nullptr)
 {
     Ui::MainWindow::setupUi(this);
 
@@ -61,6 +63,13 @@ UBMainWindow::UBMainWindow(QWidget *parent, Qt::WindowFlags flags)
     QWidget* centralWidget = new QWidget(this);
     mStackedLayout = new QStackedLayout(centralWidget);
     setCentralWidget(centralWidget);
+
+    // macOS full size content window: the title bar zone has to move the window. A toolbar
+    // in it is the title bar, otherwise a strip (the board has its own, over the board)
+    for (QToolBar* toolBar : {boardToolBar, webToolBar, documentToolBar})
+        UBWindowDragStrip::enableToolBarDrag(toolBar);
+
+    mTitleBarStrip = new UBWindowDragStrip(this, UBWindowDragStrip::Placement::Reserve);
 
 #ifdef Q_OS_OSX
     actionPreferences->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Comma));
@@ -106,6 +115,8 @@ void UBMainWindow::switchToBoardWidget()
     {
         mStackedLayout->setCurrentWidget(mBoardWidget);
     }
+
+    mTitleBarStrip->setActive(false);
 }
 
 void UBMainWindow::addWebWidget(QWidget *pWidget)
@@ -124,6 +135,8 @@ void UBMainWindow::switchToWebWidget()
     {
         mStackedLayout->setCurrentWidget(mWebWidget);
     }
+
+    mTitleBarStrip->setActive(true);
 }
 
 
@@ -142,6 +155,8 @@ void UBMainWindow::switchToDocumentsWidget()
     {
         mStackedLayout->setCurrentWidget(mDocumentsWidget);
     }
+
+    mTitleBarStrip->setActive(true);
 }
 
 void UBMainWindow::keyPressEvent(QKeyEvent *event)

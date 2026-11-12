@@ -162,6 +162,21 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
     no separator: the board runs under the transparent title bar, the clusters sit below the
     traffic lights, the web and document toolbars start to the right of them (unified title
     bar). The window `NSAppearance` follows the app theme, also when it changes at runtime.
+  * window edge (`src/gui/UBWindowDragStrip.*`): in such a window the title bar zone belongs
+    to the content, so a press there would draw on the board. Over the board a slim strip
+    lies in it, as high as the title bar: one flat even veil and a one pixel hairline along
+    its lower edge, light over a dark page and dark over a light page. Press and drag moves
+    the window with the system window move (`QWindow::startSystemMove()`, on macOS
+    `performWindowDragWithEvent:`): snapping, Spaces and dragging to another screen are
+    native. A double click does what *Double-click a window's title bar to* in the system
+    settings says (zoom, minimise or nothing; "fill" zooms). The strip lies over the board
+    (the board keeps its size and stays in line with the projection), above the board view
+    and below every panel, so the traffic lights and panels moved to the top edge stay
+    usable; mouse and pen presses in it never reach the board. In web and document mode the
+    toolbar is the title bar: its empty space (also below the traffic lights) moves the
+    window; with the toolbars at the bottom the same strip sits above the page, which moves
+    down below it. No strip in full screen, for the frameless window or in desktop
+    annotation. Windows and Linux have a native title bar and no strip.
   * panels: real system material behind every floating panel, the dock tabs and the open
     dock bodies (pages, library: a floating glass sidebar with frosted cards inside):
     `NSGlassEffectView` on macOS 26+, `NSVisualEffectView` before. Qt paints all widgets of a
@@ -202,8 +217,9 @@ See [BACKGROUNDS.md](BACKGROUNDS.md). Summary:
   dock palettes and the web/document toolbars; painted glass panels adapt to the content below,
   native glass panels on macOS follow the theme.
 * The app runs in a normal resizable window by default (`App/RunInWindow=true`); window
-  geometry is remembered. **Full screen**: Ctrl+Shift+F (OpenBoard-ML menu), or the green
-  zoom button on macOS. Connecting or disconnecting a screen does not move the window
+  geometry is remembered. The window is moved by its top edge: on macOS the strip in the
+  title bar zone (see above), on Windows and Linux the native title bar. **Full screen**:
+  Ctrl+Shift+F (OpenBoard-ML menu), or the green zoom button on macOS. Connecting or disconnecting a screen does not move the window
   (it is only brought back when its screen is gone) and does not re-centre the board.
 * **Show on Second Screen** (OpenBoard-ML menu; also Preferences → Display → *Show the board on
   a second screen or projector*; `App/UseMultiscreenMode`, **off by default**): additionally
