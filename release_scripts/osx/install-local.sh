@@ -16,6 +16,9 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 DEST_DIR="${DEST_DIR:-/Applications}"
 NAME="OpenBoard-ML.app"
 DEST="$DEST_DIR/$NAME"
+# the copy is staged in a hidden *.noindex folder: Spotlight would otherwise register the half
+# copied bundle and its Qt WebEngine helper as extra applications
+STAGE="$DEST_DIR/.OpenBoard-ML-install.noindex"
 
 version_field() { sed -n "s/^$1 *= *\([0-9]*\).*/\1/p" "$REPO/version.txt"; }
 VERSION="$(version_field VERSION_MAJ).$(version_field VERSION_MIN).$(version_field VERSION_PATCH)"
@@ -26,7 +29,7 @@ cleanup() {
         hdiutil detach "$MOUNT" -quiet || true
         rmdir "$MOUNT" 2>/dev/null || true
     fi
-    rm -rf "$DEST.new"
+    rm -rf "$STAGE"
 }
 trap cleanup EXIT
 
@@ -57,10 +60,11 @@ if pgrep -f "$DEST/Contents/MacOS/OpenBoard-ML" > /dev/null; then
 fi
 
 echo "== copying $SRC"
-rm -rf "$DEST.new"
-ditto "$SRC" "$DEST.new"
+rm -rf "$STAGE"
+mkdir "$STAGE"
+ditto "$SRC" "$STAGE/$NAME"
 rm -rf "$DEST"
-mv "$DEST.new" "$DEST"
+mv "$STAGE/$NAME" "$DEST"
 
 # a bundle taken from a downloaded disk image is quarantined; this one is built here
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
