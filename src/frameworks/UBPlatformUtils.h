@@ -34,6 +34,7 @@
 #include <QIcon>
 #include <QProcess>
 
+class QAction;
 class QMainWindow;
 class QScreen;
 
@@ -219,6 +220,7 @@ public:
 #ifdef Q_OS_OSX
         static void SetMacLocaleByIdentifier(const QString& id);
         static void toggleFinder(const bool on);
+        static QAction* wacomRestartAction();
 
         static bool errorOpeningVirtualKeyboard;
 #endif

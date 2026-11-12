@@ -2812,6 +2812,26 @@ Do you want to ignore these errors for this host?</source>
         <source>Swiss French</source>
         <translation>Zwitsers Frans</translation>
     </message>
+    <message>
+        <location filename="../../src/frameworks/UBPlatformUtils_mac.mm" line="882"/>
+        <source>Restart Wacom driver</source>
+        <translation>Wacom-driver herstarten</translation>
+    </message>
+    <message>
+        <location filename="../../src/frameworks/UBPlatformUtils_mac.mm" line="891"/>
+        <source>Restarting the Wacom driver…</source>
+        <translation>Wacom-driver wordt herstart…</translation>
+    </message>
+    <message>
+        <location filename="../../src/frameworks/UBPlatformUtils_mac.mm" line="900"/>
+        <source>The Wacom driver has been restarted. Lift the pen from the tablet and put it back.</source>
+        <translation>De Wacom-driver is herstart. Haal de pen even van het tablet en zet hem terug.</translation>
+    </message>
+    <message>
+        <location filename="../../src/frameworks/UBPlatformUtils_mac.mm" line="902"/>
+        <source>The Wacom driver did not start. Check Privacy &amp; Security in System Settings (Accessibility, Input Monitoring).</source>
+        <translation>De Wacom-driver is niet gestart. Controleer Privacy en beveiliging in Systeeminstellingen (Toegankelijkheid, Invoerbewaking).</translation>
+    </message>
 </context>
 <context>
     <name>UBPodcastController</name>

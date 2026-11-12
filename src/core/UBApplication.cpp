@@ -708,6 +708,11 @@ void UBApplication::decorateActionMenu(QAction* action)
 
             menu->addAction(mainWindow->actionMultiScreen);
             menu->addAction(mainWindow->actionToggleFullScreen);
+#ifdef Q_OS_OSX
+            // only with the Wacom tablet driver installed
+            if (QAction* restartWacom = UBPlatformUtils::wacomRestartAction())
+                menu->addAction(restartWacom);
+#endif
             menu->addSeparator();
 
             menu->addAction(mainWindow->actionPodcast);

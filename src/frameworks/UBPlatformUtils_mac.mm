@@ -32,10 +32,14 @@
 #include "core/UBDisplayManager.h"
 #include "core/UBSettings.h"
 #include "frameworks/UBFileSystemUtils.h"
+#include "gui/UBGlassStyle.h"
 #include "gui/UBMainWindow.h"
 
+#include <QAction>
 #include <QWidget>
 #include <QRegularExpression>
+
+#include <unistd.h>
 
 #import <Foundation/NSAutoreleasePool.h>
 #import <Cocoa/Cocoa.h>
@@ -779,4 +783,127 @@ void UBPlatformUtils::grabScreen(QScreen* screen, std::function<void (QPixmap)> 
 {
     QPixmap pixmap = screen->grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height());
     callback(pixmap);
+}
+
+
+namespace
+{
+    /**
+     * The per-user launchd agents of the Wacom tablet driver, in the order they are restarted.
+     * macOS starts them at login and restarts them only after a crash, so once the driver has
+     * been quit the pen stays dead. The label of the IOManager differs from its plist name.
+     */
+    struct WacomService
+    {
+        const char* label;
+        const char* plist;
+    };
+
+    const WacomService wacomServices[] = {
+        {"com.wacom.DataStoreMgr", "/Library/LaunchAgents/com.wacom.DataStoreMgr.plist"},
+        {"Wacom_IOManager", "/Library/LaunchAgents/com.wacom.IOManager.plist"},
+        {"com.wacom.wacomtablet", "/Library/LaunchAgents/com.wacom.wacomtablet.plist"},
+    };
+
+    const QString launchctl = QStringLiteral("/bin/launchctl");
+
+    // runs a tool without blocking, done tells whether it exited with status 0
+    void runTool(const QString& program, const QStringList& arguments, std::function<void(bool)> done)
+    {
+        QProcess* process = new QProcess(qApp);
+        process->setStandardOutputFile(QProcess::nullDevice());
+        process->setStandardErrorFile(QProcess::nullDevice());
+
+        QObject::connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), process,
+                         [process, done](int exitCode, QProcess::ExitStatus exitStatus) {
+            process->deleteLater();
+            done(exitStatus == QProcess::NormalExit && exitCode == 0);
+        });
+
+        QObject::connect(process, &QProcess::errorOccurred, process, [process, done](QProcess::ProcessError error) {
+            // other errors are followed by finished()
+            if (error == QProcess::FailedToStart)
+            {
+                process->deleteLater();
+                done(false);
+            }
+        });
+
+        // never leave a restart hanging
+        QTimer::singleShot(10000, process, &QProcess::kill);
+
+        process->start(program, arguments);
+    }
+
+    // restarts the services from index on, one after the other, then calls done
+    void restartWacomServices(size_t index, std::function<void()> done)
+    {
+        if (index >= std::size(wacomServices))
+        {
+            done();
+            return;
+        }
+
+        const WacomService service = wacomServices[index];
+        const QString domain = QString("gui/%1").arg(getuid());
+        const QString target = domain + "/" + service.label;
+        auto next = [index, done]() { restartWacomServices(index + 1, done); };
+
+        // a service that is not loaded at all is loaded and then started
+        runTool(launchctl, {"kickstart", "-k", target}, [=](bool restarted) {
+            if (restarted)
+            {
+                next();
+                return;
+            }
+
+            runTool(launchctl, {"bootstrap", domain, service.plist}, [=](bool loaded) {
+                if (loaded)
+                    runTool(launchctl, {"kickstart", target}, [next](bool) { next(); });
+                else
+                    next();
+            });
+        });
+    }
+}
+
+/**
+ * @brief The menu action restarting the Wacom tablet driver
+ * @return the shared action, nullptr when no Wacom driver is installed
+ */
+QAction* UBPlatformUtils::wacomRestartAction()
+{
+    static QPointer<QAction> action;
+
+    // com.wacom.wacomtablet, the tablet driver itself
+    if (action || !QFile::exists(wacomServices[2].plist))
+        return action;
+
+    action = new QAction(UBGlassStyle::icon("wacomRestart"), tr("Restart Wacom driver"), UBApplication::mainWindow);
+
+    QObject::connect(action, &QAction::triggered, action, []() {
+        static bool restarting = false;
+
+        if (restarting)
+            return;
+
+        restarting = true;
+        UBApplication::showMessage(tr("Restarting the Wacom driver…"), true);
+
+        restartWacomServices(0, []() {
+            // the program of com.wacom.wacomtablet starts WacomTabletDriver a moment later
+            QTimer::singleShot(4500, qApp, []() {
+                runTool("/usr/bin/pgrep", {"-f", "WacomTabletDriver\\.app/Contents/MacOS/WacomTabletDriver"}, [](bool running) {
+                    restarting = false;
+
+                    if (running)
+                        UBApplication::showMessage(tr("The Wacom driver has been restarted. Lift the pen from the tablet and put it back."));
+                    else
+                        UBApplication::showMessage(tr("The Wacom driver did not start. Check Privacy & Security in System Settings (Accessibility, Input Monitoring)."));
+                });
+            });
+        });
+    });
+
+    return action;
 }
