@@ -1,0 +1,248 @@
+# Windows x64 build of OpenBoard-ML: installer (Inno Setup) and portable zip.
+#
+# All real work is in release_scripts/windows/build.ps1, which also runs on an ordinary Windows PC.
+# This workflow only provides caching, logs and the release upload.
+#
+#  * push to ml-features (not for docs-only changes) or "Run workflow" on the Actions tab:
+#    the installer and the zip are downloadable as artifacts of the run.
+#  * push of a tag v*: additionally attached to the GitHub Release of that tag (created if needed).
+#
+# On forks GitHub keeps workflows disabled until the owner enables them once on the Actions tab.
+
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ml-features
+    tags:
+      - 'v*'
+    # not evaluated for tag pushes, so a tag always builds
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+
+concurrency:
+  group: windows-${{ github.ref }}
+  # a newer push supersedes a running branch build; tag builds always finish
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+permissions:
+  contents: read
+
+env:
+  # Qt 6.10 is the newest Qt whose Windows binaries the released aqtinstall (3.3.0) can install:
+  # 6.11 changed the repository layout and 6.12 the Qt WebEngine extension layout, both only
+  # supported on aqtinstall's master so far. Keep the two in step with build.ps1's defaults.
+  QT_VERSION: '6.10.3'
+  AQT_VERSION: '3.3.0'
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\build\win32-deps\vcpkg-bincache
+  VCPKG_DISABLE_METRICS: '1'
+  PYTHONUTF8: '1'
+
+jobs:
+  build:
+    name: Build Windows x64
+    # pinned instead of windows-latest: Visual Studio 2022, Inno Setup and vcpkg are preinstalled
+    runs-on: windows-2025
+    timeout-minutes: 240
+    outputs:
+      version: ${{ steps.app.outputs.version }}
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      - name: Runner information
+        id: info
+        run: |
+          "image=$env:ImageOS-$env:ImageVersion" >> $env:GITHUB_OUTPUT
+          Write-Host "Runner image: $env:ImageOS $env:ImageVersion"
+          Write-Host "PowerShell $($PSVersionTable.PSVersion); $([Environment]::ProcessorCount) CPUs"
+          Write-Host "vcpkg: $env:VCPKG_INSTALLATION_ROOT at $(git -C $env:VCPKG_INSTALLATION_ROOT rev-parse --short HEAD)"
+          python --version
+          git --version
+          $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
+          if (-not $iscc) { $iscc = Get-Item "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue }
+          Write-Host "Inno Setup: $(if ($iscc) { $iscc.Source ?? $iscc.FullName } else { 'not installed' })"
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, @{n='FreeGB';e={[math]::Round($_.Free/1GB)}} | Out-String | Write-Host
+
+      - name: Install Inno Setup if the image lacks it
+        run: |
+          if (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") { Write-Host 'Inno Setup is preinstalled'; exit 0 }
+          choco install innosetup --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed ($LASTEXITCODE)" }
+
+      - name: Make sure vcpkg has the pinned baseline
+        run: |
+          $baseline = (Get-Content -Raw release_scripts/windows/vcpkg.json | ConvertFrom-Json).'builtin-baseline'
+          git -C $env:VCPKG_INSTALLATION_ROOT cat-file -e "$baseline^{commit}" 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "baseline $baseline not in the preinstalled vcpkg; fetching"
+            git -C $env:VCPKG_INSTALLATION_ROOT fetch --quiet origin
+            git -C $env:VCPKG_INSTALLATION_ROOT cat-file -e "$baseline^{commit}"
+            if ($LASTEXITCODE -ne 0) { throw "vcpkg baseline $baseline not found" }
+          }
+          Write-Host "baseline $baseline present"
+          exit 0
+
+      - name: Restore Qt
+        id: qt-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/win32-deps/Qt
+          key: qt-${{ env.QT_VERSION }}-win64_msvc2022_64-webengine-multimedia-5compat-aqt${{ env.AQT_VERSION }}
+
+      - name: Restore vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: build/win32-deps/vcpkg-bincache
+          key: vcpkg-${{ hashFiles('release_scripts/windows/vcpkg.json', 'release_scripts/windows/vcpkg-triplets/*.cmake') }}-${{ steps.info.outputs.image }}
+          restore-keys: |
+            vcpkg-${{ hashFiles('release_scripts/windows/vcpkg.json', 'release_scripts/windows/vcpkg-triplets/*.cmake') }}-
+            vcpkg-
+
+      - name: Dependencies (Qt, vcpkg, QuaZip)
+        run: |
+          New-Item -ItemType Directory -Force -Path logs | Out-Null
+          $PSNativeCommandUseErrorActionPreference = $false
+          $ErrorActionPreference = 'Continue'
+          pwsh -NoProfile -File release_scripts/windows/build.ps1 -Phase Dependencies -QtVersion $env:QT_VERSION -AqtVersion $env:AQT_VERSION 2>&1 |
+            ForEach-Object { "$_" } | Tee-Object -FilePath logs/dependencies.log
+          exit $LASTEXITCODE
+
+      # saved right away, so that a failing compile does not throw away an hour of vcpkg builds
+      - name: Save Qt
+        if: steps.qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build/win32-deps/Qt
+          key: ${{ steps.qt-cache.outputs.cache-primary-key }}
+
+      - name: Save vcpkg binary cache
+        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: build/win32-deps/vcpkg-bincache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+
+      - name: Build, deploy and package
+        id: app
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $ErrorActionPreference = 'Continue'
+          pwsh -NoProfile -File release_scripts/windows/build.ps1 -Phase Application -QtVersion $env:QT_VERSION -AqtVersion $env:AQT_VERSION 2>&1 |
+            ForEach-Object { "$_" } | Tee-Object -FilePath logs/build.log
+          exit $LASTEXITCODE
+
+      - name: Check the tag matches version.txt
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          $tagVersion = '${{ github.ref_name }}'.Substring(1)
+          $built = '${{ steps.app.outputs.version }}'
+          if ($tagVersion -ne $built) {
+            Write-Host "::warning::tag ${{ github.ref_name }} but version.txt says $built; the files are named after version.txt"
+          }
+
+      - name: Upload installer
+        if: steps.app.outputs.setup != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: OpenBoard-ML-${{ steps.app.outputs.version }}-Windows-x64-Setup
+          path: ${{ steps.app.outputs.setup }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload portable zip
+        uses: actions/upload-artifact@v5
+        with:
+          name: OpenBoard-ML-${{ steps.app.outputs.version }}-Windows-x64-Portable
+          path: |
+            ${{ steps.app.outputs.zip }}
+            ${{ steps.app.outputs.sums }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      # ---- on failure: everything needed to diagnose it from one copy-paste ----
+
+      - name: Summarise the failure
+        if: failure()
+        run: |
+          $out = @('## Windows build failed', '')
+          foreach ($log in 'logs/dependencies.log', 'logs/build.log') {
+            if (-not (Test-Path $log)) { continue }
+            $lines = Get-Content $log
+            $errors = $lines | Select-String -Pattern '(\berror\b [A-Z]+\d+|fatal error|: error:|::error::|Project ERROR|NMAKE : fatal|LINK : fatal|unresolved external|cannot open (include|input) file|CMake Error|error: building|failed with)' |
+              Select-Object -First 80 | ForEach-Object { $_.Line }
+            $out += "### ${log}: first errors"
+            $out += '```'
+            $out += $(if ($errors) { $errors } else { '(no error lines matched)' })
+            $out += '```'
+            $out += "### ${log}: last 150 lines"
+            $out += '```'
+            $out += ($lines | Select-Object -Last 150)
+            $out += '```'
+          }
+          $out += 'The full logs are in the artifact **windows-build-logs** of this run.'
+          $out | Out-File -Append -Encoding utf8 $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: windows-build-logs
+          path: |
+            logs/
+            build/win32-deps/vcpkg-buildtrees/**/*.log
+            build/win32-msvc/.qmake.stash
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release:
+    name: Attach to the GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the build
+        uses: actions/download-artifact@v5
+        with:
+          pattern: OpenBoard-ML-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+          [ -e "dist/OpenBoard-ML-${VERSION}-Windows-x64-Setup.exe" ] || { echo "::error::installer missing"; exit 1; }
+          if ! gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+            printf '%s\n' \
+              "OpenBoard-ML ${VERSION}." \
+              "" \
+              "**Windows:** download \`OpenBoard-ML-${VERSION}-Windows-x64-Setup.exe\` and run it. It is not signed, so" \
+              "Windows SmartScreen says *Windows protected your PC*: click **More info**, then **Run anyway**." \
+              "The \`-Portable.zip\` holds the same program without installer: unpack it and start \`OpenBoard-ML.exe\`." \
+              > notes.md
+            gh release create "$TAG" --repo "$REPO" --verify-tag --title "OpenBoard-ML ${VERSION}" --notes-file notes.md
+          fi
+          # SHA256SUMS.txt is renamed so it does not clash with checksums of other platforms
+          cp dist/SHA256SUMS.txt "dist/SHA256SUMS-Windows-x64.txt"
+          gh release upload "$TAG" --repo "$REPO" --clobber \
+            "dist/OpenBoard-ML-${VERSION}-Windows-x64-Setup.exe" \
+            "dist/OpenBoard-ML-${VERSION}-Windows-x64-Portable.zip" \
+            "dist/SHA256SUMS-Windows-x64.txt"

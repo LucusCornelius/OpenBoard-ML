@@ -115,13 +115,68 @@ win32 {
    LIBS += -lOle32
    # dark title bars and rounded corners of the modern style (UBUiStyle)
    LIBS += -lDwmapi
+   # Windows Media Format (podcast encoder) is missing on Windows "N" editions without the Media
+   # Feature Pack: load it on first use instead of refusing to start
+   msvc: LIBS += -lDelayImp
+   msvc: QMAKE_LFLAGS += /DELAYLOAD:wmvcore.dll
 
-   THIRD_PARTY_PATH=../OpenBoard-ThirdParty
-   include($$THIRD_PARTY_PATH/libs.pri)
+   # Third-party libraries: poppler (with its private xpdf headers), QuaZip, OpenSSL 3, zlib.
+   # Two layouts are supported; the variables can also be set in the environment.
+   #
+   #  * WIN_LIB_PREFIX=<dir> QUAZIP_SRC=<dir>: an installed prefix with include/, lib/ and bin/
+   #    (the vcpkg tree made by release_scripts/windows/build.ps1) and the quazip/ folder of the
+   #    QuaZip 1.x sources, which is compiled into the program (no second Qt from vcpkg):
+   #      qmake OpenBoard.pro WIN_LIB_PREFIX=C:/deps/x64-windows QUAZIP_SRC=C:/deps/quazip-1.7.2/quazip
+   #  * otherwise the upstream OpenBoard-ThirdParty checkout, by default next to this one:
+   #      qmake OpenBoard.pro THIRD_PARTY_PATH=D:/src/OpenBoard-ThirdParty
+   isEmpty(WIN_LIB_PREFIX): WIN_LIB_PREFIX = $$(WIN_LIB_PREFIX)
+   isEmpty(QUAZIP_SRC): QUAZIP_SRC = $$(QUAZIP_SRC)
+   isEmpty(THIRD_PARTY_PATH): THIRD_PARTY_PATH = $$(THIRD_PARTY_PATH)
 
-   DEPENDPATH += $$THIRD_PARTY_PATH/quazip/
-   INCLUDEPATH += $$THIRD_PARTY_PATH/quazip/
-   include($$THIRD_PARTY_PATH/quazip/quazip.pri)
+   !isEmpty(WIN_LIB_PREFIX) {
+      WIN_LIB_PREFIX = $$clean_path($$WIN_LIB_PREFIX)
+      message("Windows third-party prefix $$WIN_LIB_PREFIX")
+      !exists($$WIN_LIB_PREFIX/include/poppler/PDFDoc.h): \
+         error("poppler private headers missing in $$WIN_LIB_PREFIX/include/poppler - vcpkg needs poppler with the private-api feature")
+      !exists($$WIN_LIB_PREFIX/include/poppler/cpp/poppler-version.h): \
+         error("poppler-version.h missing in $$WIN_LIB_PREFIX/include/poppler/cpp - poppler built without its cpp frontend")
+      !exists($$WIN_LIB_PREFIX/include/openssl/evp.h): error("OpenSSL headers missing in $$WIN_LIB_PREFIX/include")
+      !exists($$WIN_LIB_PREFIX/include/zlib.h): error("zlib.h missing in $$WIN_LIB_PREFIX/include")
+
+      INCLUDEPATH += $$WIN_LIB_PREFIX/include \
+                     $$WIN_LIB_PREFIX/include/poppler
+      LIBS += -L$$WIN_LIB_PREFIX/lib -lpoppler -llibssl -llibcrypto -lzlib
+      LIBS += -lWmvcore -lWinmm -lShell32
+
+      # QuaZip, compiled from source as upstream quazip.pri did
+      isEmpty(QUAZIP_SRC): error("WIN_LIB_PREFIX is set but QUAZIP_SRC is not - point it at the quazip folder of the QuaZip 1.x sources")
+      QUAZIP_SRC = $$clean_path($$QUAZIP_SRC)
+      !exists($$QUAZIP_SRC/quazip.h): error("QuaZip sources not found - no quazip.h in $$QUAZIP_SRC")
+      !exists($$QUAZIP_SRC/quazip_config.h):exists($$QUAZIP_SRC/quazip_config.h.in) {
+         # QuaZip >= 1.5 has CMake generate this header; QTextCodec comes from Qt 5 Compat (core5compat)
+         QUAZIP_CONFIG_LINES = "$${LITERAL_HASH}ifndef QUAZIP_CONFIG_H" \
+                               "$${LITERAL_HASH}define QUAZIP_CONFIG_H" \
+                               "$${LITERAL_HASH}define QUAZIP_CAN_USE_QTEXTCODEC" \
+                               "$${LITERAL_HASH}endif"
+         write_file($$QUAZIP_SRC/quazip_config.h, QUAZIP_CONFIG_LINES)|error("cannot write $$QUAZIP_SRC/quazip_config.h")
+      }
+      message("QuaZip sources $$QUAZIP_SRC")
+      DEFINES += QUAZIP_STATIC
+      INCLUDEPATH += $$QUAZIP_SRC
+      DEPENDPATH += $$QUAZIP_SRC
+      HEADERS += $$files($$QUAZIP_SRC/*.h)
+      SOURCES += $$files($$QUAZIP_SRC/*.cpp) \
+                 $$files($$QUAZIP_SRC/*.c)
+   } else {
+      isEmpty(THIRD_PARTY_PATH): THIRD_PARTY_PATH = ../OpenBoard-ThirdParty
+      !exists($$THIRD_PARTY_PATH/libs.pri): \
+         error("$$THIRD_PARTY_PATH/libs.pri not found - pass THIRD_PARTY_PATH=<OpenBoard-ThirdParty checkout>, or WIN_LIB_PREFIX and QUAZIP_SRC, or use release_scripts/windows/build.ps1")
+      include($$THIRD_PARTY_PATH/libs.pri)
+
+      DEPENDPATH += $$THIRD_PARTY_PATH/quazip/
+      INCLUDEPATH += $$THIRD_PARTY_PATH/quazip/
+      include($$THIRD_PARTY_PATH/quazip/quazip.pri)
+   }
 
    RC_FILE = resources/win/OpenBoard.rc
    CONFIG += axcontainer
