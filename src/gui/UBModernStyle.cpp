@@ -282,7 +282,9 @@ QString UBModernStyle::styleSheet(bool dark)
     const QColor onAccent = dark ? QColor(0, 0, 0) : QColor(255, 255, 255);
     const QColor accentHover = withAlpha(accentColor, 0.90);
 
-    QString css = QStringLiteral(R"CSS(
+    // the raw style sheets are not passed through a macro (QStringLiteral): the traditional
+    // preprocessor of MSVC breaks on raw string literals containing quotes in macro arguments
+    QString css = QString::fromUtf8(R"CSS(
 /* ---------- Modern layer (UBModernStyle, Windows 11 / Fluent like) ---------- */
 
 QWidget
@@ -602,7 +604,7 @@ QDialog#preferencesDialog QTabWidget::pane
 
     // floating palettes: the same selectors as the glass layer (property "glassOnDark",
     // which follows the theme in this style), so the specificity is the same
-    static const QString panelTemplate = QStringLiteral(R"CSS(
+    static const QString panelTemplate = QString::fromUtf8(R"CSS(
 /* ---------- floating palettes (modern) ---------- */
 
 @P@ UBActionPaletteButton,
