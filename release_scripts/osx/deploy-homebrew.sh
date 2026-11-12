@@ -11,7 +11,8 @@
 #    not for the helper process (its own Contents/Frameworks does not exist).
 # This script rewrites the helper's links to @rpath, gives the helper a Frameworks link to
 # the bundle's Frameworks folder, drops the Homebrew rpath, signs the bundle ad hoc and
-# builds a compressed .dmg with an Applications shortcut.
+# builds a compressed .dmg with an Applications shortcut. The bundle is left in
+# <output-dir>/bundle.noindex, the disk image in <output-dir>.
 set -euo pipefail
 
 VERSION="${1:?version, e.g. 1.0.0}"
@@ -22,8 +23,10 @@ PREFIX="${MAC_LIB_PREFIX:-/opt/homebrew}"
 MACDEPLOYQT="${MACDEPLOYQT:-$PREFIX/bin/macdeployqt}"
 
 [ -d "$SRC" ] || { echo "no build at $SRC (run qmake + make first)"; exit 1; }
-mkdir -p "$OUT"
-APP="$OUT/OpenBoard-ML.app"
+# Spotlight skips folders named *.noindex: the copies made here must not show up as extra
+# OpenBoard-ML entries in the Apps list next to the installed one
+mkdir -p "$OUT/bundle.noindex"
+APP="$OUT/bundle.noindex/OpenBoard-ML.app"
 rm -rf "$APP"
 cp -R "$SRC" "$APP"
 
@@ -73,7 +76,7 @@ codesign --verify --deep --strict "$APP"
 
 echo "== dmg"
 DMG="$OUT/OpenBoard-ML-$VERSION-macOS-$(uname -m).dmg"
-STAGE="$OUT/dmgroot"
+STAGE="$OUT/dmgroot.noindex"
 rm -rf "$STAGE" "$DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
