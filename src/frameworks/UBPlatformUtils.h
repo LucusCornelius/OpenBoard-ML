@@ -224,6 +224,12 @@ public:
 
         static bool errorOpeningVirtualKeyboard;
 #endif
+        // pressure (0..1) of the pen behind the mouse event that is being handled, negative when it is not a pen
+#ifdef Q_OS_OSX
+        static qreal penPressureOfCurrentMouseEvent();
+#else
+        static qreal penPressureOfCurrentMouseEvent() { return -1.; }
+#endif
         enum SessionType {
             UNKNOWN,
             X11,

@@ -868,6 +868,36 @@ namespace
 }
 
 /**
+ * @brief Pressure of the pen behind the mouse event that is being handled
+ *
+ * Qt only turns the tablet data of a pen into tablet events after it has seen that pen enter
+ * proximity. When it missed that, the pen arrives as a plain mouse until it has left the tablet
+ * and come back. The event of the system still carries the pressure.
+ *
+ * @return 0..1, negative when the event does not come from a pen
+ */
+qreal UBPlatformUtils::penPressureOfCurrentMouseEvent()
+{
+    NSEvent *event = [NSApp currentEvent];
+
+    switch ([event type])
+    {
+    case NSEventTypeLeftMouseDown:
+    case NSEventTypeLeftMouseDragged:
+    case NSEventTypeLeftMouseUp:
+        if ([event subtype] == NSEventSubtypeTabletPoint)
+            return [event pressure];
+        break;
+    case NSEventTypeTabletPoint:
+        return [event pressure];
+    default:
+        break;
+    }
+
+    return -1.;
+}
+
+/**
  * @brief The menu action restarting the Wacom tablet driver
  * @return the shared action, nullptr when no Wacom driver is installed
  */

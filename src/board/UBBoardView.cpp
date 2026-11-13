@@ -1191,8 +1191,17 @@ void UBBoardView::mousePressEvent (QMouseEvent *event)
                     connect(&mLongPressTimer, SIGNAL(timeout()), this, SLOT(longPressEvent()));
                     mLongPressTimer.start();
                 }
+                // a pen draws through tabletEvent(), but when the platform only delivers it as a mouse
+                // (macOS: Qt did not see the pen enter proximity) the stroke still follows its pressure
+                mMousePenPressure = -1.;
+                if (mUseHighResTabletEvent
+                        && ((currentTool == UBStylusTool::Pen && mPenPressureSensitive)
+                            || (currentTool == UBStylusTool::Marker && mMarkerPressureSensitive)))
+                    mMousePenPressure = UBPlatformUtils::penPressureOfCurrentMouseEvent();
+
                 // keep the sub-pixel position (Retina screens, tablets in mouse mode)
-                scene()->inputDevicePress(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), 1., event->modifiers());
+                scene()->inputDevicePress(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))),
+                                          mMousePenPressure < 0. ? 1. : mMousePenPressure, event->modifiers());
                 updateLineAngleIndicator();
             }
             event->accept ();
@@ -1360,7 +1369,16 @@ void UBBoardView::mouseMoveEvent (QMouseEvent *event)
 #else
             const QPointF eventPosition = event->localPos();
 #endif
-            scene()->inputDeviceMove(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), mMouseButtonIsPressed, event->modifiers());
+            qreal pressure = mMouseButtonIsPressed;
+            if (mMouseButtonIsPressed && mMousePenPressure >= 0.)
+            {
+                // a pen that arrives as a mouse, see mousePressEvent
+                const qreal penPressure = UBPlatformUtils::penPressureOfCurrentMouseEvent();
+                if (penPressure >= 0.)
+                    mMousePenPressure = penPressure;
+                pressure = mMousePenPressure;
+            }
+            scene()->inputDeviceMove(viewportTransform().inverted().map(UBGeometryUtils::pointConstrainedInRect(eventPosition, QRectF(rect()))), pressure, event->modifiers());
             updateLineAngleIndicator();
         }
         event->accept ();

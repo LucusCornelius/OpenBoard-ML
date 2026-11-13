@@ -226,6 +226,7 @@ private:
     bool mTemporaryToolFollowsPenContact{false};            // stylus: temporary tool acts only while the tip touches
     bool mTabletButtonPressPending{false};                  // next mouse press originates from a stylus button
     bool mTabletButtonPressInContact{false};                // stylus tip was touching when the button was pressed
+    qreal mMousePenPressure{-1.};                           // pen whose stroke arrives as mouse events: its pressure, negative for a mouse
 
 private slots:
     void settingChanged(QVariant newValue);
