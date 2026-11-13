@@ -22,6 +22,7 @@
 #include "UBWindowDragStrip.h"
 
 #include <QEvent>
+#include <QGuiApplication>
 #include <QMainWindow>
 #include <QMouseEvent>
 #include <QPainter>
@@ -245,6 +246,19 @@ void UBWindowDragStrip::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.fillRect(rect(), veil);
     painter.fillRect(QRectF(0, height() - pixel, width(), pixel), hairline);
+
+    // the title of the window: application name and version, centred like a native title;
+    // the margin keeps it clear of the traffic lights
+    const QString title = QGuiApplication::applicationDisplayName() + " v" + QCoreApplication::applicationVersion();
+    const int margin = 80;
+
+    QFont titleFont = font();
+    titleFont.setPixelSize(13);
+    titleFont.setWeight(QFont::DemiBold);
+    painter.setFont(titleFont);
+    painter.setPen(dark ? QColor(255, 255, 255, 190) : QColor(0, 0, 0, 165));
+    painter.drawText(rect().adjusted(margin, 0, -margin, 0), Qt::AlignCenter,
+                     painter.fontMetrics().elidedText(title, Qt::ElideRight, width() - 2 * margin));
 }
 
 

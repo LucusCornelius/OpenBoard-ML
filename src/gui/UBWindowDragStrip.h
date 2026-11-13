@@ -35,7 +35,8 @@ class QToolBar;
  * window. The strip takes the presses in that zone: press and drag moves the
  * window with the system window move (QWindow::startSystemMove(), native on
  * every platform, also to another screen), a double click does what a double
- * click on the title bar does (UBGlassEffect::titleBarDoubleClick()).
+ * click on the title bar does (UBGlassEffect::titleBarDoubleClick()). It shows
+ * the application name and version as the title of the window.
  *
  * The strip exists only while the title bar overlaps the content
  * (UBGlassEffect::topInset() > 0): not in full screen, not for a frameless
