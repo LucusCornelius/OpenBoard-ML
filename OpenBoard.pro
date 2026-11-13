@@ -143,9 +143,18 @@ win32 {
       !exists($$WIN_LIB_PREFIX/include/openssl/evp.h): error("OpenSSL headers missing in $$WIN_LIB_PREFIX/include")
       !exists($$WIN_LIB_PREFIX/include/zlib.h): error("zlib.h missing in $$WIN_LIB_PREFIX/include")
 
+      # the name of zlib's library depends on the zlib version (zlib.lib, z.lib, ...); build.ps1 passes it
+      isEmpty(WIN_ZLIB_LIB): WIN_ZLIB_LIB = $$(WIN_ZLIB_LIB)
+      isEmpty(WIN_ZLIB_LIB) {
+         for(candidate, $$list(zlib z zlib1 zdll)) {
+            isEmpty(WIN_ZLIB_LIB):exists($$WIN_LIB_PREFIX/lib/$${candidate}.lib): WIN_ZLIB_LIB = $$candidate
+         }
+      }
+      isEmpty(WIN_ZLIB_LIB): error("no zlib library (zlib.lib, z.lib, zlib1.lib or zdll.lib) in $$WIN_LIB_PREFIX/lib - pass WIN_ZLIB_LIB=<name without .lib>")
+
       INCLUDEPATH += $$WIN_LIB_PREFIX/include \
                      $$WIN_LIB_PREFIX/include/poppler
-      LIBS += -L$$WIN_LIB_PREFIX/lib -lpoppler -llibssl -llibcrypto -lzlib
+      LIBS += -L$$WIN_LIB_PREFIX/lib -lpoppler -llibssl -llibcrypto -l$$WIN_ZLIB_LIB
       LIBS += -lWmvcore -lWinmm -lShell32
 
       # QuaZip, compiled from source as upstream quazip.pri did

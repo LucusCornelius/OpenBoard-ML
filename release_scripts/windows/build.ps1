@@ -130,6 +130,25 @@ function Assert-Path([string]$Path, [string]$Message) {
     if (-not (Test-Path -LiteralPath $Path)) { throw "$Message (missing: $Path)" }
 }
 
+# The file names of zlib depend on the zlib version that vcpkg builds (zlib.lib with zlib1.dll, or z.lib),
+# so they are taken from what the vcpkg package installed instead of being assumed.
+function Get-ZlibFiles {
+    $files = @()
+    $info = @(Get-ChildItem -LiteralPath (Join-Path $VcpkgInstallRoot 'vcpkg\info') -Filter "zlib_*_$VcpkgTriplet.list" -ErrorAction SilentlyContinue |
+              Sort-Object LastWriteTime | Select-Object -Last 1)
+    if ($info.Count -gt 0) { $files = @(Get-Content -LiteralPath $info[0].FullName | ForEach-Object { $_.Trim() -replace '\\', '/' }) }
+    $libs = @($files | Where-Object { $_ -match '^[^/]+/lib/[^/]+\.lib$' } | ForEach-Object { ($_ -split '/')[-1] })
+    $dlls = @($files | Where-Object { $_ -match '^[^/]+/bin/[^/]+\.dll$' } | ForEach-Object { ($_ -split '/')[-1] })
+    # no package list (a prefix that vcpkg did not make): the names zlib has used so far
+    if ($libs.Count -eq 0) { $libs = @('zlib.lib', 'z.lib', 'zlib1.lib', 'zdll.lib') }
+    $libs = @($libs | Where-Object { Test-Path -LiteralPath (Join-Path $Prefix "lib\$_") })
+    if ($libs.Count -eq 0) {
+        $present = @(Get-ChildItem -LiteralPath (Join-Path $Prefix 'lib') -Filter '*.lib' -ErrorAction SilentlyContinue | ForEach-Object Name)
+        throw "No zlib library in $Prefix\lib (libraries there: $($present -join ', '))"
+    }
+    return @{ Lib = [IO.Path]::GetFileNameWithoutExtension($libs[0]); Dlls = $dlls }
+}
+
 function Get-AppVersion {
     $text = Get-Content -LiteralPath (Join-Path $RepoRoot 'version.txt')
     $fields = @{}
@@ -329,6 +348,8 @@ function Invoke-DependenciesPhase {
         Assert-Path (Join-Path $QtDir "bin\$dll") "Qt module missing in $QtDir"
     }
     Assert-Path (Join-Path $QtDir 'bin\QtWebEngineProcess.exe') 'Qt WebEngine is incomplete'
+    # Qt is complete: the workflow saves it to its cache when this file exists, also if a later step fails
+    Set-Content -LiteralPath (Join-Path $DepsDir 'qt.ok') -Value $QtVersion
 
     Write-Step 'vcpkg: poppler, OpenSSL, zlib'
     if (-not $VcpkgRoot) { throw 'vcpkg not found: pass -VcpkgRoot <dir> or set VCPKG_ROOT (git clone https://github.com/microsoft/vcpkg; .\vcpkg\bootstrap-vcpkg.bat)' }
@@ -360,10 +381,20 @@ function Invoke-DependenciesPhase {
         '--disable-metrics'
     )
     Invoke-Native $vcpkg $vcpkgArgs 'vcpkg install'
-    foreach ($f in 'include\poppler\PDFDoc.h', 'include\poppler\cpp\poppler-version.h', 'include\openssl\evp.h', 'include\zlib.h',
-                   'lib\poppler.lib', 'lib\libcrypto.lib', 'lib\libssl.lib', 'lib\zlib.lib', 'bin\poppler.dll') {
-        Assert-Path (Join-Path $Prefix $f) 'vcpkg did not install what OpenBoard.pro needs'
+    # everything is in the binary cache now: the workflow saves it when this file exists, also if a later step fails
+    Set-Content -LiteralPath (Join-Path $DepsDir 'vcpkg.ok') -Value $baseline
+    $missing = @('include\poppler\PDFDoc.h', 'include\poppler\cpp\poppler-version.h', 'include\openssl\evp.h', 'include\zlib.h',
+                 'lib\poppler.lib', 'lib\libcrypto.lib', 'lib\libssl.lib', 'bin\poppler.dll' |
+                 Where-Object { -not (Test-Path -LiteralPath (Join-Path $Prefix $_)) })
+    if ($missing.Count -gt 0) {
+        foreach ($dir in 'lib', 'bin') {
+            Write-Host "${Prefix}\${dir}:"
+            Get-ChildItem -LiteralPath (Join-Path $Prefix $dir) -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "   $($_.Name)" }
+        }
+        throw "vcpkg did not install what OpenBoard.pro needs (missing in ${Prefix}: $($missing -join ', '))"
     }
+    $zlib = Get-ZlibFiles
+    Write-Host "zlib: $($zlib.Lib).lib, DLLs: $($zlib.Dlls -join ', ')"
     $popplerVersion = 'unknown'
     $m = @(Select-String -LiteralPath (Join-Path $Prefix 'include\poppler\cpp\poppler-version.h') -Pattern 'POPPLER_VERSION\s+"([^"]+)"')
     if ($m.Count -gt 0) { $popplerVersion = $m[0].Matches[0].Groups[1].Value }
@@ -405,6 +436,8 @@ function Invoke-ApplicationPhase {
     else { Write-Host "WMVCore.lib: $($wmvcore[0])" }
 
     Write-Step 'qmake'
+    $zlib = Get-ZlibFiles
+    Write-Host "zlib: $($zlib.Lib).lib, DLLs: $($zlib.Dlls -join ', ')"
     if ($Clean -and (Test-Path -LiteralPath $BuildDir)) { Remove-Item -Recurse -Force -LiteralPath $BuildDir }
     New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
     Push-Location $BuildDir
@@ -413,6 +446,7 @@ function Invoke-ApplicationPhase {
             (Join-Path $RepoRoot 'OpenBoard.pro'),
             '-spec', 'win32-msvc',
             "WIN_LIB_PREFIX=$($Prefix -replace '\\', '/')",
+            "WIN_ZLIB_LIB=$($zlib.Lib)",
             "QUAZIP_SRC=$($QuaZipSrc -replace '\\', '/')"
         )
         Invoke-Native (Join-Path $qtBin 'qmake.exe') $qmakeArgs 'qmake'
@@ -505,10 +539,10 @@ function Invoke-ApplicationPhase {
         'Qt6Core.dll', 'Qt6Gui.dll', 'Qt6Widgets.dll', 'Qt6Network.dll', 'Qt6Svg.dll', 'Qt6Core5Compat.dll',
         'Qt6Multimedia.dll', 'Qt6WebEngineCore.dll', 'Qt6WebEngineWidgets.dll', 'Qt6WebChannel.dll', 'Qt6Positioning.dll',
         'platforms\qwindows.dll', 'imageformats\qsvg.dll', 'imageformats\qjpeg.dll', 'tls\qschannelbackend.dll',
-        'poppler.dll', 'libcrypto-3-x64.dll', 'libssl-3-x64.dll', 'zlib1.dll',
+        'poppler.dll', 'libcrypto-3-x64.dll', 'libssl-3-x64.dll',
         'vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll',
         'etc\OpenBoard.config', 'startupHints\index.html', 'i18n\OpenBoard_en.qm', 'i18n\OpenBoard_nl.qm', 'fonts', 'library', 'customizations'
-    )
+    ) + @($zlib.Dlls)
     $absent = @($required | Where-Object { -not (Test-Path -LiteralPath (Join-Path $tree $_)) })
     if ($absent.Count -gt 0) { throw "Deployed tree is incomplete, missing: $($absent -join ', ')" }
     $multimedia = @(Get-ChildItem -LiteralPath (Join-Path $tree 'multimedia') -Filter '*.dll' -ErrorAction SilentlyContinue)

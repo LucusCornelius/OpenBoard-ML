@@ -116,16 +116,17 @@ jobs:
             ForEach-Object { "$_" } | Tee-Object -FilePath logs/dependencies.log
           exit $LASTEXITCODE
 
-      # saved right away, so that a failing compile does not throw away an hour of vcpkg builds
+      # saved right away, and also when the step above fails after Qt or vcpkg finished (build.ps1 then
+      # has written qt.ok / vcpkg.ok), so that a failing check or compile does not throw away an hour of builds
       - name: Save Qt
-        if: steps.qt-cache.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.qt-cache.outputs.cache-hit != 'true' && hashFiles('build/win32-deps/qt.ok') != '' }}
         uses: actions/cache/save@v5
         with:
           path: build/win32-deps/Qt
           key: ${{ steps.qt-cache.outputs.cache-primary-key }}
 
       - name: Save vcpkg binary cache
-        if: steps.vcpkg-cache.outputs.cache-hit != 'true'
+        if: ${{ !cancelled() && steps.vcpkg-cache.outputs.cache-hit != 'true' && hashFiles('build/win32-deps/vcpkg.ok') != '' }}
         uses: actions/cache/save@v5
         with:
           path: build/win32-deps/vcpkg-bincache
