@@ -472,6 +472,15 @@ function Invoke-ApplicationPhase {
     Copy-Item -LiteralPath $exe -Destination $tree
     # windeployqt before the data folders are copied, so that it scans nothing but the program
     Invoke-Native (Join-Path $qtBin 'windeployqt.exe') @('--release', '--no-compiler-runtime', '--verbose', '1', (Join-Path $tree "$AppName.exe")) 'windeployqt'
+    
+    # Qt Positioning comes along with Qt WebEngine, and windeployqt copies all of its plugins. The NMEA
+    # one (a GPS receiver on a serial port) imports Qt6SerialPort.dll, which is not installed and which
+    # OpenBoard has no use for: without the plugin, web pages still get the Windows location service.
+    $nmea = Join-Path $tree 'position\qtposition_nmea.dll'
+    if (Test-Path -LiteralPath $nmea) {
+        Remove-Item -LiteralPath $nmea
+        Write-Host 'removed position\qtposition_nmea.dll (it needs Qt6SerialPort.dll, which is not shipped)'
+    }
 
     # Qt WebEngine: windeployqt normally does this; make sure, since web mode needs all of it
     if (-not (Test-Path -LiteralPath (Join-Path $tree 'QtWebEngineProcess.exe'))) {
