@@ -64,9 +64,12 @@ macx {
 }
 
 win32 {
-    
-    LIBS     += "-L$$PWD/../../zlib/1.2.3/lib" "-lzlib"
-   
+
+    # only for the OpenBoard-ThirdParty layout; with WIN_LIB_PREFIX, OpenBoard.pro links the zlib of that prefix
+    PDFMERGER_WIN_PREFIX = $$WIN_LIB_PREFIX
+    isEmpty(PDFMERGER_WIN_PREFIX): PDFMERGER_WIN_PREFIX = $$(WIN_LIB_PREFIX)
+    isEmpty(PDFMERGER_WIN_PREFIX): LIBS += "-L$$PWD/../../zlib/1.2.3/lib" "-lzlib"
+
 }
 
 linux-g++ {
