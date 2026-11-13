@@ -778,12 +778,12 @@ Do you wish to override the security check and continue ?   </source>
     <message>
         <location filename="../forms/mainWindow.ui" line="1972"/>
         <source>Snap to grid</source>
-        <translation type="unfinished"></translation>
+        <translation>Uitlijnen op raster</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1975"/>
         <source>Snap to grid and angle</source>
-        <translation type="unfinished"></translation>
+        <translation>Uitlijnen op raster en hoek</translation>
     </message>
     <message>
         <location filename="../forms/mainWindow.ui" line="1978"/>
@@ -1376,6 +1376,16 @@ Do you wish to override the security check and continue ?   </source>
 </context>
 <context>
     <name>UBApplication</name>
+    <message>
+        <location filename="../../src/core/UBApplication.cpp" line="337"/>
+        <source>Snap to grid is on</source>
+        <translation>Uitlijnen op raster staat aan</translation>
+    </message>
+    <message>
+        <location filename="../../src/core/UBApplication.cpp" line="337"/>
+        <source>Snap to grid is off</source>
+        <translation>Uitlijnen op raster staat uit</translation>
+    </message>
     <message>
         <location filename="../../src/core/UBApplication.cpp" line="573"/>
         <source>Page Size</source>

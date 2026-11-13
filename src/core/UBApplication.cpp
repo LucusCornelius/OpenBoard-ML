@@ -330,6 +330,13 @@ int UBApplication::exec(const QString& pFileToImport)
 
     mainWindow->setAttribute(Qt::WA_NativeWindow, true);
 
+    // the snap moves lines and items away from the pen: say so when it is switched by its button or shortcut
+    connect(mainWindow->actionSnap, &QAction::triggered, this, [this](bool checked)
+    {
+        mSnapHeldByShift = false;
+        showMessage(checked ? tr("Snap to grid is on") : tr("Snap to grid is off"));
+    });
+
     mainWindow->actionCopy->setShortcuts(QKeySequence::Copy);
     mainWindow->actionPaste->setShortcuts(QKeySequence::Paste);
     mainWindow->actionCut->setShortcuts(QKeySequence::Cut);
@@ -765,6 +772,16 @@ bool UBApplication::eventFilter(QObject *obj, QEvent *event)
 {
     bool result = QObject::eventFilter(obj, event);
 
+    if (mSnapHeldByShift && (event->type() == QEvent::MouseButtonPress || event->type() == QEvent::TabletPress)
+            && !QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ShiftModifier)
+            && !qobject_cast<QAbstractButton*>(QApplication::widgetAt(QCursor::pos())))
+    {
+        // the release of shift went elsewhere (system shortcut, other application): do not keep snapping;
+        // a press on a button is left alone, it may be the snap button itself
+        mSnapHeldByShift = false;
+        mainWindow->actionSnap->setChecked(false);
+    }
+
     if (event->type() == QEvent::FileOpen)
     {
         QFileOpenEvent *fileToOpenEvent = static_cast<QFileOpenEvent *>(event);
@@ -818,8 +835,10 @@ bool UBApplication::eventFilter(QObject *obj, QEvent *event)
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
 
         // set snap action when pressing shift while snapping tool is active
-        if (keyEvent->key() == Qt::Key_Shift && UBDrawingController::drawingController()->isSnappingTool())
+        if (keyEvent->key() == Qt::Key_Shift && UBDrawingController::drawingController()->isSnappingTool()
+                && !mainWindow->actionSnap->isChecked())
         {
+            mSnapHeldByShift = true;
             mainWindow->actionSnap->setChecked(true);
         }
     }
@@ -828,9 +847,10 @@ bool UBApplication::eventFilter(QObject *obj, QEvent *event)
         // intercept key release events for shortcut handler
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
 
-        // unset snap action when releasing shift while snapping tool is active
-        if (keyEvent->key() == Qt::Key_Shift && UBDrawingController::drawingController()->isSnappingTool())
+        // unset snap action when releasing shift, whatever the tool is by now
+        if (keyEvent->key() == Qt::Key_Shift && mSnapHeldByShift)
         {
+            mSnapHeldByShift = false;
             mainWindow->actionSnap->setChecked(false);
         }
 

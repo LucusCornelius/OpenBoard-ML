@@ -146,6 +146,7 @@ class UBApplication : public SingleApplication
         void setupTranslators(QStringList args);
         QList<QMenu*> mProtoMenus;
         bool mIsVerbose;
+        bool mSnapHeldByShift{false};   // the snap is only on for as long as shift is held
         QString checkLanguageAvailabilityForSankore(QString& language);
     protected:
 /*
