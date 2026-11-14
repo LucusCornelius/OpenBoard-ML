@@ -2625,6 +2625,51 @@ void UBBoardController::paste()
 }
 
 
+/**
+ * Shrinks an item that is larger than the visible part of the board and moves it inside,
+ * so that the handles of its frame can be reached. A pasted screenshot has more pixels
+ * than the board shows; at its own size its frame would be out of sight on all sides.
+ */
+void UBBoardController::fitInControlView(QGraphicsItem* item)
+{
+    const QRectF visible = mControlView->mapToScene(mControlView->viewport()->rect()).boundingRect();
+    QRectF bounds = item->sceneBoundingRect();
+
+    if (visible.isEmpty() || bounds.isEmpty())
+        return;
+
+    // leave room around the item for its frame and for the toolbars at the top and the bottom
+    const qreal maxWidth = visible.width() * .6;
+    const qreal maxHeight = visible.height() * .6;
+
+    if (bounds.width() > maxWidth || bounds.height() > maxHeight)
+    {
+        const QPointF center = bounds.center();
+        const qreal ratio = qMin(maxWidth / bounds.width(), maxHeight / bounds.height());
+
+        item->setTransform(QTransform::fromScale(ratio, ratio), true);
+        item->setPos(item->pos() + center - item->sceneBoundingRect().center());
+        bounds = item->sceneBoundingRect();
+    }
+
+    const QRectF area = visible.adjusted(visible.width() * .05, visible.height() * .15,
+                                         -visible.width() * .05, -visible.height() * .15);
+    QPointF shift;
+
+    if (bounds.left() < area.left())
+        shift.setX(area.left() - bounds.left());
+    else if (bounds.right() > area.right())
+        shift.setX(area.right() - bounds.right());
+
+    if (bounds.top() < area.top())
+        shift.setY(area.top() - bounds.top());
+    else if (bounds.bottom() > area.bottom())
+        shift.setY(area.bottom() - bounds.bottom());
+
+    item->setPos(item->pos() + shift);
+}
+
+
 bool zLevelLessThan( UBItem* s1, UBItem* s2)
 {
     qreal s1Zvalue = dynamic_cast<QGraphicsItem*>(s1)->data(UBGraphicsItemData::ItemOwnZValue).toReal();
@@ -2721,19 +2766,32 @@ void UBBoardController::processMimeData(const QMimeData* pMimeData, const QPoint
             buffer.setData(pMimeData->data(selectedFormat));
         }
 
+        // like an image that is dropped as a file: it must not be larger than what the board shows,
+        // and it is ready to be moved and resized
+        QGraphicsItem* imageItem = nullptr;
+
         if (ubMimeType == UBMimeType::VectorImage)
         {
-            mActiveScene->addSvg({}, pPos, buffer.data());
-            return;
+            imageItem = mActiveScene->addSvg({}, pPos, buffer.data());
         }
         else if (ubMimeType == UBMimeType::RasterImage)
         {
             // validate that the image is really an image, webkit does not fill properly the image mime data
             if (!buffer.data().isEmpty())
-            {
-                mActiveScene->addImage(buffer.data(), nullptr, pPos, 1.);
-                return;
-            }
+                imageItem = mActiveScene->addImage(buffer.data(), nullptr, pPos, 1.);
+        }
+
+        if (imageItem)
+        {
+            fitInControlView(imageItem);
+            UBDrawingController::drawingController()->setStylusTool(UBStylusTool::Selector);
+            mActiveScene->deselectAllItems();
+            imageItem->setSelected(true);
+            return;
+        }
+        else if (ubMimeType == UBMimeType::VectorImage)
+        {
+            return;
         }
     }
 

@@ -302,6 +302,7 @@ class UBBoardController : public UBDocumentContainer
         void buildColorActions();
         void updateColorButtonsForPaletteSize();
         int currentToolColorIndex() const;
+        void fitInControlView(QGraphicsItem* item);
 
         UBMainWindow *mMainWindow;
         std::shared_ptr<UBGraphicsScene> mActiveScene;
