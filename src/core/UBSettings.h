@@ -456,6 +456,8 @@ class UBSettings : public QObject
         // the Line tool and the Shapes tool line/arrow grip to 0/90/180/270 degrees within the tolerance (degrees)
         UBSetting* boardLineAngleGrip;
         UBSetting* boardLineAngleGripTolerance;
+        // frame around the nominal page size; off: the board has no visible limits, it can be written on everywhere
+        UBSetting* boardShowPageSizeMark;
         UBSetting* historyLimit;
 
         UBSetting* libIconSize;

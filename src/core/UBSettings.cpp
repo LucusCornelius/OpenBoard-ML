@@ -99,7 +99,7 @@ QColor UBSettings::penCirclePenColorLightBackground = QColor(0, 0, 0, 127);
 QColor UBSettings::documentSizeMarkColorDarkBackground = QColor(44, 44, 44, 200);
 QColor UBSettings::documentSizeMarkColorLightBackground = QColor(241, 241, 241);
 
-QColor UBSettings::boardDarkBackgroundColor = QColor(0x1C, 0x1C, 0x1E);
+QColor UBSettings::boardDarkBackgroundColor = QColor(Qt::black);
 
 QColor UBSettings::paletteColor = QColor(127, 127, 127, 127);
 QColor UBSettings::opaquePaletteColor = QColor(66, 66, 66, 255);
@@ -517,6 +517,7 @@ void UBSettings::init()
     rotationAngleStep = new UBSetting(this, "App", "RotationAngleStep", 5.);
     boardLineAngleGrip = new UBSetting(this, "Board", "LineAngleGrip", true);
     boardLineAngleGripTolerance = new UBSetting(this, "Board", "LineAngleGripTolerance", 2.);
+    boardShowPageSizeMark = new UBSetting(this, "Board", "ShowPageSizeMark", false);
     historyLimit = new UBSetting(this, "Web", "HistoryLimit", 15);
 
     libIconSize = new UBSetting(this, "Library", "LibIconSize", defaultLibraryIconSize);

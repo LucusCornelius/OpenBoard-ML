@@ -5,7 +5,7 @@ interactive whiteboard for schools, with a modern flat user interface and a set 
 teaching maths with a pen tablet. It is based on the upstream `dev` branch (1.8.0) and builds with the
 same tools; no new dependencies.
 
-OpenBoard-ML has its own name and version numbering (currently 1.0.0, independent of upstream) and can
+OpenBoard-ML has its own name and version numbering (currently 1.0.2, independent of upstream) and can
 be installed next to OpenBoard. It keeps OpenBoard's data location and file format: documents and
 settings of an existing OpenBoard installation (for example `~/Library/Application Support/OpenBoard`
 on macOS) are used as they are, and `.ubz` files stay compatible both ways. Because the two share
@@ -41,7 +41,7 @@ Ready-made builds are published on the [Releases](../../releases) page of this r
 
 ### macOS
 
-1. Download `OpenBoard-ML-1.0.0-macOS-arm64.dmg` from the latest release (Apple Silicon; macOS 12 or
+1. Download `OpenBoard-ML-1.0.2-macOS-arm64.dmg` from the latest release (Apple Silicon; macOS 12 or
    newer, the glass effects need macOS 26).
 2. Open the image and drag `OpenBoard-ML` to `Applications`.
 3. The app is not signed with an Apple developer certificate. The first time, right-click the app and
@@ -53,14 +53,14 @@ Ready-made builds are published on the [Releases](../../releases) page of this r
 
 ### Windows
 
-1. Download `OpenBoard-ML-1.0.0-Windows-x64-Setup.exe` from the latest release (64-bit Windows 10
+1. Download `OpenBoard-ML-1.0.2-Windows-x64-Setup.exe` from the latest release (64-bit Windows 10
    version 1809 or newer, or Windows 11).
 2. Run it. The installer is not signed with a code-signing certificate, so Windows SmartScreen shows
    **Windows protected your PC**: click **More info**, then **Run anyway**.
 3. Start OpenBoard-ML from the Start menu. Nothing else has to be installed: Qt, Qt WebEngine, the
    PDF and zip libraries and the Microsoft C++ runtime are all included.
 
-`OpenBoard-ML-1.0.0-Windows-x64-Portable.zip` contains the same program without an installer: unpack
+`OpenBoard-ML-1.0.2-Windows-x64-Portable.zip` contains the same program without an installer: unpack
 it anywhere and start `OpenBoard-ML.exe` (Windows may ask the same SmartScreen question). The program
 installs next to an existing OpenBoard instead of replacing it; documents and settings stay where
 OpenBoard keeps them in your user profile, so both see the same documents.
@@ -156,7 +156,7 @@ The modern style uses the Windows 11 Qt style when available and sets a dark tit
 * every push to `ml-features` (except changes that only touch `docs/` or Markdown files) and
   *Run workflow* on the Actions tab build the installer and the zip; they are attached to the run as
   artifacts (Actions → the run → *Artifacts*) for 30 days;
-* pushing a tag `v<version>` (for example `git tag v1.0.0 && git push origin v1.0.0`) builds the same
+* pushing a tag `v<version>` (for example `git tag v1.0.2 && git push origin v1.0.2`) builds the same
   and attaches both files to the GitHub Release of that tag, creating the release if needed. The
   file names come from `version.txt`, so update it before tagging.
 

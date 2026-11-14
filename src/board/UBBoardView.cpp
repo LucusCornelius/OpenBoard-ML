@@ -1900,7 +1900,7 @@ void UBBoardView::drawBackground (QPainter *painter, const QRectF &rect)
         return;
     }
 
-    if (!mFilterZIndex && scene ())
+    if (!mFilterZIndex && scene () && UBSettings::settings ()->boardShowPageSizeMark->get ().toBool ())
     {
         QSize pageNominalSize = scene ()->nominalSize ();
 
