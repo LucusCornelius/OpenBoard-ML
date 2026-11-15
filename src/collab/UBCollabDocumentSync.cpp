@@ -1865,6 +1865,9 @@ bool UBCollabDocumentSync::readPageContent(UBCollabReader& reader, bool authorit
     {
         applyProps(scene, props);
         page.reg.propsVersion = props.version;
+
+        if (page.shadowScene.lock() == scene)
+            page.shadowProps = propsFingerprint(propsOf(scene.get()));
     }
 
     QList<QGraphicsItem*> detached;
@@ -1885,13 +1888,17 @@ bool UBCollabDocumentSync::readPageContent(UBCollabReader& reader, bool authorit
 
     if (ok)
     {
-        // what the page of the sender does not have is not on this page either
+        // what the page of the sender does not have is not on this page either; a text the user
+        // is typing in stays (it is sent when he is done)
         const QHash<QUuid, QGraphicsItem*> current = UBCollabItems::sharedItems(scene.get());
 
         for (auto it = current.constBegin(); it != current.constEnd(); ++it)
         {
-            if (!inContent.contains(it.key()))
-                UBCollabItems::remove(scene.get(), it.value());
+            if (inContent.contains(it.key()) || it.value()->hasFocus())
+                continue;
+
+            UBCollabItems::remove(scene.get(), it.value());
+            shadowUpdate(page, scene, it.key(), nullptr);
         }
 
         // the registers of the sender, exactly, for the items that are here now
@@ -1923,9 +1930,6 @@ bool UBCollabDocumentSync::readPageContent(UBCollabReader& reader, bool authorit
     }
 
     UBCollabItems::releaseDetached(scene.get(), detached);
-
-    if (page.shadowScene.lock() == scene)
-        baseline(page, scene);
 
     pageModified(reg.uuid, scene);
     reconcilePages(shownBefore);

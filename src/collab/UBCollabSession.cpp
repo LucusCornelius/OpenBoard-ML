@@ -703,10 +703,9 @@ void UBCollabSession::flushQueue()
 
     while (!mQueue.isEmpty() && mState == Active && !UBCollabBoardLink::instance()->isGestureActive())
     {
+        // also of someone who left meanwhile: what he did before he left counts
         const Queued queued = mQueue.dequeue();
-
-        if (mRemotes.contains(queued.from) || queued.from == mHostPeer)
-            applyDocumentMessage(queued.from, queued.message);
+        applyDocumentMessage(queued.from, queued.message);
     }
 
     mFlushing = false;
