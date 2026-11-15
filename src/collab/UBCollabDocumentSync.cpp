@@ -253,6 +253,10 @@ std::shared_ptr<UBGraphicsScene> UBCollabDocumentSync::sceneForPage(const QUuid&
     if (index < 0)
         return nullptr;
 
+    // a page changed here and not saved yet: that scene, even if the scene cache let it go
+    if (mModifiedPages.contains(page))
+        return mModifiedPages.value(page);
+
     return mDocument->loadScene(index, false);
 }
 
