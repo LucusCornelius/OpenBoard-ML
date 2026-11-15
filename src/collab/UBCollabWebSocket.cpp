@@ -862,7 +862,10 @@ void UBCollabWebSocket::releaseSocket(bool graceful)
 
     if (graceful && socket->state() == QAbstractSocket::ConnectedState)
     {
-        // let what was written (a close frame) leave, then close; never wait long for it
+        // let what was written (a close frame) leave, then close; never wait long for it.
+        // The flush hands it to the system now: when the program quits, no event loop runs any more
+        // to do it, and the relay would take the line for dropped instead of the participant for gone.
+        socket->flush();
         connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         QTimer::singleShot(sReleaseTimeout, socket, [socket]()
         {
