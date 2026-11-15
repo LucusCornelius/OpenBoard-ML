@@ -76,6 +76,8 @@
 
 #include "tools/UBToolsManager.h"
 
+#include "collab/UBCollabController.h"
+
 #include "UBBoardController.h"
 
 #include "document/UBDocumentController.h"
@@ -269,6 +271,8 @@ void UBBoardPaletteManager::setupPalettes()
 
     mRightCluster = new UBToolClusterPalette(Qt::TopRightCorner, mContainer);
     mRightCluster->addGroup({mainWindow->actionBoard, mainWindow->actionWeb, mainWindow->actionDocument, mainWindow->actionDesktop});
+    // work together on the board, see docs/COLLABORATION.md
+    mRightCluster->addGroup({UBCollabController::instance()->action()});
     mRightCluster->addGroup({mainWindow->actionMenu});
 
     auto updateClusterLabels = [this](const QVariant& display) {
