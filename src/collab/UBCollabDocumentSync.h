@@ -154,6 +154,13 @@ class UBCollabDocumentSync : public QObject
         /** the messages that change the document (they wait while the user draws) */
         static bool isDocumentMessage(quint8 type);
 
+        /**
+         * The line came back: messages of this participant may have been lost.
+         * Everything whose last version is his is sent again as it is now; the
+         * others ignore what they have already (the versions are the same).
+         */
+        void resendOwnChanges();
+
         // digest and resync
         QByteArray digestMessage() const;
         QByteArray docStateMessage() const;
@@ -263,6 +270,7 @@ class UBCollabDocumentSync : public QObject
         void scanItems(const std::shared_ptr<UBGraphicsScene>& scene);
         void baseline(PageState& page, const std::shared_ptr<UBGraphicsScene>& scene);
         bool sendAssets(const QStringList& assets);
+        void sendAssetsAgain(const QStringList& assets);
         void applyDeferredTexts();
 
         // page properties

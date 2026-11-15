@@ -315,6 +315,10 @@ void UBCollabSession::resumed()
     // messages may have been lost both ways: compare with the host at once
     if (mRole == Guest && mHostPeer && mState == Active)
     {
+        // what this participant did may not have arrived: sent again before the comparison
+        if (mSync)
+            mSync->resendOwnChanges();
+
         mResumedCheck = true;
         UBCollabWriter writer;
         UBCollabProtocol::writeHeader(writer, UBCollabProtocol::DigestRequest);

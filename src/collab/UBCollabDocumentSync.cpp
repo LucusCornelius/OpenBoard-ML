@@ -2100,6 +2100,164 @@ void UBCollabDocumentSync::persistModifiedPages(bool immediately)
 }
 
 
+void UBCollabDocumentSync::resendOwnChanges()
+{
+    if (!mRunning || mApplying || !mDocument)
+        return;
+
+    // what the user did just now first
+    scanNow();
+
+    for (const QUuid& pageUuid : documentOrder())
+    {
+        if (!mPages.contains(pageUuid))
+            continue;
+
+        PageState& page = mPages[pageUuid];
+
+        // a page this participant added or moved last
+        if (page.reg.alive && page.reg.version.peer == mPeer && !page.reg.version.isZero())
+        {
+            UBCollabWriter writer;
+            UBCollabProtocol::writeHeader(writer, UBCollabProtocol::PageOp);
+
+            if (page.reg.incarnation == page.reg.version)
+            {
+                writer.u8(UBCollabProtocol::AddPage);
+                QStringList assets;
+                writePageContent(writer, pageUuid, assets);
+                sendAssetsAgain(assets);
+            }
+            else
+            {
+                writer.u8(UBCollabProtocol::MovePage);
+                writer.uuid(pageUuid);
+                writer.version(page.reg.incarnation);
+                writer.version(page.reg.version);
+                writer.bytes(page.reg.key);
+            }
+
+            emit outgoing(writer.data(), 0);
+        }
+
+        std::shared_ptr<UBGraphicsScene> scene;
+        UBCollabWriter ops;
+        quint32 count = 0;
+        QStringList assets;
+
+        for (auto it = page.reg.items.constBegin(); it != page.reg.items.constEnd(); ++it)
+        {
+            if (it.value().version.peer != mPeer || it.value().version.isZero())
+                continue;
+
+            ItemOp op;
+            op.item = it.key();
+            op.incarnation = it.value().incarnation;
+            op.version = it.value().version;
+
+            if (!it.value().alive)
+            {
+                op.op = UBCollabProtocol::RemoveItem;
+            }
+            else
+            {
+                if (!scene)
+                    scene = sceneForPage(pageUuid);
+
+                QGraphicsItem* item = scene ? findShared(scene.get(), op.item) : nullptr;
+
+                if (!item)
+                    continue;
+
+                op.op = op.incarnation == op.version ? UBCollabProtocol::AddItem : UBCollabProtocol::ChangeItem;
+                op.kind = UBCollabItems::kindOf(item, scene.get());
+                op.fragment = UBCollabItems::fragment(mProxy, scene, item);
+
+                if (op.fragment.isEmpty() || op.fragment.size() > UBCollabProtocol::maxFragmentBytes)
+                    continue;
+
+                for (const QString& asset : UBCollabItems::assets(item))
+                {
+                    if (!assets.contains(asset))
+                        assets << asset;
+                }
+            }
+
+            writeItemOp(ops, op);
+            ++count;
+        }
+
+        if (count > 0)
+        {
+            sendAssetsAgain(assets);
+
+            UBCollabWriter writer;
+            UBCollabProtocol::writeHeader(writer, UBCollabProtocol::ItemOps);
+            writer.uuid(pageUuid);
+            writer.u32(count);
+            writer.raw(ops.data());
+            emit outgoing(writer.data(), 0);
+        }
+
+        // the background and size of the page
+        if (page.reg.alive && page.reg.propsVersion.peer == mPeer && !page.reg.propsVersion.isZero())
+        {
+            if (!scene)
+                scene = sceneForPage(pageUuid);
+
+            if (scene)
+            {
+                PageProps props = propsOf(scene.get());
+                props.version = page.reg.propsVersion;
+
+                UBCollabWriter writer;
+                UBCollabProtocol::writeHeader(writer, UBCollabProtocol::PageProps);
+                writer.uuid(pageUuid);
+                writeProps(writer, props);
+                emit outgoing(writer.data(), 0);
+            }
+        }
+    }
+
+    // pages this participant removed
+    for (auto it = mPages.constBegin(); it != mPages.constEnd(); ++it)
+    {
+        const PageRegisters& reg = it.value().reg;
+
+        if (reg.alive || reg.version.peer != mPeer || reg.version.isZero())
+            continue;
+
+        UBCollabWriter writer;
+        UBCollabProtocol::writeHeader(writer, UBCollabProtocol::PageOp);
+        writer.u8(UBCollabProtocol::RemovePage);
+        writer.uuid(it.key());
+        writer.version(reg.incarnation);
+        writer.version(reg.version);
+        writer.bytes(reg.key.isEmpty() ? UBCollabOrderKey::between(QByteArray(), QByteArray()) : reg.key);
+        emit outgoing(writer.data(), 0);
+    }
+
+    if (mCurrentPageVersion.peer == mPeer && !mCurrentPageVersion.isZero() && !mCurrentPage.isNull())
+    {
+        UBCollabWriter writer;
+        UBCollabProtocol::writeHeader(writer, UBCollabProtocol::CurrentPage);
+        writer.uuid(mCurrentPage);
+        writer.version(mCurrentPageVersion);
+        emit outgoing(writer.data(), 0);
+    }
+}
+
+
+void UBCollabDocumentSync::sendAssetsAgain(const QStringList& assets)
+{
+    // files that were sent may have been lost with the operations
+    for (const QString& asset : assets)
+        mSentAssets.remove(asset);
+
+    sendAssets(assets);
+}
+
+
 // ---------------------------------------------------------------------------
 // digest
 // ---------------------------------------------------------------------------
