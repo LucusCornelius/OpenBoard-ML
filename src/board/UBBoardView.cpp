@@ -399,6 +399,20 @@ void UBBoardView::tabletEvent (QTabletEvent * event)
             mUsingTabletEraser = false;
         }
     }
+    else if (event->type () == QEvent::TabletMove && event->buttons () == Qt::NoButton
+             && mUsingTabletEraser && currentTool == UBStylusTool::Eraser) {
+        // the pen was turned back to its tip and hovers over the board: give the drawing tool back now.
+        // The press with the tip that does it above may never get here (a tap on a palette, the press
+        // that places a formula), and until then the eraser stayed the tool, with its circle on the board.
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+        if (event->pointerType () == QPointingDevice::PointerType::Pen) {
+#else
+        if (event->pointerType () == QTabletEvent::Pen) {
+#endif
+            dc->setStylusTool (dc->latestDrawingTool ());
+            mUsingTabletEraser = false;
+        }
+    }
 
     QPointF scenePos = viewportTransform ().inverted ().map (tabletPos);
 
