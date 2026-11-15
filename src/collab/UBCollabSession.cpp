@@ -41,6 +41,7 @@ namespace
 {
     // messages that wait while the user draws or while the board arrives
     constexpr int maxQueuedMessages = 20000;
+    constexpr qint64 maxQueuedBytes = 512 * 1024 * 1024;
 
     // a participant whose messages are refused this often is not listened to anymore
     constexpr int maxRefusals = 20;
@@ -678,7 +679,7 @@ void UBCollabSession::documentMessage(PeerId from, const QByteArray& message)
     // in order: while the board arrives, while the user draws, behind those that wait already
     if (mState != Active || !mSync || link->isGestureActive() || !mQueue.isEmpty())
     {
-        if (mQueue.size() >= maxQueuedMessages)
+        if (mQueue.size() >= maxQueuedMessages || mQueuedBytes + message.size() > maxQueuedBytes)
         {
             // too much at once: the digest will bring the pages back in step
             qWarning() << "collaboration: too many waiting messages, one dropped";
@@ -689,6 +690,7 @@ void UBCollabSession::documentMessage(PeerId from, const QByteArray& message)
         queued.from = from;
         queued.message = message;
         mQueue.enqueue(queued);
+        mQueuedBytes += message.size();
         return;
     }
 
@@ -731,6 +733,7 @@ void UBCollabSession::flushQueue()
     {
         // also of someone who left meanwhile: what he did before he left counts
         const Queued queued = mQueue.dequeue();
+        mQueuedBytes -= queued.message.size();
         applyDocumentMessage(queued.from, queued.message);
     }
 
@@ -1208,6 +1211,7 @@ void UBCollabSession::end(EndReason reason, const QString& detail)
 
     mState = Ended;
     mQueue.clear();
+    mQueuedBytes = 0;
     mEarly.clear();
     mSnapshotSends.clear();
     mCursors.clear();
