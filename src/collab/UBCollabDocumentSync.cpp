@@ -450,8 +450,20 @@ void UBCollabDocumentSync::scanNow()
 
     mLastEdited = scene;
 
-    if (scene && pageIndex(scene->uuid()) >= 0 && !mLink->isGestureActive())
-        scanItems(scene);
+    if (scene && pageIndex(scene->uuid()) >= 0)
+    {
+        if (!mLink->isGestureActive())
+        {
+            scanItems(scene);
+        }
+        else if (mPages.contains(scene->uuid()) && mPages.value(scene->uuid()).reg.alive
+                 && mPages.value(scene->uuid()).shadowScene.lock() != scene)
+        {
+            // a page just turned to: its starting point is taken now, before the press changes it,
+            // or what the press does would be taken for the starting point
+            baseline(mPages[scene->uuid()], scene);
+        }
+    }
 
     applyDeferredTexts();
 }

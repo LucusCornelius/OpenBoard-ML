@@ -22,6 +22,7 @@
 #ifndef UBCOLLABBOARDLINK_H_
 #define UBCOLLABBOARDLINK_H_
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QPointF>
 #include <QPointer>
@@ -29,6 +30,7 @@
 
 #include <memory>
 
+class QTimer;
 class QWidget;
 class UBBackgroundRuling;
 class UBDocumentProxy;
@@ -60,7 +62,12 @@ class UBCollabBoardLink : public QObject
         /** the board shows this document */
         bool showsDocument(std::shared_ptr<UBDocumentProxy> document) const;
 
-        /** a press of the mouse, pen or finger on the board has not been released yet */
+        /**
+         * A press of the mouse, pen or finger on the board has not been released yet.
+         * A press whose release went elsewhere does not count for long: it ends with the
+         * next move without a pressed button, or when nothing pressed is left after a
+         * few seconds without events; the touch pad of a laptop is no press at all.
+         */
         bool isGestureActive() const { return mGestureActive; }
 
         /** shows a page of the document on the board (the board switches to the document if needed) */
@@ -100,11 +107,25 @@ class UBCollabBoardLink : public QObject
     private:
         explicit UBCollabBoardLink(QObject* parent);
 
+        enum Source
+        {
+            NoSource,
+            Mouse,
+            Tablet,
+            Touch
+        };
+
         void watchBoard();
         void pointerEvent(const QPointF& viewportPos, bool pressed);
+        void startGesture(Source source);
+        void endGesture();
+        void checkStaleGesture();
 
         QPointer<QWidget> mViewport;
         bool mGestureActive{false};
+        Source mGestureSource{NoSource};
+        QElapsedTimer mLastGestureEvent;
+        QTimer* mStaleTimer{nullptr};
 };
 
 #endif /* UBCOLLABBOARDLINK_H_ */

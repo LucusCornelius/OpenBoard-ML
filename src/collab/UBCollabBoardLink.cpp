@@ -22,9 +22,15 @@
 #include "UBCollabBoardLink.h"
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QMouseEvent>
 #include <QTabletEvent>
 #include <QTimer>
+#include <QTouchEvent>
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+#include <QInputDevice>
+#endif
 
 #include "board/UBBoardController.h"
 #include "board/UBBoardView.h"
@@ -89,7 +95,10 @@ UBCollabBoardLink* UBCollabBoardLink::instance()
 
 UBCollabBoardLink::UBCollabBoardLink(QObject* parent)
     : QObject(parent)
+    , mStaleTimer(new QTimer(this))
 {
+    mStaleTimer->setInterval(500);
+    connect(mStaleTimer, &QTimer::timeout, this, &UBCollabBoardLink::checkStaleGesture);
 }
 
 
@@ -219,33 +228,78 @@ bool UBCollabBoardLink::eventFilter(QObject* watched, QEvent* event)
     switch (event->type())
     {
         case QEvent::MouseButtonPress:
-        case QEvent::TabletPress:
-        case QEvent::TouchBegin:
-            mGestureActive = true;
+            startGesture(Mouse);
             pointerEvent(eventPosition(event), true);
             break;
 
-        case QEvent::MouseButtonRelease:
-        case QEvent::TabletRelease:
-        case QEvent::TouchEnd:
-        case QEvent::TouchCancel:
+        case QEvent::TabletPress:
+            startGesture(Tablet);
+            pointerEvent(eventPosition(event), true);
+            break;
+
+        case QEvent::TouchBegin:
+        case QEvent::TouchUpdate:
         {
-            const bool wasActive = mGestureActive;
-            mGestureActive = false;
+            // the touch pad of a laptop sends touches to the widget under the pointer: they
+            // are no press on the board; a touch screen is
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+            const bool touchPad = static_cast<QTouchEvent*>(event)->device()
+                    && static_cast<QTouchEvent*>(event)->device()->type() == QInputDevice::DeviceType::TouchPad;
+#else
+            const bool touchPad = static_cast<QTouchEvent*>(event)->device()
+                    && static_cast<QTouchEvent*>(event)->device()->type() == QTouchDevice::TouchPad;
+#endif
 
-            if (event->type() != QEvent::TouchEnd && event->type() != QEvent::TouchCancel)
-                pointerEvent(eventPosition(event), false);
-
-            if (wasActive)
+            if (!touchPad)
             {
-                // once the board handled the release (the stroke is finished, its undo step pushed)
-                QTimer::singleShot(0, this, &UBCollabBoardLink::gestureEnded);
+                if (event->type() == QEvent::TouchBegin)
+                    startGesture(Touch);
+                else if (mGestureActive)
+                    mLastGestureEvent.restart();
             }
             break;
         }
 
+        case QEvent::MouseButtonRelease:
+        case QEvent::TabletRelease:
+            pointerEvent(eventPosition(event), false);
+            endGesture();
+            break;
+
+        case QEvent::TouchEnd:
+        case QEvent::TouchCancel:
+            if (mGestureSource == Touch)
+                endGesture();
+            break;
+
         case QEvent::MouseMove:
+        {
+            const bool buttons = static_cast<QMouseEvent*>(event)->buttons() != Qt::NoButton;
+
+            // the release of this press went elsewhere: the press is over
+            if (mGestureActive && mGestureSource == Mouse && !buttons)
+                endGesture();
+            else if (mGestureActive && buttons)
+                mLastGestureEvent.restart();
+
+            pointerEvent(eventPosition(event), mGestureActive);
+            break;
+        }
+
         case QEvent::TabletMove:
+        {
+            QTabletEvent* tablet = static_cast<QTabletEvent*>(event);
+            const bool touching = tablet->pressure() > 0 || tablet->buttons() != Qt::NoButton;
+
+            if (mGestureActive && mGestureSource == Tablet && !touching)
+                endGesture();
+            else if (mGestureActive && touching)
+                mLastGestureEvent.restart();
+
+            pointerEvent(eventPosition(event), mGestureActive);
+            break;
+        }
+
         case QEvent::HoverMove:
             pointerEvent(eventPosition(event), mGestureActive);
             break;
@@ -260,6 +314,52 @@ bool UBCollabBoardLink::eventFilter(QObject* watched, QEvent* event)
     }
 
     return QObject::eventFilter(watched, event);
+}
+
+
+void UBCollabBoardLink::startGesture(Source source)
+{
+    mGestureActive = true;
+    mGestureSource = source;
+    mLastGestureEvent.restart();
+    mStaleTimer->start();
+}
+
+
+void UBCollabBoardLink::endGesture()
+{
+    mStaleTimer->stop();
+
+    if (!mGestureActive)
+        return;
+
+    mGestureActive = false;
+    mGestureSource = NoSource;
+
+    // once the board handled the release (the stroke is finished, its undo step pushed)
+    QTimer::singleShot(0, this, &UBCollabBoardLink::gestureEnded);
+}
+
+
+void UBCollabBoardLink::checkStaleGesture()
+{
+    if (!mGestureActive)
+    {
+        mStaleTimer->stop();
+        return;
+    }
+
+    // still pressed: a pen held still, a button held down
+    if (mLastGestureEvent.elapsed() < 3000 || QGuiApplication::mouseButtons() != Qt::NoButton)
+        return;
+
+    UBBoardController* board = UBApplication::boardController;
+
+    if (board && board->activeScene() && board->activeScene()->isInputDevicePressed())
+        return;
+
+    // a press whose release never reached the board must not hold the sync back
+    endGesture();
 }
 
 
