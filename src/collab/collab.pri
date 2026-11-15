@@ -35,5 +35,3 @@ SOURCES      += src/collab/UBCollabBoardLink.cpp \
                 src/collab/UBCollabSnapshot.cpp \
                 src/collab/UBCollabSvgFilter.cpp \
                 src/collab/UBCollabWire.cpp
-
-RESOURCES    += src/collab/collab.qrc

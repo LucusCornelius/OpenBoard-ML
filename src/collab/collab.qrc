@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/images/glass">
-        <file alias="collab.svg">collab.svg</file>
-    </qresource>
-</RCC>

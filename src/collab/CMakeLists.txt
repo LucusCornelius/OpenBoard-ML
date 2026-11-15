@@ -34,12 +34,3 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBCollabWire.cpp
     UBCollabWire.h
 )
-
-# the glyph of the toolbar button, under :/images/glass with the other glyphs
-if(Qt5_VERSION AND Qt5_VERSION VERSION_LESS "5.15")
-    qt5_add_resources(OPENBOARD_COLLAB_RESOURCES collab.qrc)
-else()
-    qt_add_resources(OPENBOARD_COLLAB_RESOURCES collab.qrc)
-endif()
-
-target_sources(${PROJECT_NAME} PRIVATE ${OPENBOARD_COLLAB_RESOURCES})
