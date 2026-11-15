@@ -83,6 +83,18 @@ namespace
         return line;
     }
 
+    /**
+     * a widget that only holds a group of controls: the styles of the panel make the pages
+     * see-through, not the widgets inside a page, so this one says it of itself
+     */
+    QWidget* section(QWidget* parent)
+    {
+        QWidget* widget = new QWidget(parent);
+        widget->setObjectName("collabSection");
+        widget->setStyleSheet("QWidget#collabSection { background: transparent; border: none; }");
+        return widget;
+    }
+
     QLabel* sectionTitle(const QString& text, QWidget* parent)
     {
         QLabel* label = new QLabel(text, parent);
@@ -334,7 +346,7 @@ QWidget* UBCollabPanel::buildSessionPage()
     mSessionLabel->setWordWrap(true);
     layout->addWidget(mSessionLabel);
 
-    mInvitationBox = new QWidget(page);
+    mInvitationBox = section(page);
     QVBoxLayout* invitationLayout = new QVBoxLayout(mInvitationBox);
     invitationLayout->setContentsMargins(0, 0, 0, 0);
     invitationLayout->setSpacing(6);
@@ -348,7 +360,7 @@ QWidget* UBCollabPanel::buildSessionPage()
 
     layout->addWidget(separator(page));
 
-    mParticipantList = new QWidget(page);
+    mParticipantList = section(page);
     mParticipantLayout = new QVBoxLayout(mParticipantList);
     mParticipantLayout->setContentsMargins(0, 0, 0, 0);
     mParticipantLayout->setSpacing(4);
@@ -393,7 +405,7 @@ void UBCollabPanel::rebuildParticipants()
 
     for (const UBCollabSession::Participant& participant : session->participants())
     {
-        QWidget* row = new QWidget(mParticipantList);
+        QWidget* row = section(mParticipantList);
         QHBoxLayout* rowLayout = new QHBoxLayout(row);
         rowLayout->setContentsMargins(0, 0, 0, 0);
         rowLayout->setSpacing(8);
