@@ -157,6 +157,13 @@ class UBCollabDocumentSync : public QObject
         QByteArray docStateMessage() const;
         QByteArray pageContentMessage(const QUuid& page);
 
+        /**
+         * Milliseconds since this participant last sent a change of the page (of
+         * the list of pages for a null uuid); -1 when never. A difference with the
+         * digest of the host is expected while such a change is on its way.
+         */
+        qint64 sinceLocalChange(const QUuid& page) const;
+
         /** compares a digest of the host with the state here; false when the digest is invalid */
         bool compareDigest(UBCollabReader& reader, QList<QUuid>& differentPages, bool& docDiffers) const;
 
@@ -324,6 +331,7 @@ class UBCollabDocumentSync : public QObject
         UBCollabVersion mCurrentPageVersion;
 
         QSet<QString> mSentAssets;
+        QHash<QUuid, qint64> mLocalChanges;     // page (null: the list of pages) -> time of the last change sent
         QHash<QString, std::pair<QUuid, ItemOp>> mDeferredTexts;
         QHash<QUuid, TextEdit> mTextEdits;
         QHash<QUuid, std::shared_ptr<UBGraphicsScene>> mModifiedPages;

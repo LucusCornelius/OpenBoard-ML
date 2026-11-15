@@ -883,12 +883,24 @@ void UBCollabSession::handleDigest(PeerId from, UBCollabReader& reader)
         return;
     }
 
-    // a difference has to last for two digests: operations may be on their way
+    // a difference has to last for two digests: operations may be on their way, also those of
+    // this participant (not counted while he is changing the page)
     const int strikesNeeded = mResumedCheck ? 1 : 2;
     QHash<QUuid, int> strikes;
 
+    auto busy = [this](const QUuid& page) {
+        const qint64 since = mSync->sinceLocalChange(page);
+        return !mResumedCheck && since >= 0 && since < 2 * digestIntervalMs;
+    };
+
     for (const QUuid& page : std::as_const(different))
     {
+        if (busy(page))
+        {
+            strikes.insert(page, mDigestStrikes.value(page));
+            continue;
+        }
+
         const int count = mDigestStrikes.value(page) + 1;
 
         if (count >= strikesNeeded)
@@ -898,7 +910,7 @@ void UBCollabSession::handleDigest(PeerId from, UBCollabReader& reader)
     }
 
     const QUuid documentKey;
-    const int docCount = docDiffers ? mDigestStrikes.value(documentKey) + 1 : 0;
+    const int docCount = docDiffers ? mDigestStrikes.value(documentKey) + (busy(documentKey) ? 0 : 1) : 0;
 
     if (docDiffers && docCount >= strikesNeeded)
     {

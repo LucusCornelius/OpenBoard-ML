@@ -638,6 +638,22 @@ void UBCollabDocumentSync::scanPages()
     }
 
     mShadowOrder = order;
+    mLocalChanges.insert(QUuid(), mTime.elapsed());
+
+    for (const QUuid& uuid : order)
+    {
+        if (!before.contains(uuid))
+            mLocalChanges.insert(uuid, mTime.elapsed());
+    }
+}
+
+
+qint64 UBCollabDocumentSync::sinceLocalChange(const QUuid& page) const
+{
+    if (!mLocalChanges.contains(page))
+        return -1;
+
+    return mTime.elapsed() - mLocalChanges.value(page);
 }
 
 
@@ -828,6 +844,7 @@ void UBCollabDocumentSync::scanItems(const std::shared_ptr<UBGraphicsScene>& sce
         writer.u32(quint32(count));
         writer.raw(ops.data());
         emit outgoing(writer.data(), 0);
+        mLocalChanges.insert(pageUuid, mTime.elapsed());
     }
 
     // background and size of the page
@@ -847,6 +864,7 @@ void UBCollabDocumentSync::scanItems(const std::shared_ptr<UBGraphicsScene>& sce
         writer.uuid(pageUuid);
         writeProps(writer, sent);
         emit outgoing(writer.data(), 0);
+        mLocalChanges.insert(pageUuid, mTime.elapsed());
     }
 
     // what is not shared: told once
