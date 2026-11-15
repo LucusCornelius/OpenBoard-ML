@@ -56,7 +56,7 @@ namespace
     constexpr int pointerIntervalMs = 66;      // at most 15 cursor updates per second
     constexpr int digestIntervalMs = 3000;
     constexpr qint64 digestRepeatMs = 15000;
-    constexpr qint64 pageRequestPauseMs = 8000;
+    constexpr qint64 pageRequestPauseMs = 3000;
     constexpr int joinTimeoutMs = 30000;
     constexpr int snapshotIdleTimeoutMs = 90000;
     constexpr qint64 cursorIdleMs = 10000;
@@ -936,9 +936,23 @@ void UBCollabSession::requestPage(const QUuid& page)
 
     const qint64 now = mTime.elapsed();
 
+    // not more often than this for one page; a request that has to wait is sent when the pause ends
+    // (it was asked for a reason that does not go away by waiting: a missing file, a difference)
     if (mPageRequests.contains(page) && now - mPageRequests.value(page) < pageRequestPauseMs)
-        return;
+    {
+        if (!mPendingRequests.contains(page))
+        {
+            mPendingRequests.insert(page);
+            QTimer::singleShot(int(pageRequestPauseMs - (now - mPageRequests.value(page))) + 10, this, [this, page]() {
+                if (mPendingRequests.remove(page))
+                    requestPage(page);
+            });
+        }
 
+        return;
+    }
+
+    mPendingRequests.remove(page);
     mPageRequests.insert(page, now);
     ++mResyncs;
 

@@ -30,6 +30,7 @@
 #include <QPointF>
 #include <QPointer>
 #include <QQueue>
+#include <QSet>
 #include <QUuid>
 
 #include <memory>
@@ -258,6 +259,7 @@ class UBCollabSession : public QObject
         quint64 mLastDigest{0};
         qint64 mLastDigestTime{0};
         QHash<QUuid, qint64> mPageRequests;
+        QSet<QUuid> mPendingRequests;
         int mRefused{0};
         int mResyncs{0};
 
