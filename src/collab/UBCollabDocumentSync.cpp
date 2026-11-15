@@ -604,7 +604,21 @@ void UBCollabDocumentSync::scanPages()
             std::shared_ptr<UBGraphicsScene> scene = sceneForPage(uuid);
 
             if (scene)
+            {
                 baseline(page, scene);
+
+                // a page that brings what is not shared (an imported PDF page, a video): told once
+                for (QGraphicsItem* item : scene->items())
+                {
+                    const UBCollabItems::LocalOnly kind = UBCollabItems::localOnlyKind(item, scene.get());
+
+                    if (kind != UBCollabItems::NotLocalOnly && !mNoticesShown.contains(kind))
+                    {
+                        mNoticesShown.insert(kind);
+                        emit localOnlyAdded(kind);
+                    }
+                }
+            }
         }
         else
         {
