@@ -249,6 +249,7 @@ class UBCollabSession : public QObject
         bool mSnapshotRequested{false};
         QList<SnapshotSend> mSnapshotSends;
         QQueue<Queued> mQueue;
+        QHash<PeerId, QList<QByteArray>> mEarly;
         bool mFlushing{false};
 
         QHash<QUuid, int> mDigestStrikes;

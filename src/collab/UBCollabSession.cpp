@@ -45,6 +45,10 @@ namespace
     // a participant whose messages are refused this often is not listened to anymore
     constexpr int maxRefusals = 20;
 
+    // messages kept from a participant before his greeting
+    constexpr int maxEarlyMessages = 2000;
+    constexpr qint64 maxEarlyBytes = 128 * 1024 * 1024;
+
     // the line is held back above this many bytes waiting to be sent
     constexpr qint64 snapshotBacklog = 8 * 1024 * 1024;
 
@@ -295,6 +299,7 @@ void UBCollabSession::peerJoined(PeerId peer)
 void UBCollabSession::peerLeft(PeerId peer)
 {
     mRemotes.remove(peer);
+    mEarly.remove(peer);
     mCursors.remove(peer);
 
     for (int i = int(mSnapshotSends.size()) - 1; i >= 0; --i)
@@ -387,8 +392,19 @@ void UBCollabSession::handleMessage(PeerId from, const QByteArray& message)
 
     if (!mRemotes.value(from).greeted)
     {
-        // nothing before the greeting: the protocol version is not known yet
-        refuse(from, "a message before the greeting");
+        // the protocol version is not known yet: kept until the greeting (which may come later
+        // than the first operations when someone joins while others work)
+        QList<QByteArray>& early = mEarly[from];
+        qint64 bytes = message.size();
+
+        for (const QByteArray& kept : std::as_const(early))
+            bytes += kept.size();
+
+        if (early.size() < maxEarlyMessages && bytes <= maxEarlyBytes)
+            early << message;
+        else
+            refuse(from, "too many messages before the greeting");
+
         return;
     }
 
@@ -539,6 +555,15 @@ void UBCollabSession::handleHello(PeerId from, UBCollabReader& reader)
 
     if (!wasGreeted)
         emit participantsChanged();
+
+    // what came before the greeting
+    if (mEarly.contains(from))
+    {
+        const QList<QByteArray> early = mEarly.take(from);
+
+        for (const QByteArray& message : early)
+            handleMessage(from, message);
+    }
 }
 
 
@@ -1183,6 +1208,7 @@ void UBCollabSession::end(EndReason reason, const QString& detail)
 
     mState = Ended;
     mQueue.clear();
+    mEarly.clear();
     mSnapshotSends.clear();
     mCursors.clear();
     mPumpTimer->stop();
