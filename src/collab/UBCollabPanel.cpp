@@ -72,14 +72,24 @@ namespace
         return UBUiStyle::isModern() ? UBModernStyle::accent(UBGlassStyle::isDark()) : (onDark ? UBGlassStyle::accent().lighter(115) : UBGlassStyle::accent());
     }
 
+    /** a flat hairline between the sections, visible on light and dark glass */
     QFrame* separator(QWidget* parent)
     {
         QFrame* line = new QFrame(parent);
-        line->setObjectName("clusterSeparator");
+        line->setObjectName("collabSeparator");
         line->setFixedHeight(1);
         line->setFrameShape(QFrame::NoFrame);
-        line->setStyleSheet("QFrame { background: rgba(128, 128, 128, 60); border: none; }");
+        line->setStyleSheet("QFrame#collabSeparator { background: rgba(128, 128, 128, 70); border: none; }");
         return line;
+    }
+
+    QLabel* sectionTitle(const QString& text, QWidget* parent)
+    {
+        QLabel* label = new QLabel(text, parent);
+        QFont font = label->font();
+        font.setWeight(QFont::DemiBold);
+        label->setFont(font);
+        return label;
     }
 }
 
@@ -223,8 +233,7 @@ QWidget* UBCollabPanel::buildIdlePage()
 
     layout->addWidget(separator(page));
 
-    QLabel* joinTitle = new QLabel(tr("Join a session"), page);
-    layout->addWidget(joinTitle);
+    layout->addWidget(sectionTitle(tr("Join a session"), page));
 
     QHBoxLayout* joinRow = new QHBoxLayout();
     joinRow->setSpacing(6);
@@ -238,15 +247,14 @@ QWidget* UBCollabPanel::buildIdlePage()
 
     layout->addWidget(separator(page));
 
-    QLabel* nameTitle = new QLabel(tr("Your name"), page);
-    layout->addWidget(nameTitle);
+    layout->addWidget(sectionTitle(tr("Your name"), page));
     mNameInput = new QLineEdit(page);
     mNameInput->setPlaceholderText(tr("Participant"));
     mNameInput->setMaxLength(40);
     layout->addWidget(mNameInput);
 
-    QLabel* relayTitle = new QLabel(tr("Relay"), page);
-    layout->addWidget(relayTitle);
+    layout->addWidget(separator(page));
+    layout->addWidget(sectionTitle(tr("Relay"), page));
     layout->addWidget(makeHint(tr("Only to start a session: the address of a relay and its key, if it asks one. They come from whoever set the relay up.")));
     mRelayInput = new QLineEdit(page);
     mRelayInput->setPlaceholderText(tr("wss://relay.example.org"));
