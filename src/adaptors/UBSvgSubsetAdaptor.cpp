@@ -147,6 +147,20 @@ static bool itemZIndexComp(const QGraphicsItem* item1,
     return item1->data(UBGraphicsItemData::ItemOwnZValue).toReal() < item2->data(UBGraphicsItemData::ItemOwnZValue).toReal();
 }
 
+/**
+ * The transform a polygon of a strokes group has of its own, relative to the group. The reader
+ * gives a polygon the transform of its group when its own is the identity and takes any other as
+ * the place in the page, so a transform of its own (polygons put back by an undo into a group that
+ * was moved since) is written into its points instead; identity otherwise.
+ */
+static QTransform ownPolygonTransform(const UBGraphicsPolygonItem* polygonItem)
+{
+    if (polygonItem->parentItem() && polygonItem->strokesGroup() && !polygonItem->transform().isIdentity())
+        return polygonItem->transform();
+
+    return QTransform();
+}
+
 
 QDomDocument UBSvgSubsetAdaptor::loadSceneDocument(std::shared_ptr<UBDocumentProxy> proxy, const int pageId)
 {
@@ -1680,7 +1694,7 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::polygonItemToSvgLine(UBGraphicsPolyg
 {
     mXmlWriter.writeStartElement("line");
 
-    QLineF line = polygonItem->originalLine();
+    QLineF line = ownPolygonTransform(polygonItem).map(polygonItem->originalLine());
 
     mXmlWriter.writeAttribute("x1", QString::number(line.p1().x(), 'f', 2));
     mXmlWriter.writeAttribute("y1", QString::number(line.p1().y(), 'f', 2));
@@ -1724,10 +1738,10 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::strokeToSvgPolyline(UBGraphicsStroke
 
         foreach(UBGraphicsPolygonItem* polygon, pols)
         {
-            points << polygon->originalLine().p1();
+            points << ownPolygonTransform(polygon).map(polygon->originalLine().p1());
         }
 
-        points << pols.last()->originalLine().p2();
+        points << ownPolygonTransform(pols.last()).map(pols.last()->originalLine().p2());
 
         // SVG renderers (Chrome) do not like line withe where x1/y1 == x2/y2
         if (points.size() == 2 && (points.at(0) == points.at(1)))
@@ -1791,7 +1805,8 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::strokeToSvgPolygon(UBGraphicsStroke*
 void UBSvgSubsetAdaptor::UBSvgSubsetWriter::polygonItemToSvgPolygon(UBGraphicsPolygonItem* polygonItem, bool groupHoldsInfo)
 {
 
-    QPolygonF polygon = polygonItem->polygon();
+    const QTransform own = ownPolygonTransform(polygonItem);
+    QPolygonF polygon = own.map(polygonItem->polygon());
     int pointsCount = polygon.size();
 
     if (pointsCount > 0)
@@ -1800,7 +1815,7 @@ void UBSvgSubsetAdaptor::UBSvgSubsetWriter::polygonItemToSvgPolygon(UBGraphicsPo
 
         QString points = pointsToSvgPointsAttribute(polygon);
         mXmlWriter.writeAttribute("points", points);
-        mXmlWriter.writeAttribute("transform",toSvgTransform(polygonItem->transform()));
+        mXmlWriter.writeAttribute("transform",toSvgTransform(own.isIdentity() ? polygonItem->transform() : QTransform()));
         mXmlWriter.writeAttribute("fill", polygonItem->brush().color().name());
 
         qreal alpha = polygonItem->brush().color().alphaF();
