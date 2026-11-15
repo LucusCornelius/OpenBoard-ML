@@ -55,6 +55,15 @@ class UBGraphicsPolygonItem : public QGraphicsPolygonItem, public UBItem
 
         void setStrokesGroup(UBGraphicsStrokesGroup* group);
         UBGraphicsStrokesGroup* strokesGroup() const{return mpGroup;}
+
+        /** remembers where the polygon lies in its strokes group, before it is taken out of it */
+        void rememberPlaceInGroup();
+        /**
+         * Before the polygon is put back into its strokes group: when the group was moved since the
+         * polygon was taken out (by another participant of a shared board), the polygon goes back
+         * to its place in the group, not to its old place on the page.
+         */
+        void takePlaceInGroup(QGraphicsItem* group);
         void setColor(const QColor& color);
 
         QColor color() const;
@@ -151,6 +160,10 @@ class UBGraphicsPolygonItem : public QGraphicsPolygonItem, public UBItem
 
         UBGraphicsStroke* mStroke;
         UBGraphicsStrokesGroup* mpGroup;
+
+        bool mHasPlaceInGroup{false};
+        QTransform mPlaceInGroup;
+        QTransform mGroupPlace;
 
 };
 
