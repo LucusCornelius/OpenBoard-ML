@@ -23,6 +23,7 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -56,6 +57,19 @@ namespace
         }
 
         return QUuid();
+    }
+
+    /** the content of a received file, read back from the new folder */
+    bool isSafeAssetFile(const QString& fileName, const QString& path)
+    {
+        QFile file(fileName);
+
+        if (!file.open(QIODevice::ReadOnly))
+            return false;
+
+        // only an svg picture has to be looked through as a whole
+        const bool whole = path.endsWith(".svg", Qt::CaseInsensitive);
+        return UBCollabSvgFilter::isSafeAssetContent(path, whole ? file.readAll() : file.read(16));
     }
 }
 
@@ -216,6 +230,17 @@ bool UBCollabSnapshotReceiver::asset(UBCollabReader& reader)
         return fail(reader, "cannot write a file");
 
     mAssetWritten[path] += chunk.size();
+    file.close();
+
+    // the whole file is there: one that is not a picture, or an svg picture that would load
+    // something from elsewhere, is left out of the board (its item stays empty)
+    if (mAssetWritten.value(path) == qint64(total) && !isSafeAssetFile(mPath + "/" + path, path))
+    {
+        qWarning() << "collaboration: file not accepted:" << path;
+        QFile::remove(mPath + "/" + path);
+        ++mDropped;
+    }
+
     return true;
 }
 

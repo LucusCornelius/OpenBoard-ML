@@ -62,7 +62,16 @@ class UBCollabSvgFilter
         /** a file of the document an item may refer to: a plain name in images/ (and objects/ for PDFs of a page) */
         static bool isSafeAssetPath(const QString& path, Mode mode);
 
-        /** the html of a text item without images and external references */
+        /**
+         * the content of a file of the document that comes from another computer: a raster picture, or
+         * an svg picture that loads nothing from outside itself (PDFs are not looked into)
+         */
+        static bool isSafeAssetContent(const QString& path, const QByteArray& data);
+
+        /**
+         * the html of a text item without images and external references; a text that still asks
+         * for a file after that comes back as plain text
+         */
         static QString cleanTextHtml(const QString& html);
 };
 

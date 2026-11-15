@@ -1169,6 +1169,14 @@ bool UBCollabDocumentSync::storeAsset(const QString& path, const QByteArray& dat
     if (QFile::exists(target))
         return true;
 
+    // not a refusal of the sender (a damaged picture is no attack): the file is left out, and the
+    // item that needs it waits
+    if (!UBCollabSvgFilter::isSafeAssetContent(path, data))
+    {
+        qWarning() << "collaboration: file not accepted:" << path;
+        return false;
+    }
+
     QDir().mkpath(QFileInfo(target).absolutePath());
     QFile file(target);
 

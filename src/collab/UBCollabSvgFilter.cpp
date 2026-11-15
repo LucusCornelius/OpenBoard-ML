@@ -22,9 +22,14 @@
 #include "UBCollabSvgFilter.h"
 
 #include <QBuffer>
+#include <QGuiApplication>
 #include <QRegularExpression>
 #include <QSet>
+#include <QTextBlock>
+#include <QTextDocument>
+#include <QUrl>
 #include <QUuid>
+#include <QVariant>
 #include <QXmlStreamReader>
 #include <QXmlStreamWriter>
 
@@ -70,6 +75,43 @@ namespace
     {
         return UBSettings::uniboardDocumentNamespaceUri;
     }
+
+    /** a text document that counts the files a text asks for and fetches none of them */
+    class ProbeDocument : public QTextDocument
+    {
+        public:
+            int requests() const
+            {
+                return mRequests;
+            }
+
+            bool holdsImages() const
+            {
+                for (QTextBlock block = begin(); block.isValid(); block = block.next())
+                {
+                    for (QTextBlock::iterator it = block.begin(); !it.atEnd(); ++it)
+                    {
+                        if (it.fragment().charFormat().isImageFormat())
+                            return true;
+                    }
+                }
+
+                return false;
+            }
+
+        protected:
+            QVariant loadResource(int type, const QUrl& name) override
+            {
+                Q_UNUSED(type);
+                Q_UNUSED(name);
+
+                ++mRequests;
+                return QVariant();
+            }
+
+        private:
+            int mRequests{0};
+    };
 
     bool isNumericAttribute(const QString& ns, const QString& name)
     {
@@ -816,5 +858,77 @@ QString UBCollabSvgFilter::cleanTextHtml(const QString& html)
     clean.remove(image);
     clean.remove(link);
     clean.replace(url, "url-blocked(");
-    return clean;
+
+    // nothing can be laid out without a graphical application, and nothing is shown either
+    if (!qobject_cast<QGuiApplication*>(QCoreApplication::instance()))
+        return clean;
+
+    // the patterns above do not see what is written with character references or escapes, nor a
+    // background attribute or an imported style sheet: the text is read the way the text item will
+    // read it, and whatever it asks for is counted instead of fetched
+    ProbeDocument probe;
+    probe.setHtml(clean);
+
+    if (probe.requests() == 0 && !probe.holdsImages())
+        return clean;
+
+    return Qt::convertFromPlainText(probe.toPlainText());
+}
+
+
+bool UBCollabSvgFilter::isSafeAssetContent(const QString& path, const QByteArray& data)
+{
+    const QString suffix = path.section('.', -1).toLower();
+
+    if (suffix == "pdf")
+        return true;
+
+    if (suffix != "svg")
+    {
+        // a picture reader goes by the content when the suffix does not fit: a raster picture it
+        // has to be, or an svg picture under another name would be read as one
+        return data.startsWith("\x89PNG\r\n\x1a\n") || data.startsWith("\xff\xd8\xff")
+                || data.startsWith("GIF87a") || data.startsWith("GIF89a") || data.startsWith("BM")
+                || (data.startsWith("RIFF") && data.mid(8, 4) == "WEBP")
+                || data.startsWith(QByteArray("II*\0", 4)) || data.startsWith(QByteArray("MM\0*", 4));
+    }
+
+    // an svg picture is drawn with the pictures and style sheets it refers to, read from any path
+    // (on Windows also from another computer): only what it carries itself is allowed. It is read
+    // the way the renderer reads it; a compressed one is not readable here and refused.
+    QXmlStreamReader reader(data);
+    reader.setNamespaceProcessing(false);
+
+    while (!reader.atEnd())
+    {
+        switch (reader.readNext())
+        {
+            case QXmlStreamReader::ProcessingInstruction:
+                return false;
+
+            case QXmlStreamReader::StartElement:
+            {
+                const QXmlStreamAttributes attributes = reader.attributes();
+
+                for (const QXmlStreamAttribute& attribute : attributes)
+                {
+                    const QStringView name = attribute.qualifiedName();
+
+                    if (name != QLatin1String("href") && !name.endsWith(QLatin1String(":href")))
+                        continue;
+
+                    const QStringView value = attribute.value().trimmed();
+
+                    if (!value.isEmpty() && !value.startsWith(QLatin1Char('#')) && !value.startsWith(QLatin1String("data:")))
+                        return false;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
+    return !reader.hasError();
 }
