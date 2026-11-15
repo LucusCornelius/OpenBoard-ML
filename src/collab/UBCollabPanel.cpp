@@ -533,19 +533,21 @@ void UBCollabPanel::reposition()
 
     if (mAnchor && container->isAncestorOf(mAnchor))
     {
-        // below the cluster of the button, its right edge at the right of the button
+        // below the cluster of the button (above it when the clusters are at the bottom),
+        // its right edge at the right of the button
         const QRect anchor(mAnchor->mapTo(container, QPoint(0, 0)), mAnchor->size());
-        QWidget* cluster = mAnchor->parentWidget();
-        int bottom = anchor.bottom();
+        QRect body = anchor;
 
-        if (UBFloatingPalette* palette = qobject_cast<UBFloatingPalette*>(cluster))
+        if (UBFloatingPalette* palette = qobject_cast<UBFloatingPalette*>(mAnchor->parentWidget()))
         {
             const int pb = palette->border();
-            bottom = palette->geometry().adjusted(pb, pb, -pb, -pb).bottom();
+            body = palette->geometry().adjusted(pb, pb, -pb, -pb);
         }
 
+        const bool below = body.center().y() < container->height() / 2;
+
         x = anchor.right() + b - width() + 12;
-        y = bottom + gap - b + 2;
+        y = below ? body.bottom() + 1 + gap - b : body.top() - gap - height() + b;
     }
 
     x = qBound(gap - b, x, qMax(gap - b, container->width() - width() + b - gap));
