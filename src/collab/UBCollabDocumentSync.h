@@ -37,6 +37,7 @@
 #include "UBCollabChannel.h"
 #include "UBCollabItems.h"
 #include "UBCollabProtocol.h"
+#include "UBCollabRules.h"
 #include "UBCollabWire.h"
 
 class QGraphicsItem;
@@ -76,17 +77,7 @@ class UBCollabDocumentSync : public QObject
     public:
         using PeerId = UBCollabChannel::PeerId;
 
-        struct ItemRegister
-        {
-            UBCollabVersion incarnation;
-            UBCollabVersion version;
-            bool alive{true};
-
-            bool operator==(const ItemRegister& other) const
-            {
-                return incarnation == other.incarnation && version == other.version && alive == other.alive;
-            }
-        };
+        using ItemRegister = UBCollabRegister;
 
         /** the registers of a page, as the initial board and the list of pages carry them */
         struct PageRegisters

@@ -25,6 +25,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBCollabPanel.h
     UBCollabProtocol.cpp
     UBCollabProtocol.h
+    UBCollabRules.cpp
+    UBCollabRules.h
     UBCollabSession.cpp
     UBCollabSession.h
     UBCollabSnapshot.cpp

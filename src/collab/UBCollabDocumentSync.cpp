@@ -1263,67 +1263,36 @@ bool UBCollabDocumentSync::applyItemOp(const QUuid& pageUuid, const std::shared_
     PageState& page = pageState(pageUuid);
     QGraphicsItem* existing = findShared(scene.get(), op.item);
 
-    const bool hasRegister = page.reg.items.contains(op.item);
-    const ItemRegister reg = page.reg.items.value(op.item, ItemRegister());
-    const bool known = hasRegister || existing;
-    const bool alive = hasRegister ? reg.alive : existing != nullptr;
+    const UBCollabRules::Decision decision = UBCollabRules::decide(page.reg.items.contains(op.item), page.reg.items.value(op.item),
+                                                                   existing != nullptr, op.op, op.incarnation, op.version,
+                                                                   authoritative);
 
-    ItemRegister updated;
-    updated.incarnation = op.incarnation;
-    updated.version = op.version;
-    updated.alive = op.op != UBCollabProtocol::RemoveItem;
-
-    if (!authoritative)
+    switch (decision.action)
     {
-        // an operation of an incarnation that was replaced already
-        if (known && op.incarnation < reg.incarnation)
+        case UBCollabRules::Ignore:
             return true;
 
-        const bool sameIncarnation = known && op.incarnation == reg.incarnation;
+        case UBCollabRules::Store:
+            page.reg.items.insert(op.item, decision.reg);
+            return true;
 
-        if (sameIncarnation && !alive)
+        case UBCollabRules::Remove:
         {
-            // removed in this incarnation: the removal wins over every change
-            if (op.op == UBCollabProtocol::RemoveItem && op.version > reg.version)
+            if (existing)
             {
-                ItemRegister dead = reg;
-                dead.version = op.version;
-                page.reg.items.insert(op.item, dead);
+                if (existing->hasFocus())
+                    existing->clearFocus();
+
+                UBCollabItems::remove(scene.get(), existing);
             }
 
+            shadowUpdate(page, scene, op.item, nullptr);
+            page.reg.items.insert(op.item, decision.reg);
             return true;
         }
 
-        if (sameIncarnation && op.op != UBCollabProtocol::RemoveItem && op.version <= reg.version)
-            return true;
-
-        if (sameIncarnation && op.op == UBCollabProtocol::RemoveItem)
-            updated.version = qMax(reg.version, op.version);
-    }
-    else if (hasRegister && reg == updated && (existing != nullptr) == updated.alive)
-    {
-        // the host has what is here already
-        return true;
-    }
-    else if (!hasRegister && op.incarnation.isZero() && op.version.isZero() && existing && updated.alive)
-    {
-        // an item of the initial board that nobody changed
-        return true;
-    }
-
-    if (op.op == UBCollabProtocol::RemoveItem)
-    {
-        if (existing)
-        {
-            if (existing->hasFocus())
-                existing->clearFocus();
-
-            UBCollabItems::remove(scene.get(), existing);
-        }
-
-        shadowUpdate(page, scene, op.item, nullptr);
-        page.reg.items.insert(op.item, updated);
-        return true;
+        case UBCollabRules::Apply:
+            break;
     }
 
     // a text the user is typing in keeps his text until he is done; the last writer wins then
@@ -1347,8 +1316,8 @@ bool UBCollabDocumentSync::applyItemOp(const QUuid& pageUuid, const std::shared_
     if (result == ContentWaiting)
         return true;
 
-    if (!updated.incarnation.isZero() || !updated.version.isZero())
-        page.reg.items.insert(op.item, updated);
+    if (!decision.reg.incarnation.isZero() || !decision.reg.version.isZero())
+        page.reg.items.insert(op.item, decision.reg);
     else
         page.reg.items.remove(op.item);
 
@@ -1455,45 +1424,48 @@ bool UBCollabDocumentSync::handlePageOp(UBCollabReader& reader)
     const bool known = mPages.contains(uuid);
     PageState& page = pageState(uuid);
 
-    if (known && incarnation < page.reg.incarnation)
-        return true;
+    // the same rules as for items: the key is the content of a page in the list
+    UBCollabRegister here;
+    here.incarnation = page.reg.incarnation;
+    here.version = page.reg.version;
+    here.alive = page.reg.alive;
 
-    const bool same = known && incarnation == page.reg.incarnation;
+    const UBCollabRules::Decision decision = UBCollabRules::decide(known, here, known && here.alive,
+                                                                   kind == UBCollabProtocol::RemovePage ? UBCollabProtocol::RemoveItem
+                                                                                                        : UBCollabProtocol::ChangeItem,
+                                                                   incarnation, version, false);
 
-    if (kind == UBCollabProtocol::RemovePage)
+    switch (decision.action)
     {
-        if (same)
-        {
-            page.reg.alive = false;
-            page.reg.version = qMax(page.reg.version, version);
-        }
-        else
-        {
-            page.reg.incarnation = incarnation;
-            page.reg.version = version;
-            page.reg.alive = false;
-            page.reg.key = key;
-            page.reg.items.clear();
-        }
-    }
-    else
-    {
-        if (same)
-        {
-            if (!page.reg.alive || version <= page.reg.version)
-                return true;
+        case UBCollabRules::Ignore:
+            return true;
 
-            page.reg.key = key;
-            page.reg.version = version;
-        }
-        else
+        case UBCollabRules::Store:
+        case UBCollabRules::Remove:
+            if (decision.reg.incarnation != page.reg.incarnation)
+                page.reg.items.clear();
+
+            page.reg.incarnation = decision.reg.incarnation;
+            page.reg.version = decision.reg.version;
+            page.reg.alive = false;
+
+            if (page.reg.key.isEmpty())
+                page.reg.key = key;
+            break;
+
+        case UBCollabRules::Apply:
         {
-            // a page of which this computer missed the add: it is fetched
-            page.reg.incarnation = incarnation;
-            page.reg.version = version;
+            const bool newIncarnation = !known || decision.reg.incarnation != page.reg.incarnation;
+
+            page.reg.incarnation = decision.reg.incarnation;
+            page.reg.version = decision.reg.version;
             page.reg.alive = true;
             page.reg.key = key;
-            emit pageNeedsResync(uuid);
+
+            // a page of which this computer missed the add: it is fetched
+            if (newIncarnation || pageIndex(uuid) < 0)
+                emit pageNeedsResync(uuid);
+            break;
         }
     }
 
@@ -2317,10 +2289,14 @@ quint64 UBCollabDocumentSync::pageDigest(const QUuid& pageUuid) const
     const PageRegisters& reg = mPages.value(pageUuid).reg;
     QCryptographicHash hash(QCryptographicHash::Sha1);
 
-    hash.addData(reg.uuid.toRfc4122());
+    hash.addData(pageUuid.toRfc4122());
     writeVersion(hash, reg.incarnation);
     writeVersion(hash, reg.version);
     hash.addData(reg.alive ? QByteArray("a") : QByteArray("d"));
+
+    if (!reg.alive)
+        return digestOf(hash.result());
+
     hash.addData(reg.key);
     writeVersion(hash, reg.propsVersion);
 
@@ -2354,7 +2330,10 @@ quint64 UBCollabDocumentSync::documentDigest() const
         writeVersion(hash, reg.incarnation);
         writeVersion(hash, reg.version);
         hash.addData(reg.alive ? QByteArray("a") : QByteArray("d"));
-        hash.addData(reg.key);
+
+        // where a removed page was in the list does not matter, and differs with the order of arrival
+        if (reg.alive)
+            hash.addData(reg.key);
     }
 
     return digestOf(hash.result());

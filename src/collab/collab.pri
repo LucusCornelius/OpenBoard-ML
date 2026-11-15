@@ -18,6 +18,7 @@ HEADERS      += src/collab/UBCollabBoardLink.h \
                 src/collab/UBCollabLoopbackChannel.h \
                 src/collab/UBCollabPanel.h \
                 src/collab/UBCollabProtocol.h \
+                src/collab/UBCollabRules.h \
                 src/collab/UBCollabSession.h \
                 src/collab/UBCollabSnapshot.h \
                 src/collab/UBCollabSvgFilter.h \
@@ -31,6 +32,7 @@ SOURCES      += src/collab/UBCollabBoardLink.cpp \
                 src/collab/UBCollabLoopbackChannel.cpp \
                 src/collab/UBCollabPanel.cpp \
                 src/collab/UBCollabProtocol.cpp \
+                src/collab/UBCollabRules.cpp \
                 src/collab/UBCollabSession.cpp \
                 src/collab/UBCollabSnapshot.cpp \
                 src/collab/UBCollabSvgFilter.cpp \
