@@ -152,14 +152,31 @@ UBCollabPanel::UBCollabPanel(UBCollabController* controller, QWidget* parent)
     layout->setSpacing(10);
     layout->setSizeConstraint(QLayout::SetFixedSize);
 
+    QHBoxLayout* header = new QHBoxLayout();
+    header->setContentsMargins(0, 0, 0, 0);
+    header->setSpacing(6);
+
     mTitle = new QLabel(tr("Work together"), this);
     QFont titleFont = mTitle->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(titleFont.pointSizeF() + 1);
     mTitle->setFont(titleFont);
-    // room for the close button at the right
-    mTitle->setContentsMargins(0, 0, 28, 0);
-    layout->addWidget(mTitle);
+    header->addWidget(mTitle, 1, Qt::AlignVCenter);
+
+    // a close glyph like the other glyphs of the glass panels; the button of the toolbar and
+    // Escape close the panel as well
+    QToolButton* close = new QToolButton(this);
+    close->setObjectName("glassButton");
+    close->setIcon(UBGlassStyle::icon("close"));
+    close->setIconSize(QSize(14, 14));
+    close->setFixedSize(26, 26);
+    close->setFocusPolicy(Qt::NoFocus);
+    close->setToolTip(tr("Close"));
+    close->setStyleSheet(QString("QToolButton#glassButton { border-radius: %1px; padding: 0px; }")
+                         .arg(UBUiStyle::isModern() ? UBModernStyle::controlRadius : 12));
+    connect(close, &QToolButton::clicked, this, &UBCollabPanel::hide);
+    header->addWidget(close, 0, Qt::AlignVCenter);
+    layout->addLayout(header);
 
     mPages = new QStackedWidget(this);
     mPages->setFixedWidth(panelWidth);
@@ -178,7 +195,6 @@ UBCollabPanel::UBCollabPanel(UBCollabController* controller, QWidget* parent)
     mMessage->hide();
     layout->addWidget(mMessage);
 
-    setClosable(true);
     hide();
 }
 
@@ -196,8 +212,14 @@ QToolButton* UBCollabPanel::makeButton(const QString& text, bool primary)
     button->setToolButtonStyle(Qt::ToolButtonTextOnly);
     button->setFocusPolicy(Qt::NoFocus);
     button->setText(text);
-    button->setMinimumHeight(30);
+    button->setFixedHeight(30);
     button->setMinimumWidth(button->fontMetrics().horizontalAdvance(text) + 28);
+
+    // Rounded like the fields: a corner radius beyond half the height is ignored by the style
+    // sheets (the button was square), so it is set for this height; the modern style keeps its
+    // small corners. Colours, hover and the accent of the main button come from the style.
+    button->setStyleSheet(QString("QToolButton#glassButton { border-radius: %1px; padding: 4px 14px; }")
+                          .arg(UBUiStyle::isModern() ? UBModernStyle::controlRadius : 14));
 
     if (primary)
     {

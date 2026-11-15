@@ -1710,12 +1710,12 @@ Do you wish to override the security check and continue ?   </source>
 <context>
     <name>UBCollabDocumentSync</name>
     <message>
-        <location filename="../../src/collab/UBCollabDocumentSync.cpp" line="601"/>
+        <location filename="../../src/collab/UBCollabDocumentSync.cpp" line="617"/>
         <source>a page</source>
         <translation>een pagina</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabDocumentSync.cpp" line="786"/>
+        <location filename="../../src/collab/UBCollabDocumentSync.cpp" line="832"/>
         <source>an item</source>
         <translation>een onderdeel</translation>
     </message>
@@ -1723,154 +1723,159 @@ Do you wish to override the security check and continue ?   </source>
 <context>
     <name>UBCollabPanel</name>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="155"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="159"/>
         <source>Work together</source>
         <translation>Samenwerken</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="230"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="174"/>
+        <source>Close</source>
+        <translation>Sluiten</translation>
+    </message>
+    <message>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="252"/>
         <source>Start session</source>
         <translation>Sessie starten</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="232"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="254"/>
         <source>Shares the document on the board. Pass the invitation on to the others.</source>
         <translation>Deelt het document op het bord. Geef de uitnodiging door aan de anderen.</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="236"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="258"/>
         <source>Join a session</source>
         <translation>Deelnemen aan een sessie</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="241"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="263"/>
         <source>Paste the invitation</source>
         <translation>Plak de uitnodiging</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="243"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="265"/>
         <source>Join</source>
         <translation>Deelnemen</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="250"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="272"/>
         <source>Your name</source>
         <translation>Je naam</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="252"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="274"/>
         <source>Participant</source>
         <translation>Deelnemer</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="257"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="279"/>
         <source>Relay</source>
         <translation>Relay</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="258"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="280"/>
         <source>Only to start a session: the address of a relay and its key, if it asks one. They come from whoever set the relay up.</source>
         <translation>Alleen om een sessie te starten: het adres van een relay en de sleutel, als die erom vraagt. Je krijgt ze van wie de relay heeft opgezet.</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="260"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="282"/>
         <source>wss://relay.example.org</source>
         <translation>wss://relay.example.org</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="263"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="285"/>
         <source>Relay key (optional)</source>
         <translation>Relaysleutel (optioneel)</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="292"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="314"/>
         <source>Cancel</source>
         <translation>Annuleren</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="319"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="341"/>
         <source>Pass this invitation on to the people you work with:</source>
         <translation>Geef deze uitnodiging door aan de mensen met wie je samenwerkt:</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="323"/>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="674"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="345"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="696"/>
         <source>Copy invitation</source>
         <translation>Uitnodiging kopiëren</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="337"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="359"/>
         <source>Follow page</source>
         <translation>Pagina volgen</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="340"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="362"/>
         <source>Go along when someone turns the page. Off: you browse on your own and the others do not follow you.</source>
         <translation>Ga mee als iemand een andere pagina opent. Uit: je bladert zelf en de anderen volgen jou niet.</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="342"/>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="468"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="364"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="490"/>
         <source>Leave session</source>
         <translation>Sessie verlaten</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="389"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="411"/>
         <source>you</source>
         <translation>jij</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="392"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="414"/>
         <source>host</source>
         <translation>host</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="434"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="456"/>
         <source>Starting the session...</source>
         <translation>Sessie starten...</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="434"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="456"/>
         <source>Connecting...</source>
         <translation>Verbinden...</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="440"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="462"/>
         <source>Receiving the board... %1%</source>
         <translation>Bord ontvangen... %1%</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="445"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="467"/>
         <source>Waiting for the board of the host...</source>
         <translation>Wachten op het bord van de host...</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="454"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="476"/>
         <source>only you so far</source>
         <translation>nog alleen jij</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="454"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="476"/>
         <source>%1 people</source>
         <translation>%1 mensen</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="456"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="478"/>
         <source>Your session is on: %1.</source>
         <translation>Je sessie loopt: %1.</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="457"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="479"/>
         <source>You are in a session: %1.</source>
         <translation>Je neemt deel aan een sessie: %1.</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="468"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="490"/>
         <source>End session</source>
         <translation>Sessie beëindigen</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabPanel.cpp" line="669"/>
+        <location filename="../../src/collab/UBCollabPanel.cpp" line="691"/>
         <source>Copied</source>
         <translation>Gekopieerd</translation>
     </message>
@@ -1878,7 +1883,7 @@ Do you wish to override the security check and continue ?   </source>
 <context>
     <name>UBCollabSession</name>
     <message>
-        <location filename="../../src/collab/UBCollabSession.cpp" line="157"/>
+        <location filename="../../src/collab/UBCollabSession.cpp" line="162"/>
         <source>Participant</source>
         <translation>Deelnemer</translation>
     </message>
@@ -1886,12 +1891,12 @@ Do you wish to override the security check and continue ?   </source>
 <context>
     <name>UBCollabSnapshotReceiver</name>
     <message>
-        <location filename="../../src/collab/UBCollabSnapshot.cpp" line="296"/>
+        <location filename="../../src/collab/UBCollabSnapshot.cpp" line="321"/>
         <source>Shared board %1</source>
         <translation>Gedeeld bord %1</translation>
     </message>
     <message>
-        <location filename="../../src/collab/UBCollabSnapshot.cpp" line="298"/>
+        <location filename="../../src/collab/UBCollabSnapshot.cpp" line="323"/>
         <source>Shared board %1 (%2)</source>
         <translation>Gedeeld bord %1 (%2)</translation>
     </message>
