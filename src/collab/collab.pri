@@ -2,9 +2,14 @@
 # the line between the participants: relay connection, encryption
 
 HEADERS      += src/collab/UBCollabChannel.h \
-                src/collab/UBCollabRelayChannel.h
+                src/collab/UBCollabCrypto.h \
+                src/collab/UBCollabRelayChannel.h \
+                src/collab/UBCollabRelayTuning.h \
+                src/collab/UBCollabWebSocket.h
 
-SOURCES      += src/collab/UBCollabRelayChannel.cpp
+SOURCES      += src/collab/UBCollabCrypto.cpp \
+                src/collab/UBCollabRelayChannel.cpp \
+                src/collab/UBCollabWebSocket.cpp
 
 
 
