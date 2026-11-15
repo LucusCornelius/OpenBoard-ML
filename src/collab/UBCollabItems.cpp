@@ -398,9 +398,10 @@ quint64 UBCollabItems::fingerprint(const QGraphicsItem* item, TextCache* cache)
                 }
             }
 
+            // not the height: the layout makes it from the content and the width, differently
+            // on other computers (fonts), which would send it back and forth
             h.add(html);
             h.add(text->textWidth());
-            h.add(text->textHeight());
             h.add(text->hasBoxBorder());
             h.add(text->hasBoxFill());
             h.add(text->boxFillColor());
@@ -557,12 +558,27 @@ void UBCollabItems::insert(UBGraphicsScene* scene, Parsed& parsed)
 
     if (parsed.scene)
     {
+        // a text read into its own scene took the focus there: it must not take it on the page
+        QList<QGraphicsItem*> pending{item};
+
+        while (!pending.isEmpty())
+        {
+            QGraphicsItem* current = pending.takeLast();
+            current->clearFocus();
+            pending << current->childItems();
+        }
+
         parsed.scene->removeItem(item);
         parsed.scene->removeItemFromDeletion(item);
     }
 
+    QGraphicsItem* focus = scene->focusItem();
+
     scene->addItem(item);
     recolor(scene, item);
+
+    if (scene->focusItem() != focus && scene->focusItem() && (scene->focusItem() == item || item->isAncestorOf(scene->focusItem())))
+        scene->focusItem()->clearFocus();
 
     parsed.item = nullptr;
 }
@@ -640,6 +656,9 @@ bool UBCollabItems::update(UBGraphicsScene* scene, QGraphicsItem* existing, Pars
             text->setColorOnLightBackground(other->colorOnLightBackground());
             text->activateTextEditor(false);
             recolor(scene, text);
+
+            // the layout now, so that its size change (which also asks for the focus) is done here
+            text->document()->size();
 
             if (scene->focusItem() != focus)
             {
