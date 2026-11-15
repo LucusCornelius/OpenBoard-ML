@@ -773,6 +773,7 @@ void UBBoardPaletteManager::tooglePodcastPalette(bool checked)
 
 void UBBoardPaletteManager::addItem(const QUrl& pUrl)
 {
+    discardCapturedItems();
     mItemUrl = pUrl;
     mPixmap = QPixmap();
     mPos = QPointF(0, 0);
@@ -965,6 +966,7 @@ void UBBoardPaletteManager::changeMode(eUBDockPaletteWidgetMode newMode, bool is
 
 void UBBoardPaletteManager::addItem(const QPixmap& pPixmap, const QPointF& pos,  qreal scaleFactor, const QUrl& sourceUrl)
 {
+    discardCapturedItems();
     mItemUrl = sourceUrl;
     mPixmap = pPixmap;
     mPos = pos;
@@ -978,12 +980,53 @@ void UBBoardPaletteManager::addItem(const QPixmap& pPixmap, const QPointF& pos, 
 }
 
 
+void UBBoardPaletteManager::setCapturedItems(const QList<QGraphicsItem*>& items, bool capturedOnDark, std::shared_ptr<UBDocumentProxy> document)
+{
+    discardCapturedItems();
+    mCapturedItems = items;
+    mCapturedOnDark = capturedOnDark;
+    mCapturedDocument = document;
+}
+
+
+void UBBoardPaletteManager::discardCapturedItems()
+{
+    qDeleteAll(mCapturedItems);
+    mCapturedItems.clear();
+}
+
+
 void UBBoardPaletteManager::addItemToCurrentPage()
 {
     UBApplication::applicationController->showBoard();
     mAddItemPalette->hide();
 
-    if (mPixmap.isNull())
+    auto scene = UBApplication::boardController->activeScene();
+
+    // the copies refer to the files of their document: in another document the picture is added
+    if (!mCapturedItems.isEmpty() && scene->document() != mCapturedDocument.lock())
+    {
+        discardCapturedItems();
+    }
+
+    if (!mCapturedItems.isEmpty())
+    {
+        // the captured part of the page as strokes and items: the eraser and the pen work on them
+        const QList<QGraphicsItem*> items = mCapturedItems;
+        mCapturedItems.clear();
+
+        scene->deselectAllItems();
+        scene->addCapturedItems(items, mCapturedOnDark);
+
+        // selected like the picture, ready to be moved as a whole
+        for (QGraphicsItem* item : items)
+        {
+            item->setSelected(true);
+        }
+
+        UBDrawingController::drawingController()->setStylusTool(UBStylusTool::Selector);
+    }
+    else if (mPixmap.isNull())
     {
         UBApplication::boardController->downloadURL(mItemUrl);
     }
@@ -1042,6 +1085,8 @@ void UBBoardPaletteManager::addItemToLibrary()
         UBApplication::showMessage(tr("Error Adding Image to Library"));
     }
 
+    // the library stores files: a capture is added there as the picture
+    discardCapturedItems();
     mAddItemPalette->hide();
 }
 

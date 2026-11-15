@@ -2463,11 +2463,28 @@ void UBBoardController::grabScene(const QRectF& pSceneRect)
 
         mActiveScene->render(&painter, targetRect, pSceneRect);
 
+        // the same part of the page as strokes and items that can be edited, placed where the picture
+        // would be: centred at the origin of the page
+        QList<QGraphicsItem*> editableItems;
+
+        if (UBSettings::settings()->boardCaptureAsEditableItems->get().toBool())
+        {
+            editableItems = mActiveScene->copyItemsInRect(pSceneRect, scalingFactor);
+
+            for (QGraphicsItem* item : std::as_const(editableItems))
+            {
+                item->setPos(item->pos() - pSceneRect.center());
+            }
+        }
+
         mActiveScene->setRenderingContext(UBGraphicsScene::Screen);
 //        mActiveScene->setRenderingQuality(UBItem::RenderingQualityNormal);
         mActiveScene->setRenderingQuality(UBItem::RenderingQualityHigh, UBItem::CacheAllowed);
 
         mPaletteManager->addItem(QPixmap::fromImage(image), QPointF{}, 1. / scalingFactor);
+
+        // without anything to copy (or with the setting off) the picture is added
+        mPaletteManager->setCapturedItems(editableItems, mActiveScene->isDarkBackground(), mActiveScene->document());
         QDateTime now = QDateTime::currentDateTime();
         selectedDocument()->setMetaData(UBSettings::documentUpdatedAt, UBStringUtils::toUtcIsoDateTime(now));
     }

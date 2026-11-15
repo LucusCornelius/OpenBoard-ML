@@ -1268,30 +1268,36 @@ void UBGraphicsScene::recolorAllItems()
         view->setViewportUpdateMode(QGraphicsView::NoViewportUpdate);
     }
 
-    bool currentIslight = isLightBackground();
     foreach (QGraphicsItem *item, items()) {
-        if (item->type() == UBGraphicsStrokesGroup::Type) {
-            UBGraphicsStrokesGroup *curGroup = static_cast<UBGraphicsStrokesGroup*>(item);
-            QColor compareColor =  curGroup->color(currentIslight ? UBGraphicsStrokesGroup::colorOnDarkBackground
-                                                                  : UBGraphicsStrokesGroup::colorOnLightBackground);
-
-            if (curGroup->color() == compareColor) {
-                QColor newColor = curGroup->color(!currentIslight ? UBGraphicsStrokesGroup::colorOnDarkBackground
-                                                                  : UBGraphicsStrokesGroup::colorOnLightBackground);
-                curGroup->setColor(newColor);
-            }
-        }
-
-        if (item->type() == UBGraphicsTextItem::Type)
-        {
-            UBGraphicsTextItem *textItem = static_cast<UBGraphicsTextItem*>(item);
-            textItem->recolor();
-        }
+        recolorItem(item);
     }
 
     foreach(QGraphicsView* view, views())
     {
         view->setViewportUpdateMode(previousUpdateModes.value(view));
+    }
+}
+
+void UBGraphicsScene::recolorItem(QGraphicsItem* item)
+{
+    bool currentIslight = isLightBackground();
+
+    if (item->type() == UBGraphicsStrokesGroup::Type) {
+        UBGraphicsStrokesGroup *curGroup = static_cast<UBGraphicsStrokesGroup*>(item);
+        QColor compareColor =  curGroup->color(currentIslight ? UBGraphicsStrokesGroup::colorOnDarkBackground
+                                                              : UBGraphicsStrokesGroup::colorOnLightBackground);
+
+        if (curGroup->color() == compareColor) {
+            QColor newColor = curGroup->color(!currentIslight ? UBGraphicsStrokesGroup::colorOnDarkBackground
+                                                              : UBGraphicsStrokesGroup::colorOnLightBackground);
+            curGroup->setColor(newColor);
+        }
+    }
+
+    if (item->type() == UBGraphicsTextItem::Type)
+    {
+        UBGraphicsTextItem *textItem = static_cast<UBGraphicsTextItem*>(item);
+        textItem->recolor();
     }
 }
 
@@ -1686,6 +1692,13 @@ UBGraphicsPixmapItem* UBGraphicsScene::addImage(QByteArray pData, QGraphicsItem*
     pixmapItem->show();
     setDocumentUpdated();
 
+    storeImageAsset(pixmapItem, pData, format, useProxyForDocumentPath);
+
+    return pixmapItem;
+}
+
+void UBGraphicsScene::storeImageAsset(UBGraphicsPixmapItem* pixmapItem, const QByteArray& pData, QString format, bool useProxyForDocumentPath)
+{
     QString documentPath;
     if(useProxyForDocumentPath)
         documentPath = this->document()->persistencePath();
@@ -1715,8 +1728,6 @@ UBGraphicsPixmapItem* UBGraphicsScene::addImage(QByteArray pData, QGraphicsItem*
             file.close();
         }
     }
-
-    return pixmapItem;
 }
 
 void UBGraphicsScene::textUndoCommandAdded(UBGraphicsTextItem *textItem)
@@ -3417,4 +3428,354 @@ UBGraphicsStrokesGroup* UBGraphicsScene::addInkShapes(const QList<QPolygonF>& sh
     setDocumentUpdated();
 
     return group;
+}
+
+namespace
+{
+    /**
+     * Copy of a strokes group with its polygons inside clip (scene coordinates); a polygon crossing the
+     * border is cut there the way the eraser cuts it. Without clip all polygons are copied. The copy has the
+     * transform and the position of the group, it is nullptr when no polygon lies inside.
+     *
+     * UBGraphicsStrokesGroup::deepCopy() is not used: it moves the original for a moment.
+     */
+    UBGraphicsStrokesGroup* copyStrokesGroup(const UBGraphicsStrokesGroup* group, const QRectF* clip)
+    {
+        UBGraphicsStrokesGroup* copy = new UBGraphicsStrokesGroup();
+        group->copyItemParameters(copy);
+
+        // the polygons keep their transforms relative to the group
+        copy->resetTransform();
+        copy->setPos(0, 0);
+
+        QPainterPath clipPath;
+
+        if (clip)
+        {
+            clipPath.addRect(*clip);
+        }
+
+        // the copied polygons of a stroke share a new stroke, as in UBGraphicsStrokesGroup::deepCopy()
+        QHash<UBGraphicsStroke*, UBGraphicsStroke*> strokes;
+
+        const QList<QGraphicsItem*> children = group->childItems();
+
+        for (QGraphicsItem* child : children)
+        {
+            UBGraphicsPolygonItem* polygon = qgraphicsitem_cast<UBGraphicsPolygonItem*>(child);
+
+            if (!polygon || !polygon->isVisible())
+            {
+                continue;
+            }
+
+            const QPolygonF scenePolygon = polygon->sceneTransform().map(polygon->polygon());
+            const QRectF sceneBounds = scenePolygon.boundingRect();
+            QList<UBGraphicsPolygonItem*> pieces;
+
+            if (!clip || clip->contains(sceneBounds))
+            {
+                UBGraphicsPolygonItem* whole = dynamic_cast<UBGraphicsPolygonItem*>(polygon->deepCopy());
+
+                if (whole)
+                {
+                    whole->setUuid(QUuid::createUuid());
+                    pieces << whole;
+                }
+            }
+            else if (clip->intersects(sceneBounds))
+            {
+                // the part inside the rectangle, as eraseLineTo() keeps the part outside the eraser
+                QPainterPath path;
+                path.addPolygon(scenePolygon);
+                path.setFillRule(polygon->fillRule());
+
+                const QList<QPolygonF> parts = path.intersected(clipPath).simplified()
+                                                   .toFillPolygons(polygon->sceneTransform().inverted());
+
+                for (const QPolygonF& part : parts)
+                {
+                    UBGraphicsPolygonItem* piece = new UBGraphicsPolygonItem(part, nullptr);
+                    polygon->copyItemParameters(piece);
+                    piece->setNominalLine(false);
+                    pieces << piece;
+                }
+            }
+
+            for (UBGraphicsPolygonItem* piece : pieces)
+            {
+                UBGraphicsStroke* stroke = strokes.value(polygon->stroke());
+
+                if (!stroke)
+                {
+                    // a polygon without a stroke is not saved unless it is a nominal line
+                    stroke = new UBGraphicsStroke();
+                    strokes.insert(polygon->stroke(), stroke);
+                }
+
+                piece->setPos(polygon->pos());
+                piece->setStroke(stroke);
+                piece->setStrokesGroup(copy);
+                copy->addToGroup(piece);
+            }
+        }
+
+        if (copy->childItems().isEmpty())
+        {
+            delete copy;
+            return nullptr;
+        }
+
+        copy->setTransform(group->transform());
+        copy->setPos(group->pos());
+
+        return copy;
+    }
+
+    /**
+     * Copy of an item with a new uuid, also for the items in a group: two items with the same uuid on
+     * a page break groups and undo, which look items up by uuid.
+     */
+    QGraphicsItem* copyWholeItem(QGraphicsItem* item)
+    {
+        if (!item->isVisible())
+        {
+            return nullptr;
+        }
+
+        if (item->type() == UBGraphicsStrokesGroup::Type)
+        {
+            return copyStrokesGroup(static_cast<UBGraphicsStrokesGroup*>(item), nullptr);
+        }
+
+        if (item->type() == UBGraphicsGroupContainerItem::Type)
+        {
+            // as in UBGraphicsScene::sceneDeepCopy(): the children are added while the copy is not transformed
+            UBGraphicsGroupContainerItem* group = static_cast<UBGraphicsGroupContainerItem*>(item);
+            UBGraphicsGroupContainerItem* copy = group->deepCopyNoChildDuplication();
+            copy->setUuid(QUuid::createUuid());
+            copy->resetTransform();
+            copy->setPos(0, 0);
+
+            const QList<QGraphicsItem*> children = group->childItems();
+
+            for (QGraphicsItem* child : children)
+            {
+                QGraphicsItem* childCopy = copyWholeItem(child);
+
+                if (childCopy)
+                {
+                    copy->addToGroup(childCopy);
+                }
+            }
+
+            if (copy->childItems().isEmpty())
+            {
+                delete copy;
+                return nullptr;
+            }
+
+            if (group->Delegate()->isLocked())
+            {
+                copy->setData(UBGraphicsItemData::ItemLocked, QVariant(true));
+            }
+
+            copy->setData(UBGraphicsItemData::ItemIsHiddenOnDisplay, group->data(UBGraphicsItemData::ItemIsHiddenOnDisplay));
+            copy->setTransform(group->transform());
+            copy->setPos(group->pos());
+
+            return copy;
+        }
+
+        UBItem* ubItem = dynamic_cast<UBItem*>(item);
+        UBItem* ubCopy = ubItem ? ubItem->deepCopy() : nullptr;
+        QGraphicsItem* copy = dynamic_cast<QGraphicsItem*>(ubCopy);
+
+        if (!copy)
+        {
+            delete ubCopy;
+            return nullptr;
+        }
+
+        // widgets, media and PDF items are created as children of the parent of the original
+        if (copy->parentItem())
+        {
+            copy->setParentItem(nullptr);
+
+            if (copy->scene())
+            {
+                copy->scene()->removeItem(copy);
+            }
+        }
+
+        ubCopy->setUuid(QUuid::createUuid());
+
+        return copy;
+    }
+
+    bool isCopiedWhole(const QGraphicsItem* item)
+    {
+        switch (item->type())
+        {
+        case UBGraphicsItemType::groupContainerType:
+        case UBGraphicsItemType::PixmapItemType:
+        case UBGraphicsItemType::SvgItemType:
+        case UBGraphicsItemType::TextItemType:
+        case UBGraphicsItemType::ShapeItemType:
+        case UBGraphicsItemType::MediaItemType:
+        case UBGraphicsItemType::VideoItemType:
+        case UBGraphicsItemType::AudioItemType:
+        case UBGraphicsItemType::GraphicsWidgetItemType:
+        case UBGraphicsItemType::PDFItemType:
+            return true;
+
+        default:
+            // tools, the eraser, frames and the other controls are not content of the page
+            return false;
+        }
+    }
+}
+
+QList<QGraphicsItem*> UBGraphicsScene::copyItemsInRect(const QRectF& rect, qreal backgroundScale) const
+{
+    QList<QGraphicsItem*> copies;
+
+    // top-level items from the bottom up
+    QList<QGraphicsItem*> roots;
+    QSet<QGraphicsItem*> seen;
+
+    for (QGraphicsItem* item : items(rect, Qt::IntersectsItemBoundingRect, Qt::AscendingOrder))
+    {
+        QGraphicsItem* root = item->topLevelItem();
+
+        if (!seen.contains(root))
+        {
+            seen.insert(root);
+            roots << root;
+        }
+    }
+
+    // by their own z values, as pasted items are: a selected item is shown above its own z value
+    std::stable_sort(roots.begin(), roots.end(), [](const QGraphicsItem* item1, const QGraphicsItem* item2) {
+        return item1->data(UBGraphicsItemData::ItemOwnZValue).toReal() < item2->data(UBGraphicsItemData::ItemOwnZValue).toReal();
+    });
+
+    for (QGraphicsItem* root : roots)
+    {
+        if (!root->isVisible() || mTools.contains(root) || isBackgroundObject(root))
+        {
+            continue;
+        }
+
+        QGraphicsItem* copy = nullptr;
+
+        if (root->type() == UBGraphicsStrokesGroup::Type)
+        {
+            copy = copyStrokesGroup(static_cast<UBGraphicsStrokesGroup*>(root), &rect);
+        }
+        else if (isCopiedWhole(root) && rect.contains(root->sceneBoundingRect().center()))
+        {
+            copy = copyWholeItem(root);
+        }
+
+        if (copy)
+        {
+            copies << copy;
+        }
+    }
+
+    if (copies.isEmpty())
+    {
+        return copies;
+    }
+
+    // the background object (e.g. a PDF page) cannot be cut: its part inside the rectangle as a picture
+    if (mBackgroundObject && mBackgroundObject->isVisible() && mBackgroundObject->sceneBoundingRect().intersects(rect))
+    {
+        QImage image((rect.size() * backgroundScale).toSize(), QImage::Format_ARGB32_Premultiplied);
+
+        if (!image.isNull())
+        {
+            image.fill(Qt::transparent);
+
+            QPainter painter(&image);
+            painter.setRenderHint(QPainter::Antialiasing);
+            painter.setRenderHint(QPainter::SmoothPixmapTransform);
+            painter.setTransform(mBackgroundObject->sceneTransform()
+                                 * QTransform::fromTranslate(-rect.left(), -rect.top())
+                                 * QTransform::fromScale(backgroundScale, backgroundScale));
+
+            QStyleOptionGraphicsItem option;
+            option.rect = mBackgroundObject->boundingRect().toAlignedRect();
+            option.exposedRect = mBackgroundObject->boundingRect()
+                                 & mBackgroundObject->sceneTransform().inverted().mapRect(rect);
+            mBackgroundObject->paint(&painter, &option, nullptr);
+            painter.end();
+
+            UBGraphicsPixmapItem* picture = new UBGraphicsPixmapItem();
+            picture->setFlag(QGraphicsItem::ItemIsMovable, true);
+            picture->setFlag(QGraphicsItem::ItemIsSelectable, true);
+            picture->setPixmap(QPixmap::fromImage(image));
+            picture->setTransform(QTransform::fromScale(1. / backgroundScale, 1. / backgroundScale));
+            picture->setPos(rect.topLeft());
+
+            copies.prepend(picture);
+        }
+    }
+
+    return copies;
+}
+
+void UBGraphicsScene::addCapturedItems(const QList<QGraphicsItem*>& items, bool capturedOnDark)
+{
+    QSet<QGraphicsItem*> addedItems;
+
+    for (QGraphicsItem* item : items)
+    {
+        UBGraphicsPixmapItem* pixmapItem = qgraphicsitem_cast<UBGraphicsPixmapItem*>(item);
+
+        // the picture of the background object has no file in the document yet
+        if (pixmapItem && pixmapItem->mediaAssets().isEmpty())
+        {
+            QBuffer buffer;
+            pixmapItem->pixmap().save(&buffer, "png");
+            storeImageAsset(pixmapItem, buffer.data(), "png", true);
+        }
+
+        // new z values: on top of the page, in the order of the copies
+        UBGraphicsItem::assignZValue(item, DEFAULT_Z_VALUE);
+        addItem(item);
+        addedItems << item;
+
+        // strokes and texts in the colours for this background, as when the background is changed
+        if (capturedOnDark != mDarkBackground)
+        {
+            QList<QGraphicsItem*> toRecolor{item};
+
+            while (!toRecolor.isEmpty())
+            {
+                QGraphicsItem* current = toRecolor.takeLast();
+                recolorItem(current);
+                toRecolor << current->childItems();
+            }
+        }
+    }
+
+    if (addedItems.isEmpty())
+    {
+        return;
+    }
+
+    if (mUndoRedoStackEnabled && UBApplication::undoStack) //should be deleted after scene own undo stack implemented
+    {
+        UBApplication::undoStack->push(new UBGraphicsItemUndoCommand(shared_from_this(), QSet<QGraphicsItem*>(), addedItems));
+
+        // the command freezes the widgets it adds; copied widgets run, as pasted ones do
+        for (QGraphicsItem* item : std::as_const(addedItems))
+        {
+            UBApplication::boardController->freezeW3CWidget(item, false);
+        }
+    }
+
+    setDocumentUpdated();
 }

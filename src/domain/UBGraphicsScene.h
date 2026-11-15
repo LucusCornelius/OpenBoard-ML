@@ -383,6 +383,22 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         UBGraphicsStrokesGroup* addInkShapes(const QList<QPolygonF>& shapes,
                                              const QColor& colorOnLightBackground, const QColor& colorOnDarkBackground);
 
+        /**
+         * Copies of what lies in a part of the page (scene coordinates), for the Capture tool. Strokes are
+         * cut at the rectangle; other items are copied whole when the centre of their bounding rectangle
+         * lies inside it. The part of the background object (e.g. an imported PDF page) inside the
+         * rectangle becomes a picture, rendered at backgroundScale pixels per scene unit, below the rest.
+         * The copies are in no scene, have new uuids and are ordered by z value; the caller owns them.
+         * Empty if nothing but the background lies in the rectangle.
+         */
+        QList<QGraphicsItem*> copyItemsInRect(const QRectF& rect, qreal backgroundScale) const;
+
+        /**
+         * Add copies made by copyItemsInRect() on top of the page, keeping their order, as a single undo
+         * step. capturedOnDark: the background the copies were shown on, to recolour strokes and texts.
+         */
+        void addCapturedItems(const QList<QGraphicsItem*>& items, bool capturedOnDark);
+
 public slots:
         void updateSelectionFrame();
         void updateSelectionFrameWrapper(int);
@@ -456,6 +472,7 @@ signals:
         virtual void keyReleaseEvent(QKeyEvent * keyEvent);
 
         void recolorAllItems();
+        void recolorItem(QGraphicsItem* item);
 
         virtual void drawItems (QPainter * painter, int numItems,
                                QGraphicsItem * items[], const QStyleOptionGraphicsItem options[], QWidget * widget = 0);
@@ -467,6 +484,7 @@ signals:
 
     private:
         void setDocumentUpdated();
+        void storeImageAsset(UBGraphicsPixmapItem* pixmapItem, const QByteArray& pData, QString format, bool useProxyForDocumentPath);
         void updateBackground();
         bool shownDark() const;
         bool applyDarkBackground(bool dark);
