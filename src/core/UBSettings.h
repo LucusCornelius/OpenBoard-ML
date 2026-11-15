@@ -96,6 +96,13 @@ class UBSettings : public QObject
         qreal eraserStrongWidth();
         qreal currentEraserWidth();
 
+        // the eraser widths are plain values (no UBSetting), their defaults and limits in screen pixels
+        static constexpr qreal defaultEraserFineWidth = 16.0;
+        static constexpr qreal defaultEraserMediumWidth = 64.0;
+        static constexpr qreal defaultEraserStrongWidth = 128.0;
+        static constexpr qreal minEraserWidth = 4.0;
+        static constexpr qreal maxEraserWidth = 128.0;
+
         // Background related
         // isDarkBackground(): the board is shown dark, either because of the background chosen
         // for the page (isPageDarkBackground) or because the board follows the dark appearance

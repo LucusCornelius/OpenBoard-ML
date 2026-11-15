@@ -85,6 +85,7 @@
 #include "gui/UBToolbarButtonGroup.h"
 #include "gui/UBPenPanel.h"
 #include "gui/UBPaletteSwitchButton.h"
+#include "gui/UBPenWidthPopover.h"
 #include "gui/UBToolClusterPalette.h"
 #include "gui/UBGlassStyle.h"
 #include "gui/UBGlassEffect.h"
@@ -478,6 +479,9 @@ void UBBoardController::setupToolbar()
 
     penPanel->addSection(lineWidthChoice);
 
+    // a press on the selected width opens a popover to adjust that preset
+    UBPenWidthPopover::attach(lineWidthChoice, false);
+
     //-----------------------------------------------------------//
     // Setup eraser width choice widget, visible while the eraser is active
 
@@ -495,6 +499,8 @@ void UBBoardController::setupToolbar()
 
     eraserWidthChoice->setCurrentIndex(settings->eraserWidthIndex());
     eraserWidthActions.at(settings->eraserWidthIndex())->setChecked(true);
+
+    UBPenWidthPopover::attach(eraserWidthChoice, true);
 
     //-----------------------------------------------------------//
     // Setup shape kind choice widget, visible while the shapes tool is active

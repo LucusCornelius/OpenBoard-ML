@@ -57,6 +57,8 @@ class UBToolbarButtonGroup : public QWidget
         void setLabel(const QString& label);
         void setSelectableCount(int count);
         int selectableCount() const { return mSelectableCount; }
+        /** the buttons of this group, in the order of the actions */
+        const QList<QToolButton*>& buttons() const { return mButtons; }
 
     protected:
         void paintEvent(QPaintEvent *);

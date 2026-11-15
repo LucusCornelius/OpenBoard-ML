@@ -2753,6 +2753,55 @@ Do you want to ignore these errors for this host?</source>
     </message>
 </context>
 <context>
+    <name>UBPenWidthPopover</name>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="262"/>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="661"/>
+        <source>%1 px</source>
+        <translation>%1 px</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="289"/>
+        <source>Default</source>
+        <translation>Standaard</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="290"/>
+        <source>Restore the default width of this preset</source>
+        <translation>De standaarddikte van deze voorinstelling terugzetten</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="543"/>
+        <source>Pen width</source>
+        <translation>Pendikte</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="546"/>
+        <source>Marker width</source>
+        <translation>Dikte markeerstift</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="549"/>
+        <source>Eraser size</source>
+        <translation>Grootte wisser</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="553"/>
+        <source>Fine</source>
+        <translation>Dun</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="553"/>
+        <source>Medium</source>
+        <translation>Medium</translation>
+    </message>
+    <message>
+        <location filename="../../src/gui/UBPenWidthPopover.cpp" line="553"/>
+        <source>Strong</source>
+        <translation>Dik</translation>
+    </message>
+</context>
+<context>
     <name>UBPersistenceManager</name>
     <message>
         <location filename="../../src/core/UBPersistenceManager.cpp" line="266"/>
