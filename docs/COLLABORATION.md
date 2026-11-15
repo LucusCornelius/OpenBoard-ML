@@ -126,7 +126,7 @@ widgets, media and web content are left out (with a notice to the guest).
 |---|---|---|
 | Line | `UBCollabChannel`, `UBCollabRelayChannel` | Opaque messages between participants (relay, encryption); `UBCollabLoopbackChannel` for tests |
 | Session | `UBCollabSession` | Greeting and version, the initial board, digests, page requests, cursors, the end of a session |
-| Document | `UBCollabDocumentSync` | Sees the changes of the user, sends operations, applies those of the others, registers, digest |
+| Document | `UBCollabDocumentSync`, `UBCollabRules` | Sees the changes of the user, sends operations, applies those of the others (the rules of the registers are one function), digest |
 | Items | `UBCollabItems`, `UBCollabSvgFilter` | Which items are shared, fingerprints, item text in and out, cleaning what arrives |
 | Board | `UBCollabBoardLink`, `UBCollabController`, `UBCollabPanel`, `UBCollabCursorOverlay` | The board on the screen, the button, the panel, the cursors |
 
@@ -193,7 +193,15 @@ as tie-break, so two operations are never equal. On every computer:
   higher version wins (last writer wins per item);
 * an add with a newer incarnation brings an item back (an undo of a delete);
 * adding, changing and removing are idempotent (a message that arrives twice
-  changes nothing).
+  changes nothing);
+* the register of a removed item holds the highest removal of its incarnation,
+  not the version of a change that happened to arrive before the removal, so
+  that it is the same everywhere.
+
+`UBCollabRules::decide` is the one place of these rules; a randomized test
+(several replicas making concurrent adds, changes and removals, delivered in
+random orders per sender and sometimes twice) ends in the same registers and
+content on every replica.
 
 Items of the initial board have no register until they change. Pages are
 ordered by keys: strings compared byte by byte, with a key between any two
@@ -209,8 +217,10 @@ differently on different computers and a page read again is not identical to
 the bytes it came from). A guest compares it with his own; a page that differs
 in two digests in a row (one after the line came back, `resumed()`) is fetched
 from the host, who is the authority, and replaces the page of the guest. A
-difference of the list of pages fetches the list. Someone who joins late gets
-the current board.
+difference of the list of pages fetches the list. When the line of a guest
+comes back, he first sends again everything whose last version is his (the
+others ignore what they have), so that a resync does not undo his work.
+Someone who joins late gets the current board.
 
 ### The initial board
 
