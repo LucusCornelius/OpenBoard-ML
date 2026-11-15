@@ -121,6 +121,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     UBWindowDragStrip.h
     UBPenPanel.cpp
     UBPenPanel.h
+    UBPenWidthPopover.cpp
+    UBPenWidthPopover.h
     UBPaletteSwitchButton.cpp
     UBPaletteSwitchButton.h
     UBToolClusterPalette.cpp

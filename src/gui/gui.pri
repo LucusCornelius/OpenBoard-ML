@@ -61,6 +61,7 @@ HEADERS +=  \
     src/gui/UBGlassEffect.h \
     src/gui/UBWindowDragStrip.h \
     src/gui/UBPenPanel.h \
+    src/gui/UBPenWidthPopover.h \
     src/gui/UBPaletteSwitchButton.h \
     src/gui/UBToolClusterPalette.h \
     src/gui/UBUiStyle.h \
@@ -127,6 +128,7 @@ SOURCES +=  \
     src/gui/UBGlassStyle.cpp \
     src/gui/UBWindowDragStrip.cpp \
     src/gui/UBPenPanel.cpp \
+    src/gui/UBPenWidthPopover.cpp \
     src/gui/UBPaletteSwitchButton.cpp \
     src/gui/UBToolClusterPalette.cpp \
     src/gui/UBUiStyle.cpp \

@@ -868,7 +868,7 @@ void UBSettings::setEraserWidthIndex(int index)
 
 qreal UBSettings::eraserFineWidth()
 {
-    return value("Board/EraserFineWidth", 16).toDouble();
+    return value("Board/EraserFineWidth", defaultEraserFineWidth).toDouble();
 }
 
 void UBSettings::setEraserFineWidth(qreal width)
@@ -878,7 +878,7 @@ void UBSettings::setEraserFineWidth(qreal width)
 
 qreal UBSettings::eraserMediumWidth()
 {
-    return value("Board/EraserMediumWidth", 64).toDouble();
+    return value("Board/EraserMediumWidth", defaultEraserMediumWidth).toDouble();
 }
 
 void UBSettings::setEraserMediumWidth(qreal width)
@@ -888,7 +888,7 @@ void UBSettings::setEraserMediumWidth(qreal width)
 
 qreal UBSettings::eraserStrongWidth()
 {
-    return value("Board/EraserStrongWidth", 128).toDouble();
+    return value("Board/EraserStrongWidth", defaultEraserStrongWidth).toDouble();
 }
 
 void UBSettings::setEraserStrongWidth(qreal width)

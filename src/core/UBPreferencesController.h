@@ -75,6 +75,12 @@ class UBPreferencesController : public QObject
         bool handleMouseEvent(QMouseEvent *event);
         bool handleTabletEvent(QTabletEvent *event);
 
+        // limits of the pen and marker widths and the slider units per pixel, also used by the
+        // width popover of the pen panel (UBPenWidthPopover)
+        static qreal sSliderRatio;
+        static qreal sMinPenWidth;
+        static qreal sMaxPenWidth;
+
     public slots:
 
         void show();
@@ -120,9 +126,6 @@ class UBPreferencesController : public QObject
 
 
     private:
-        static qreal sSliderRatio;
-        static qreal sMinPenWidth;
-        static qreal sMaxPenWidth;
         QModelIndex currentIndex;
 };
 
