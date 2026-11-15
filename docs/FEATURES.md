@@ -12,6 +12,7 @@ with the normal upstream build instructions (CMake or qmake); no new dependencie
 | Maths notation palette, typeset like LaTeX (√, ∫, Σ, lim, brackets, Greek, …) | "Maths" toolbar button (show/hide) | [Maths](#maths-notation-palette), [docs/MATHS.md](MATHS.md) |
 | Shapes tool and text boxes (Freeform-like) | Stylus palette, after the Line tool; text item title bar | [Shapes](#shapes-and-text-boxes) |
 | Line angle readout and horizontal/vertical grip | Line tool, Shapes tool line/arrow; Preferences → Grid | [Line angle](#line-angle) |
+| Work together on one board over the internet: sessions, invitation, cursors of the others | "Work together" button in the top right cluster | [docs/COLLABORATION.md](COLLABORATION.md) |
 
 ## Colours and palettes
 
