@@ -659,7 +659,7 @@ void UBCollabPanel::copyClicked()
         mCopyButton->setText(tr("Copied"));
 
         QPointer<QToolButton> button = mCopyButton;
-        QTimer::singleShot(1500, this, [this, button]() {
+        QTimer::singleShot(1500, this, [button]() {
             if (button)
                 button->setText(tr("Copy invitation"));
         });

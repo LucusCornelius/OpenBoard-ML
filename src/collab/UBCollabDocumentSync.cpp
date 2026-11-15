@@ -62,6 +62,9 @@ namespace
     // unknown backgrounds that another participant may add to the list of this computer
     constexpr int maxRulingsPerSession = 16;
 
+    // far below the limit of the reader (2^60), far above what counting can reach
+    constexpr quint64 maxObservedClock = Q_UINT64_C(1) << 56;
+
     QGraphicsItem* findShared(UBGraphicsScene* scene, const QUuid& uuid)
     {
         if (!scene)
@@ -200,6 +203,11 @@ UBCollabVersion UBCollabDocumentSync::nextVersion()
 
 void UBCollabDocumentSync::observe(const UBCollabVersion& version)
 {
+    // a clock pushed near the end of its range by someone would make the versions of
+    // this participant unreadable for the others: such a value does not move the clock
+    if (version.counter > maxObservedClock)
+        return;
+
     if (version.counter > mClock)
         mClock = version.counter;
 }
@@ -317,7 +325,9 @@ void UBCollabDocumentSync::startFromSnapshot(const QList<PageRegisters>& pages, 
     }
 
     mShadowOrder = documentOrder();
-    mClock = qMax(mClock, clock);
+    UBCollabVersion snapshotClock;
+    snapshotClock.counter = clock;
+    observe(snapshotClock);
     observe(currentPageVersion);
     mCurrentPage = currentPage;
     mCurrentPageVersion = currentPageVersion;
