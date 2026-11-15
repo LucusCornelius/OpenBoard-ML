@@ -1981,6 +1981,10 @@ std::shared_ptr<UBGraphicsScene> UBCollabDocumentSync::createPage(const QUuid& p
             index = i + 1;
     }
 
+    // the board saves its page with the index it has: before the list changes under it
+    if (mLink)
+        mLink->saveShownPage(mProxy);
+
     std::shared_ptr<UBGraphicsScene> scene = mDocument->createPage(index, true, true, true, true);
 
     if (!scene)
@@ -2002,6 +2006,18 @@ void UBCollabDocumentSync::reconcilePages(const QUuid& shownBefore)
 
     UBDocumentToc* toc = mDocument->toc();
 
+    // The board saves the page it shows with the index it had when the list of pages
+    // changes (the board follows the change afterwards): with that page saved before,
+    // nothing is written to the page that now has that index.
+    bool saved = false;
+
+    auto saveShown = [this, &saved]() {
+        if (!saved && mLink)
+            mLink->saveShownPage(mProxy);
+
+        saved = true;
+    };
+
     // removed pages that are still here; the last page of a document cannot go
     for (int i = toc->pageCount() - 1; i >= 0; --i)
     {
@@ -2009,6 +2025,7 @@ void UBCollabDocumentSync::reconcilePages(const QUuid& shownBefore)
 
         if (mPages.contains(uuid) && !mPages.value(uuid).reg.alive && toc->pageCount() > 1)
         {
+            saveShown();
             mModifiedPages.remove(uuid);
             mDocument->deletePages({i}, false);
         }
@@ -2045,7 +2062,10 @@ void UBCollabDocumentSync::reconcilePages(const QUuid& shownBefore)
         const int to = int(order.indexOf(knownNow.at(k)));
 
         if (from >= 0 && to >= 0 && from != to)
+        {
+            saveShown();
             mDocument->movePage(from, to);
+        }
     }
 
     mShadowOrder = documentOrder();
@@ -2063,6 +2083,7 @@ void UBCollabDocumentSync::reconcilePages(const QUuid& shownBefore)
 
         if (!anyAlive)
         {
+            saveShown();
             mDocument->createPage(toc->pageCount(), true, true, true, true);
             scheduleScan();
         }
