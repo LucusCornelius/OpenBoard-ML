@@ -91,6 +91,12 @@ class UBSvgSubsetAdaptor
 
         static void persistScene(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene, const int pageId);
 
+        /** the page as persistScene() writes it to its file, in memory */
+        static QByteArray sceneToSvg(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene);
+
+        /** a page with only these items of the scene (and what they contain), e.g. to send them to another computer */
+        static QByteArray itemsToSvg(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene, const QList<QGraphicsItem*>& items);
+
         static QUuid sceneUuid(std::shared_ptr<UBDocumentProxy> proxy, const int pageId);
         static QUuid sceneUuid(const QString& xmlContent);
         static QVersionNumber sceneVersion(const QString& xmlContent);
@@ -211,6 +217,8 @@ class UBSvgSubsetAdaptor
                 UBSvgSubsetWriter(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene, const int pageId);
 
                 bool persistScene(std::shared_ptr<UBDocumentProxy> proxy, int pageId);
+
+                QByteArray writeScene(std::shared_ptr<UBDocumentProxy> proxy, QList<QGraphicsItem*> items);
 
                 virtual ~UBSvgSubsetWriter(){}
 

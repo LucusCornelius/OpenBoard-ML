@@ -103,6 +103,8 @@ void UBGraphicsItemUndoCommand::undo()
         bool bApplyTransform = false;
         UBGraphicsPolygonItem *polygonItem = qgraphicsitem_cast<UBGraphicsPolygonItem*>(item);
         if (polygonItem){
+            polygonItem->rememberPlaceInGroup();
+
             if (polygonItem->strokesGroup()
                     && polygonItem->strokesGroup()->parentItem()
                     && UBGraphicsGroupContainerItem::Type == polygonItem->strokesGroup()->parentItem()->type())
@@ -140,6 +142,7 @@ void UBGraphicsItemUndoCommand::undo()
                 {
                     mScene->removeItem(polygonItem);
                     mScene->removeItemFromDeletion(polygonItem);
+                    polygonItem->takePlaceInGroup(polygonItem->strokesGroup());
                     polygonItem->strokesGroup()->addToGroup(polygonItem);
                 }
             }
@@ -234,6 +237,8 @@ void UBGraphicsItemUndoCommand::redo()
             UBGraphicsPolygonItem *polygonItem = qgraphicsitem_cast<UBGraphicsPolygonItem*>(item);
 
             if (polygonItem){
+                polygonItem->rememberPlaceInGroup();
+
                 if(polygonItem->strokesGroup()
                         && polygonItem->strokesGroup()->parentItem()
                         && UBGraphicsGroupContainerItem::Type == polygonItem->strokesGroup()->parentItem()->type())
@@ -276,6 +281,7 @@ void UBGraphicsItemUndoCommand::redo()
                 {
                     mScene->removeItem(polygonItem);
                     mScene->removeItemFromDeletion(polygonItem);
+                    polygonItem->takePlaceInGroup(polygonItem->strokesGroup());
                     polygonItem->strokesGroup()->addToGroup(polygonItem);
                 }
             }

@@ -128,6 +128,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 add_subdirectory(src/adaptors)
 add_subdirectory(src/api)
 add_subdirectory(src/board)
+add_subdirectory(src/collab)
 add_subdirectory(src/core)
 add_subdirectory(src/desktop)
 add_subdirectory(src/document)

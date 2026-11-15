@@ -113,6 +113,27 @@ void UBGraphicsPolygonItem::setStrokesGroup(UBGraphicsStrokesGroup *group)
     mpGroup = group;
 }
 
+void UBGraphicsPolygonItem::rememberPlaceInGroup()
+{
+    mHasPlaceInGroup = parentItem() != nullptr;
+
+    if (mHasPlaceInGroup)
+    {
+        mPlaceInGroup = transform() * QTransform::fromTranslate(pos().x(), pos().y());
+        mGroupPlace = parentItem()->sceneTransform();
+    }
+}
+
+void UBGraphicsPolygonItem::takePlaceInGroup(QGraphicsItem* group)
+{
+    // a group that did not move: the polygon is where it was, nothing to do
+    if (!mHasPlaceInGroup || !group || parentItem() || group->sceneTransform() == mGroupPlace)
+        return;
+
+    setPos(QPointF());
+    setTransform(mPlaceInGroup * group->sceneTransform());
+}
+
 void UBGraphicsPolygonItem::setStroke(UBGraphicsStroke* stroke)
 {
     if (stroke) {

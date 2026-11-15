@@ -1134,6 +1134,8 @@ void UBGraphicsScene::eraseLineTo(const QPointF &pEndPoint, const qreal &pWidth)
         bool bApplyTransform = false;
         if (intersectedPolygonItem->strokesGroup())
         {
+            intersectedPolygonItem->rememberPlaceInGroup();
+
             if (intersectedPolygonItem->strokesGroup()->parentItem())
             {
                 bApplyTransform = true;

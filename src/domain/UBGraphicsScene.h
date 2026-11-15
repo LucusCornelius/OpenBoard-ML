@@ -146,6 +146,9 @@ class UBGraphicsScene: public UBCoreGraphicsScene, public UBItem, public std::en
         bool inputDeviceMove(const QPointF& scenePos, const qreal& pressure = 1.0, Qt::KeyboardModifiers modifiers = Qt::NoModifier);
         bool inputDeviceRelease(int tool = -1, Qt::KeyboardModifiers modifiers = Qt::NoModifier);
 
+        /** a press of the pen, mouse or eraser on the page has not been released yet */
+        bool isInputDevicePressed() const { return mInputDeviceIsPressed; }
+
         void leaveEvent (QEvent* event);
 
         void addItem(QGraphicsItem* item);
