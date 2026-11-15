@@ -29,11 +29,13 @@
 #include <QLocale>
 #include <QXmlStreamReader>
 
+#include "adaptors/UBMetadataDcSubsetAdaptor.h"
 #include "core/UBPersistenceManager.h"
 #include "core/UBSettings.h"
 #include "document/UBDocumentProxy.h"
 #include "document/UBDocumentToc.h"
 #include "frameworks/UBFileSystemUtils.h"
+#include "frameworks/UBStringUtils.h"
 
 #include "UBCollabProtocol.h"
 #include "UBCollabSvgFilter.h"
@@ -296,6 +298,19 @@ std::shared_ptr<UBDocumentProxy> UBCollabSnapshotReceiver::end(UBCollabReader& r
             : QCoreApplication::translate("UBCollabSnapshotReceiver", "Shared board %1 (%2)")
                   .arg(QLocale().toString(QDateTime::currentDateTime(), QLocale::ShortFormat), mName);
 
+    // the description of the document, as a new document has it: its own identity, dates of
+    // today, and this version (its list of pages is complete, no scan needed)
+    {
+        std::shared_ptr<UBDocumentProxy> description = std::make_shared<UBDocumentProxy>(mPath);
+        const QString now = UBStringUtils::toUtcIsoDateTime(QDateTime::currentDateTime());
+        description->setUuid(QUuid::createUuid());
+        description->setMetaData(UBSettings::documentName, name);
+        description->setMetaData(UBSettings::documentVersion, UBSettings::currentFileVersion);
+        description->setMetaData(UBSettings::documentDate, now);
+        description->setMetaData(UBSettings::documentUpdatedAt, now);
+        UBMetadataDcSubsetAdaptor::persist(description);
+    }
+
     std::shared_ptr<UBDocumentProxy> proxy = UBPersistenceManager::persistenceManager()->createDocumentFromDir(mPath, "", name, false, false, false);
 
     if (!proxy)
@@ -303,10 +318,6 @@ std::shared_ptr<UBDocumentProxy> UBCollabSnapshotReceiver::end(UBCollabReader& r
         fail(reader, "cannot make the document");
         return nullptr;
     }
-
-    // a document of this version: its list of pages is complete, no scan needed
-    proxy->setMetaData(UBSettings::documentVersion, UBSettings::currentFileVersion);
-    UBPersistenceManager::persistenceManager()->persistDocumentMetadata(proxy, true);
 
     mFinished = true;
     return proxy;

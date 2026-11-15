@@ -1562,6 +1562,10 @@ void UBCollabDocumentSync::setLocalCurrentPage(const QUuid& page)
     if (!mRunning || page.isNull() || page == mCurrentPage)
         return;
 
+    // a page that was just added goes first, so that the others can turn to it
+    if (!mApplying)
+        scanPages();
+
     mCurrentPage = page;
     mCurrentPageVersion = nextVersion();
 
@@ -1848,7 +1852,8 @@ bool UBCollabDocumentSync::readPageContent(UBCollabReader& reader, bool authorit
         return true;
     }
 
-    std::shared_ptr<UBGraphicsScene> scene = pageIndex(reg.uuid) >= 0 ? sceneForPage(reg.uuid) : createPage(reg.uuid, page.reg);
+    const bool created = pageIndex(reg.uuid) < 0;
+    std::shared_ptr<UBGraphicsScene> scene = created ? createPage(reg.uuid, page.reg) : sceneForPage(reg.uuid);
 
     if (!scene)
     {
@@ -1924,6 +1929,11 @@ bool UBCollabDocumentSync::readPageContent(UBCollabReader& reader, bool authorit
 
     pageModified(reg.uuid, scene);
     reconcilePages(shownBefore);
+
+    // the group may have turned to this page before it was here
+    if (created && reg.uuid == mCurrentPage)
+        emit remoteCurrentPage(mCurrentPage);
+
     return ok;
 }
 
