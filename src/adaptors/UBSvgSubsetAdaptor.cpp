@@ -1215,6 +1215,33 @@ void UBSvgSubsetAdaptor::persistScene(std::shared_ptr<UBDocumentProxy> proxy, st
     writer.persistScene(proxy, pageId);
 }
 
+QByteArray UBSvgSubsetAdaptor::sceneToSvg(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene)
+{
+    UBSvgSubsetWriter writer(proxy, pScene, -1);
+    return writer.writeScene(proxy, pScene->items());
+}
+
+QByteArray UBSvgSubsetAdaptor::itemsToSvg(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene, const QList<QGraphicsItem*>& items)
+{
+    // the items with everything they contain, as the scene lists them for a whole page
+    QList<QGraphicsItem*> all;
+    QList<QGraphicsItem*> pending = items;
+
+    while (!pending.isEmpty())
+    {
+        QGraphicsItem* item = pending.takeFirst();
+
+        if (item && !all.contains(item))
+        {
+            all << item;
+            pending << item->childItems();
+        }
+    }
+
+    UBSvgSubsetWriter writer(proxy, pScene, -1);
+    return writer.writeScene(proxy, all);
+}
+
 
 UBSvgSubsetAdaptor::UBSvgSubsetWriter::UBSvgSubsetWriter(std::shared_ptr<UBDocumentProxy> proxy, std::shared_ptr<UBGraphicsScene> pScene, const int pageId)
     : mScene(pScene)
@@ -1284,6 +1311,24 @@ bool UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistScene(std::shared_ptr<UBDocum
 {
     Q_UNUSED(pageId);
 
+    const QByteArray data = writeScene(proxy, mScene->items());
+    QString fileName = mDocumentPath + UBPersistenceManager::persistenceManager()->sceneFilenameForId(mPageId);
+    QFile file(fileName);
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    {
+        qCritical() << "cannot open " << fileName << " for writing. Error : " << file.errorString();
+        return false;
+    }
+    file.write(data);
+    file.flush();
+    file.close();
+
+    return true;
+}
+
+QByteArray UBSvgSubsetAdaptor::UBSvgSubsetWriter::writeScene(std::shared_ptr<UBDocumentProxy> proxy, QList<QGraphicsItem*> items)
+{
     //Creating dom structure to store information
     QDomDocument groupDomDocument;
     QDomElement groupRoot = groupDomDocument.createElement(tGroups);
@@ -1307,9 +1352,6 @@ bool UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistScene(std::shared_ptr<UBDocum
     {
         mScene->background()->toXml(mXmlWriter);
     }
-
-    // Get the items from the scene
-    QList<QGraphicsItem*> items = mScene->items();
 
     std::sort(items.begin(), items.end(), itemZIndexComp);
 
@@ -1588,19 +1630,8 @@ bool UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistScene(std::shared_ptr<UBDocum
     }
 
     mXmlWriter.writeEndDocument();
-    QString fileName = mDocumentPath + UBPersistenceManager::persistenceManager()->sceneFilenameForId(mPageId);
-    QFile file(fileName);
 
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
-    {
-        qCritical() << "cannot open " << fileName << " for writing. Error : " << file.errorString();
-        return false;
-    }
-    file.write(buffer.data());
-    file.flush();
-    file.close();
-
-    return true;
+    return buffer.data();
 }
 
 void UBSvgSubsetAdaptor::UBSvgSubsetWriter::persistGroupToDom(QGraphicsItem *groupItem, QDomElement *curParent, QDomDocument *groupDomDocument)

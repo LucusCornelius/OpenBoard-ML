@@ -10,6 +10,14 @@ SOURCES      += src/collab/UBCollabRelayChannel.cpp
 
 # the shared board: what is sent about a board, and the interface of a session
 
-HEADERS      +=
+HEADERS      += src/collab/UBCollabItems.h \
+                src/collab/UBCollabLoopbackChannel.h \
+                src/collab/UBCollabProtocol.h \
+                src/collab/UBCollabSvgFilter.h \
+                src/collab/UBCollabWire.h
 
-SOURCES      +=
+SOURCES      += src/collab/UBCollabItems.cpp \
+                src/collab/UBCollabLoopbackChannel.cpp \
+                src/collab/UBCollabProtocol.cpp \
+                src/collab/UBCollabSvgFilter.cpp \
+                src/collab/UBCollabWire.cpp
