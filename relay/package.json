@@ -1,0 +1,14 @@
+{
+  "name": "openboard-ml-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Relay for shared OpenBoard-ML sessions: a Cloudflare Worker with one Durable Object per session",
+  "license": "GPL-3.0-only",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.162.0"
+  }
+}
