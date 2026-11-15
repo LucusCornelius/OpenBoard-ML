@@ -857,15 +857,18 @@ QString UBCollabSvgFilter::cleanTextHtml(const QString& html)
     QString clean = html;
     clean.remove(image);
     clean.remove(link);
-    clean.replace(url, "url-blocked(");
 
-    // nothing can be laid out without a graphical application, and nothing is shown either
+    // no text can be read without a graphical application (and none is shown): the coarse pattern,
+    // which also changes these letters where they are words of the text
     if (!qobject_cast<QGuiApplication*>(QCoreApplication::instance()))
+    {
+        clean.replace(url, "url-blocked(");
         return clean;
+    }
 
-    // the patterns above do not see what is written with character references or escapes, nor a
-    // background attribute or an imported style sheet: the text is read the way the text item will
-    // read it, and whatever it asks for is counted instead of fetched
+    // patterns do not see what is written with character references or escapes, nor a background
+    // attribute or an imported style sheet: the text is read the way the text item will read it,
+    // and whatever it asks for is counted instead of fetched
     ProbeDocument probe;
     probe.setHtml(clean);
 
