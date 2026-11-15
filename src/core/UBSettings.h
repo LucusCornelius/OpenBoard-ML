@@ -458,6 +458,9 @@ class UBSettings : public QObject
         UBSetting* boardLineAngleGripTolerance;
         // frame around the nominal page size; off: the board has no visible limits, it can be written on everywhere
         UBSetting* boardShowPageSizeMark;
+        // the Capture tool adds the captured part of a page as strokes and items that can be edited;
+        // off: as a picture
+        UBSetting* boardCaptureAsEditableItems;
         UBSetting* historyLimit;
 
         UBSetting* libIconSize;

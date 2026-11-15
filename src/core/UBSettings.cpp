@@ -518,6 +518,7 @@ void UBSettings::init()
     boardLineAngleGrip = new UBSetting(this, "Board", "LineAngleGrip", true);
     boardLineAngleGripTolerance = new UBSetting(this, "Board", "LineAngleGripTolerance", 2.);
     boardShowPageSizeMark = new UBSetting(this, "Board", "ShowPageSizeMark", false);
+    boardCaptureAsEditableItems = new UBSetting(this, "Board", "CaptureAsEditableItems", true);
     historyLimit = new UBSetting(this, "Web", "HistoryLimit", 15);
 
     libIconSize = new UBSetting(this, "Library", "LibIconSize", defaultLibraryIconSize);

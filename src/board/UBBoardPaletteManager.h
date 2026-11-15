@@ -57,6 +57,7 @@ class UBMainWindow;
 class UBApplicationController;
 class UBStartupHintsPalette;
 class UBPageNavigationWidget;
+class UBDocumentProxy;
 
 class UBBoardPaletteManager : public QObject
 {
@@ -99,6 +100,11 @@ class UBBoardPaletteManager : public QObject
         void containerResized();
         void addItem(const QUrl& pUrl);
         void addItem(const QPixmap& pPixmap, const QPointF& p = QPointF(0.0, 0.0), qreal scale = 1.0, const QUrl& sourceUrl = QUrl());
+        /**
+         * The picture given to the last addItem() as editable copies (see UBGraphicsScene::copyItemsInRect()),
+         * added instead of the picture to the current or a new page. Takes ownership of the items.
+         */
+        void setCapturedItems(const QList<QGraphicsItem*>& items, bool capturedOnDark, std::shared_ptr<UBDocumentProxy> document);
 
         void slot_changeMainMode(UBApplicationController::MainMode);
         void slot_changeDesktopMode(bool);
@@ -114,6 +120,7 @@ class UBBoardPaletteManager : public QObject
         void connectPalettes();
         void positionFreeDisplayPalette();
         void setupDockPaletteWidgets();
+        void discardCapturedItems();
 
         QWidget* mContainer;
         UBBoardController *mBoardControler;
@@ -141,6 +148,11 @@ class UBBoardPaletteManager : public QObject
         QPixmap mPixmap;
         QPointF mPos;
         qreal mScaleFactor;
+        // editable copies of a captured part of a page, in no scene until they are added; their images
+        // and other media are files of the document they were captured in
+        QList<QGraphicsItem*> mCapturedItems;
+        bool mCapturedOnDark{false};
+        std::weak_ptr<UBDocumentProxy> mCapturedDocument;
 
         QTime mPageButtonPressedTime;
         bool mPendingPageButtonPressed;
