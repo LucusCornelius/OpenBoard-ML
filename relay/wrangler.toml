@@ -1,0 +1,21 @@
+# The relay for shared OpenBoard-ML sessions. See README.md.
+#
+# "name" becomes part of the address: https://<name>.<your-subdomain>.workers.dev
+name = "openboard-ml-relay"
+main = "relay.js"
+compatibility_date = "2026-11-01"
+
+workers_dev = true
+
+# the relay itself logs nothing; this keeps Cloudflare from storing a log of the requests too
+[observability]
+enabled = false
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# the free plan only has Durable Objects with SQLite storage
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
